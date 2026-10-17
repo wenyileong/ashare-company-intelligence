@@ -2,7 +2,7 @@
 ## Consolidated Build Plan and Data Pipeline
 
 **Current implemented release:** v2.0.3 (end state; section 18, with fixes from the first two live runs and the v2.0.2 live-run findings)  
-**Next planned release:** v2.1 (speed and polish: live-run findings 2, 7 to 11 and 16 to 18; see `CHANGELOG.md`)
+**Next planned release:** v2.1 (desktop language toggle, extraction speed, polish; see `docs/plan_v2.1.md` and the draft glossary `docs/glossary_zh_CN.md`)
 **Status:** v2.0.3 implemented and verified offline: 166 tests pass on Linux Python 3.12 (two skips), 163 against PostgreSQL 16 (five skips, three of them the SQLite-only migration fixtures), 164 on Windows CPython 3.12 under Wine (four skips) and 159 on Python 3.13 (seven skips). The company list (v2.0.1) has been confirmed live by the user (5,574 companies). The Windows installer was built and installed, used and uninstalled under Wine. The v2.0.3 changes to the live sources (CNINFO's paging limit, the Eastmoney quote-list variants and the busy-day re-catalogue) still need confirmation on a networked machine (`CHANGELOG.md`, "Still to confirm live"); the installer is unsigned because no certificate was available.
 
 > **Correction to the v0.7 status line.** v0.7 was recorded as "consolidated and verified", but its session factory returned a `sessionmaker` rather than a session, so every database operation failed. Its tests covered only pure helper functions. The defects and fixes are listed under v0.7.1 below.
