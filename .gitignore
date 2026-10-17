@@ -10,20 +10,22 @@ market_raw/
 exports/
 AShareScraper-windows.zip
 
-# Data and outputs created by running the program (never commit these)
+# Data and outputs created by running the program (never commit these).
+# Folder patterns start with / so they match only at the top level
+# (ashare/charts/ is source code and must stay tracked).
 *.db-wal
 *.db-shm
 *.db.bak-*
 pseudonym.key
 run_log.txt
-releases/
-panels/
-reports/
-charts/
-event_studies/
-selftest*/
-corpus_synthetic/
-docs/html/
+/releases/
+/panels/
+/reports/
+/charts/
+/event_studies/
+/selftest*/
+/corpus_synthetic/
+/docs/html/
 # Build outputs
 *.exe
 *.zip
