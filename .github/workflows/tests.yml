@@ -5,6 +5,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false        # let every Python version report its own result
       matrix:
         python-version: ["3.12", "3.13"]
     steps:
@@ -13,7 +14,25 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install -r requirements-dev.txt
-      - run: python -m pytest -q
+      - name: Tests
+        run: python -m pytest -q -rfE --junitxml=pytest-report.xml
+      - name: Report failing tests as annotations
+        if: failure()
+        run: |
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+          root = ET.parse("pytest-report.xml").getroot()
+          for case in root.iter("testcase"):
+              for bad in list(case.findall("failure")) + list(case.findall("error")):
+                  msg = (bad.get("message") or "").replace("\n", " ")[:300]
+                  print(f"::error title={case.get('classname')}.{case.get('name')}::{msg}")
+          PY
+      - name: Keep the test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-report-${{ matrix.python-version }}
+          path: pytest-report.xml
       - name: Parser accuracy gate
         run: |
           python -m ashare.app synthetic-corpus --out corpus_ci --fmt pdf
