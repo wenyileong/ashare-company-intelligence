@@ -220,5 +220,8 @@ def test_docs_and_citation_files_present():
     for f in ("docs/user_guide.md", "docs/methods.md", "docs/developer_guide.md", "docs/compliance.md",
               "docs/codebook.md", "CITATION.cff", "packaging/installer.nsi"):
         assert (root / f).exists(), f
+    import re
     for f in root.joinpath("docs").glob("*.md"):
-        assert "—" not in f.read_text(encoding="utf-8"), f"em dash in {f.name}"
+        # The Chinese dash in official titles (《…指引第3号——…》) is allowed; em dashes in English text are not.
+        text = re.sub(r"(?<=[\u4e00-\u9fff\d])——(?=[\u4e00-\u9fff])", "", f.read_text(encoding="utf-8"))
+        assert "—" not in text, f"em dash in {f.name}"
