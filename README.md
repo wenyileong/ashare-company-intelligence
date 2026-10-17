@@ -689,3 +689,7 @@ v1.3 adds `human_capital_observations`, `esg_observations` and `esg_ratings`. v1
 - **Timezone.** Announcement timestamps are converted with a fixed UTC+8 offset instead of `zoneinfo`, which needs the separate `tzdata` package on Windows. Without this change, disclosure cataloguing would have failed in the Windows build.
 - **Requirements.** `pandas` and `pydantic` were listed but never used, and have been removed. Development requirements are now in `requirements-dev.txt`.
 - **Error messages.** The command line now prints a one-line error, for example on a network failure, instead of a traceback. Set `ASHARE_DEBUG=1` for the full traceback.
+
+## Acknowledgements
+
+The software was designed and directed by Wen Yi Leong. Its code, tests and documentation were written with Claude (Anthropic), an AI assistant, working to the author's build plan and the findings of the author's live runs. Commits are made in the author's name; this section is the record of Claude's contribution.
