@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below. Cite a dataset built with it by its release name and database fingerprint (see the release's own CITATION.cff)."
+type: software
+title: "A-share Company Intelligence"
+abstract: "A provenance-preserving research data system for companies listed on the Shanghai and Shenzhen stock exchanges: collection from statutory disclosures, calibrated extraction, staged validation, point-in-time panels and licence-aware, optionally pseudonymised dataset releases."
+version: "2.0.2"
+date-released: 2026-10-09
+authors:
+  - family-names: "Leong"
+    given-names: "Wen Yi"
+    orcid: "https://orcid.org/0009-0005-5691-1270"
+keywords:
+  - China
+  - A-shares
+  - corporate disclosure
+  - research data
+  - point-in-time

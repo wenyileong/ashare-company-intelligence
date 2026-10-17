@@ -1,0 +1,31 @@
+__pycache__/
+.pytest_cache/
+.build-venv/
+build/
+dist/
+*.db
+raw/
+disclosures/
+market_raw/
+exports/
+AShareScraper-windows.zip
+
+# Data and outputs created by running the program (never commit these)
+*.db-wal
+*.db-shm
+*.db.bak-*
+pseudonym.key
+run_log.txt
+releases/
+panels/
+reports/
+charts/
+event_studies/
+selftest*/
+corpus_synthetic/
+docs/html/
+# Build outputs
+*.exe
+*.zip
+.venv/
+venv/

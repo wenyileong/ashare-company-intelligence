@@ -1,0 +1,20 @@
+# Runs the test suite and the parser accuracy gate on every push.
+name: tests
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m pytest -q
+      - name: Parser accuracy gate
+        run: |
+          python -m ashare.app synthetic-corpus --out corpus_ci --fmt pdf
+          python -m ashare.app evaluate-parsers --corpus corpus_ci --baseline packaging/parser_baseline.json --max-drop 1.0

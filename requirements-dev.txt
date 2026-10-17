@@ -1,0 +1,4 @@
+-r requirements.txt
+pytest>=8,<9
+reportlab>=4
+pyinstaller>=6.10,<7

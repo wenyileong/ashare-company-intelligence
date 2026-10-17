@@ -1,0 +1,46 @@
+# Builds the Windows application on GitHub's Windows runners whenever a
+# tag like v0.9.0 is pushed, or on demand from the Actions tab.
+name: build-windows
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: python -m pip install -r requirements-dev.txt
+      - name: Test
+        run: python -m pytest -q
+      - name: Parser accuracy gate
+        run: |
+          python -m ashare.app synthetic-corpus --out corpus_ci --fmt pdf
+          python -m ashare.app evaluate-parsers --corpus corpus_ci --baseline packaging/parser_baseline.json --max-drop 1.0
+      - name: Build
+        run: pyinstaller --noconfirm --clean packaging\ashare.spec --distpath dist --workpath build
+      - name: Smoke test
+        run: dist\AShareScraper\ashare-cli.exe version
+      - name: Add quick-start note and documentation
+        run: |
+          copy packaging\READ_ME_FIRST.txt dist\AShareScraper\
+          python packaging\build_docs.py dist\AShareScraper\docs
+      - name: Installer
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          $v = (dist\AShareScraper\ashare-cli.exe version).Trim()
+          & "${env:ProgramFiles(x86)}\NSIS\makensis.exe" /V2 /DVERSION=$v packaging\installer.nsi
+          Compress-Archive -Path dist\AShareScraper -DestinationPath "AShareScraper-$v-portable.zip"
+      # Signing: add the certificate as a secret and call packaging\sign.bat on
+      # the executables (before the installer step) and on the installer.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AShareScraper-windows
+          path: |
+            AShareScraper-*-setup.exe
+            AShareScraper-*-portable.zip

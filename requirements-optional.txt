@@ -1,0 +1,5 @@
+# Optional extras for source installations (not part of the Windows build)
+matplotlib>=3.8   # PNG / publication figures (ashare.charts.mpl)
+pyarrow>=15       # Parquet output in releases and panels
+psycopg[binary]>=3.1  # PostgreSQL back end (ASHARE_DB_URL)
+duckdb>=1.0           # export-duckdb
