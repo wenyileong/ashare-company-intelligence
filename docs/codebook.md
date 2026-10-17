@@ -2,7 +2,7 @@
 
 All panel variables (`ashare-cli panel-variables` lists them too). A panel's own codebook, written beside it, adds coverage by year for that panel.
 
-Identifiers: `code` (current security code), `name` (short name on the measurement date), `period` (fiscal period end or row date), `measure_date`, `cutoff` (latest publication date used).
+Identifiers: `code` (current security code), `name` (short name on the measurement date), `period` (fiscal period end or row date), `measure_date`, `cutoff` (latest publication date used), `universe_basis` (why the company is in the row: LISTING_RECORD, its listing record covers the date; REPORT_EVIDENCE, its listing record is incomplete but it published a periodic report for that year).
 
 ## revenue
 

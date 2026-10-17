@@ -615,8 +615,16 @@ def build_panel(variables_: list[str] | None = None, unit: str = "year", start: 
                 as_of: str | None = None, codes: list[str] | None = None, index_code: str | None = None,
                 boards: list[str] | None = None, exclude_financials: bool = False, min_class: str | None = None,
                 reviewed_only: bool = False, winsor: float | None = None, lags: dict[str, int] | None = None,
-                with_dates: bool = False) -> dict:
-    """Build a panel in memory; see :func:`write_panel` for files."""
+                with_dates: bool = False, universe_basis: str = "auto") -> dict:
+    """Build a panel in memory; see :func:`write_panel` for files.
+
+    ``universe_basis`` (v2.0.3, finding 4) decides which companies a row date
+    covers. ``listing``: only companies whose listing record covers the date.
+    ``auto`` (default): as ``listing``, and for yearly rows also companies
+    whose listing record is incomplete (no listing date, or delisted on an
+    unknown date) but who published a periodic report for that year;
+    ``report-evidence``: yearly rows from report evidence alone. Every row
+    says which in ``universe_basis`` (LISTING_RECORD or REPORT_EVIDENCE)."""
     _ensure()
     from .security_master import universe_at, index_members
     from .models import SessionLocal, Company
@@ -629,21 +637,40 @@ def build_panel(variables_: list[str] | None = None, unit: str = "year", start: 
         raise ValueError("unit must be year, quarter or month")
     if unit == "month":
         align = "pit"
+    universe_basis = (universe_basis or "auto").lower().replace("_", "-")
+    if universe_basis not in ("auto", "listing", "report-evidence"):
+        raise ValueError("universe_basis must be auto, listing or report-evidence")
+    if universe_basis == "report-evidence" and unit != "year":
+        raise ValueError("report evidence covers whole years only: use unit 'year', or universe basis 'listing'")
+    evidence = _report_evidence() if unit == "year" and universe_basis != "listing" else {}
     order = {"HIGH": 3, "MEDIUM": 2, "LOW": 1, "UNVALIDATED": 0}
     min_rank = order.get((min_class or "UNVALIDATED").upper(), 0)
     spec = _rows_spec(unit, start, end, align, pit_day, as_of)
     s = SessionLocal()
     try:
-        all_codes = sorted(c.security_code for c in s.query(Company))
+        companies = {c.security_code: {"name": c.short_name_cn, "board": c.board} for c in s.query(Company)}
     finally:
         s.close()
+    all_codes = sorted(companies)
     rows, dropped, max_pub = [], defaultdict(int), ""
     contexts: dict[str, dict] = {}
     for period, measure, cutoff in spec:
         if lag_days and align == "pit":
             cutoff = (date.fromisoformat(cutoff) - timedelta(days=lag_days)).isoformat()
         urep: dict = {}
-        listed = {r["current_code"]: r for r in universe_at(measure, report=urep)}
+        listed = {r["current_code"]: dict(r, universe_basis="LISTING_RECORD")
+                  for r in universe_at(measure, report=urep)}
+        if universe_basis == "report-evidence":
+            listed = {}
+        if evidence:
+            year = int(measure[:4])
+            pool = companies if universe_basis == "report-evidence" else urep.get("excluded_codes", [])
+            for code in pool:
+                pub = _evidence_for(evidence, code, year, align, cutoff)
+                if pub and code not in listed:
+                    listed[code] = {"current_code": code, "name": companies[code]["name"],
+                                    "board": companies[code]["board"], "universe_basis": "REPORT_EVIDENCE"}
+                    dropped["included_by_report_evidence"] += 1
         for k in ("excluded_no_listing_date", "excluded_delisting_date_unknown"):
             if urep.get(k):                                     # v2.0.2: reported, not silent
                 dropped[k] = max(dropped.get(k, 0), urep[k])
@@ -665,7 +692,7 @@ def build_panel(variables_: list[str] | None = None, unit: str = "year", start: 
                     dropped["financial_sector"] += 1
                     continue
             row = {"code": code, "name": u["name"], "period": period or measure, "measure_date": measure,
-                   "cutoff": "" if cutoff == "9999-12-31" else cutoff}
+                   "cutoff": "" if cutoff == "9999-12-31" else cutoff, "universe_basis": u["universe_basis"]}
             for n in names:
                 try:
                     v, pub, cls, review = VARIABLES[n].getter(ctx)
@@ -704,8 +731,87 @@ def build_panel(variables_: list[str] | None = None, unit: str = "year", start: 
     params = {"variables": names, "unit": unit, "start": start, "end": end, "align": align, "pit_day": pit_day,
               "lag_days": lag_days, "as_of": as_of, "codes": codes, "index": index_code, "boards": boards,
               "exclude_financials": exclude_financials, "min_class": min_class, "reviewed_only": reviewed_only,
-              "winsor": winsor, "lags": lags}
-    return {"rows": rows, "params": params, "max_published": max_pub or None, "dropped": dict(dropped)}
+              "winsor": winsor, "lags": lags, "universe_basis": universe_basis}
+    return {"rows": rows, "params": params, "max_published": max_pub or None, "dropped": dict(dropped),
+            "companies": len(companies), "periods": len(spec)}
+
+
+_YEAR_RE = None
+
+
+def _report_evidence() -> dict[str, dict[int, str]]:
+    """code -> {fiscal year: earliest publication date} from periodic reports
+    in the catalogue (annual, interim and quarterly reports, summaries
+    included). Publishing a report for a year shows the company was listed
+    in that year."""
+    import re
+    from .models import SessionLocal, Company, Disclosure
+    global _YEAR_RE
+    _YEAR_RE = _YEAR_RE or re.compile(r"((?:19|20)\d{2})\s*年")
+    s = SessionLocal()
+    out: dict[str, dict[int, str]] = defaultdict(dict)
+    try:
+        codes = {c.id: c.security_code for c in s.query(Company)}
+        q = s.query(Disclosure.company_id, Disclosure.title_cn, Disclosure.announcement_date).filter(
+            Disclosure.kind.like("annual_report%") | Disclosure.kind.like("interim_report%")
+            | Disclosure.kind.like("quarterly_report%"))
+        for cid, title, pub in q:
+            m = _YEAR_RE.search(title or "")
+            code = codes.get(cid)
+            if not m or not code or not pub:
+                continue
+            y = int(m.group(1))
+            if y not in out[code] or pub < out[code][y]:
+                out[code][y] = pub
+    finally:
+        s.close()
+    return out
+
+
+def _evidence_for(evidence, code, year, align, cutoff) -> str | None:
+    """Publication date of a report showing ``code`` was listed in ``year``
+    (and, for point-in-time rows, published by the cut-off), else None."""
+    e = evidence.get(code) or {}
+    if align == "fiscal":
+        return e.get(year)
+    for y in (year, year - 1):              # pit: a report for this year, or last year's published this year
+        pub = e.get(y)
+        if pub and pub <= cutoff and (y == year or pub[:4] == str(year)):
+            return pub
+    return None
+
+
+def empty_reason(result: dict) -> str:
+    """Why a panel has no rows, and what to do (finding 4)."""
+    d, p = result.get("dropped") or {}, result.get("params") or {}
+    if not result.get("companies"):
+        return ("the company list is empty. Run 'Update the company list' (ashare-cli update-universe) first.")
+    if not result.get("periods"):
+        return (f"no row dates between {p.get('start')} and {p.get('end')} for unit '{p.get('unit')}'"
+                + (f" and as-of {p['as_of']}" if p.get("as_of") else "") + ". Check the start, end and as-of dates.")
+    missing = d.get("excluded_no_listing_date", 0) + d.get("excluded_delisting_date_unknown", 0)
+    if missing and missing >= result["companies"] * 0.5:
+        msg = (f"{d.get('excluded_no_listing_date', 0):,} companies have no listing date (and "
+               f"{d.get('excluded_delisting_date_unknown', 0):,} were delisted on an unknown date), so no company "
+               "is known to have been listed on the row dates. Listing dates come from the public quote list "
+               "when the company list is updated; if that failed, run 'Diagnose the quote list' "
+               "(ashare-cli diagnose-quote-list), then 'Update the company list' again.")
+        if p.get("unit") == "year" and p.get("universe_basis") != "listing":
+            msg += (" For yearly panels the report-evidence fallback found no periodic reports for these years "
+                    "either: catalogue the reports first (catalogue-disclosures --kind reports).")
+        elif p.get("unit") == "year":
+            msg += " For yearly panels, '--universe-basis auto' counts companies that published a report that year."
+        else:
+            msg += " Alternatively build a yearly panel, which can use report evidence (--unit year)."
+        return msg
+    filters = [k for k in ("codes", "index", "boards") if p.get(k)]
+    if filters:
+        return (f"no company passes the filters ({', '.join(filters)}) on the row dates; widen them, or check the "
+                "codes and board names (universe-at shows who was listed on a date).")
+    if d.get("financial_sector"):
+        return "every company was dropped as financial (--exclude-financials)."
+    return ("no company was listed on any row date (universe-at shows who was listed on a date). Check the dates "
+            "and that the company list has listing dates (validate-universe).")
 
 
 def coverage(rows: list[dict], names: list[str]) -> dict[str, dict]:
@@ -740,7 +846,9 @@ def codebook_markdown(entries: list[dict], params: dict | None = None) -> str:
                                                                                                      False)), ""]
     lines += ["Identifiers: `code` (current security code), `name` (short name on the measurement date), "
               "`period` (fiscal period end or row date), `measure_date`, `cutoff` (latest publication date "
-              "used).", ""]
+              "used), `universe_basis` (why the company is in the row: LISTING_RECORD, its listing record covers "
+              "the date; REPORT_EVIDENCE, its listing record is incomplete but it published a periodic report for "
+              "that year).", ""]
     for e in entries:
         lines += [f"## {e['name']}", "", f"*{e['label']}* ({e['unit']}; {e['group']})", "",
                   f"- Definition: {e['definition']}"]
@@ -780,8 +888,14 @@ def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def write_panel(result: dict, out_dir: str, name: str = "panel", formats: tuple[str, ...] = ("csv", "dta")) -> dict:
-    """Write the panel, a codebook, R helpers and a manifest."""
+class EmptyPanel(ValueError):
+    """A panel with no rows (v2.0.3: refused rather than written and reported as done)."""
+
+
+def write_panel(result: dict, out_dir: str, name: str = "panel", formats: tuple[str, ...] = ("csv", "dta"),
+                allow_empty: bool = False) -> dict:
+    """Write the panel, a codebook, R helpers and a manifest. A panel with no
+    rows raises :class:`EmptyPanel` with the reason, unless ``allow_empty``."""
     from .research import database_fingerprint
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -792,8 +906,10 @@ def write_panel(result: dict, out_dir: str, name: str = "panel", formats: tuple[
         for k in r:
             if k not in cols:
                 cols.append(k)
+    if not rows and not allow_empty:
+        raise EmptyPanel(empty_reason(result))
     if not cols:
-        cols = ["code", "name", "period", "measure_date", "cutoff"] + names
+        cols = ["code", "name", "period", "measure_date", "cutoff", "universe_basis"] + names
     files = []
     if "csv" in formats:
         p = out / f"{name}.csv"
@@ -810,12 +926,12 @@ def write_panel(result: dict, out_dir: str, name: str = "panel", formats: tuple[
             for c in cols:
                 v = VARIABLES.get(c)
                 kind = "character" if (v and v.unit == "TEXT") or c in ("code", "name", "period", "measure_date",
-                                                                         "cutoff") or c.endswith("__published") \
+                                                                         "cutoff", "universe_basis") or c.endswith("__published") \
                     else "double"
                 w.writerow([c, kind, v.label if v else c])
         files.append(types)
         loader = out / f"{name}_load.R"
-        spec = ", ".join(f'`{c}` = "{("c" if c in ("code", "name", "period", "measure_date", "cutoff") or c.endswith("__published") or (VARIABLES.get(c) and VARIABLES[c].unit == "TEXT") else "d")}"' for c in cols)
+        spec = ", ".join(f'`{c}` = "{("c" if c in ("code", "name", "period", "measure_date", "cutoff", "universe_basis") or c.endswith("__published") or (VARIABLES.get(c) and VARIABLES[c].unit == "TEXT") else "d")}"' for c in cols)
         loader.write_text(f'# Load the panel with readr, keeping codes as text\nlibrary(readr)\n'
                           f'{name} <- read_csv("{name}.csv", col_types = cols({spec}))\n', encoding="utf-8")
         files.append(loader)

@@ -10,7 +10,8 @@ def enrich_listing_status(info: dict | None = None) -> dict:
       delisting announcement is extracted or imported); any other company
       absent from the quote list is NOT_IN_QUOTE_LIST (suspended, or delisted
       recently).
-    The quote list is applied only when it looks complete (over 3,000 rows).
+    v2.0.3: a partial quote list is applied too (listing dates and LISTED for
+    the companies it holds); NOT_IN_QUOTE_LIST is set only from a complete list.
     """
     from .models import SessionLocal, Company
     from .universe import looks_delisted
@@ -21,7 +22,7 @@ def enrich_listing_status(info: dict | None = None) -> dict:
             info = fetch_listing_info()
         except Exception as exc:   # the universe itself is still usable
             info, note = {}, f"listing dates not fetched: {type(exc).__name__}: {exc}"
-    complete = len(info) > 3000
+    complete = getattr(info, "complete", len(info) > 3000)
     s = SessionLocal()
     counts = {"LISTED": 0, "DELISTED": 0, "NOT_IN_QUOTE_LIST": 0, "listing_dates_added": 0}
     try:
@@ -44,8 +45,11 @@ def enrich_listing_status(info: dict | None = None) -> dict:
         s.close()
     if note:
         counts["note"] = note
+    elif getattr(info, "note", None):
+        counts["note"] = info.note
     elif not complete:
-        counts["note"] = f"quote list incomplete ({len(info)} rows); statuses from names only"
+        counts["note"] = f"quote list incomplete ({len(info)} rows); 'not in the quote list' not set"
+    counts["quote_list_complete"] = bool(complete)
     return counts
 
 

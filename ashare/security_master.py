@@ -405,7 +405,8 @@ def universe_at(on: str, boards: list[str] | None = None, report: dict | None = 
     init_db()
     s = SessionLocal()
     rep = report if report is not None else {}
-    rep.update({"excluded_no_listing_date": 0, "excluded_delisting_date_unknown": 0})
+    rep.update({"excluded_no_listing_date": 0, "excluded_delisting_date_unknown": 0,
+                "excluded_codes": []})       # v2.0.3: which companies, for the report-evidence fallback
     try:
         hist = defaultdict(list)
         for h in s.query(SecurityHistory).all():
@@ -420,12 +421,14 @@ def universe_at(on: str, boards: list[str] | None = None, report: dict | None = 
                     first = min(rows, key=lambda r: r.valid_from or "")
                     if not first.valid_from:
                         rep["excluded_no_listing_date"] += 1
+                        rep["excluded_codes"].append(c.security_code)
                         continue
                 cur = next((r for r in rows if _covers(r, on)), None)
                 if cur is None or cur.listing_status != "LISTED":
                     continue
                 if not imported and "DELISTING_DATE_UNKNOWN" in (cur.basis or ""):
                     rep["excluded_delisting_date_unknown"] += 1
+                    rep["excluded_codes"].append(c.security_code)
                     continue
                 rec = {"code": cur.security_code, "current_code": c.security_code, "name": cur.short_name_cn,
                        "board": cur.board, "risk_warning": cur.risk_warning, "basis": cur.source}
@@ -433,11 +436,13 @@ def universe_at(on: str, boards: list[str] | None = None, report: dict | None = 
                 ld = normalise_date(c.listing_date)
                 if not ld:
                     rep["excluded_no_listing_date"] += 1
+                    rep["excluded_codes"].append(c.security_code)
                     continue
                 if ld > on:
                     continue
                 if c.status == "DELISTED":
                     rep["excluded_delisting_date_unknown"] += 1
+                    rep["excluded_codes"].append(c.security_code)
                     continue
                 rec = {"code": c.security_code, "current_code": c.security_code, "name": c.short_name_cn,
                        "board": c.board, "risk_warning": None, "basis": "COMPANY_RECORD (no history built)"}

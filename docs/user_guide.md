@@ -8,7 +8,7 @@ This guide covers the desktop application and the command line. The [methods doc
 
 ### Windows installer
 
-Run `AShareScraper-2.0.2-setup.exe`. It installs for the current user (no administrator rights are needed) into `%LOCALAPPDATA%\Programs\AShareScraper` and adds Start-menu entries for the application, the command line, this guide and the uninstaller. Two options are offered:
+Run `AShareScraper-2.0.3-setup.exe`. It installs for the current user (no administrator rights are needed) into `%LOCALAPPDATA%\Programs\AShareScraper` and adds Start-menu entries for the application, the command line, this guide and the uninstaller. Two options are offered:
 
 - a desktop shortcut;
 - adding the program folder to your PATH, so that `ashare-cli` runs from any command prompt.
@@ -19,7 +19,7 @@ If the installer is not code-signed, Windows SmartScreen may show "Windows prote
 
 ### Portable zip
 
-Unzip `AShareScraper-2.0.2-portable.zip` anywhere and double-click `AShareScraper.exe`. Keep the folder together: both programs need the `_internal` folder beside them.
+Unzip `AShareScraper-2.0.3-portable.zip` anywhere and double-click `AShareScraper.exe`. Keep the folder together: both programs need the `_internal` folder beside them.
 
 ### From source (any operating system)
 
@@ -148,6 +148,11 @@ Pseudonymised data are still personal information in law. Read the [compliance n
 | Extract financials | `ashare-cli extract-financials --security-code 600519` |
 | Validate everything | `ashare-cli validate-all` |
 | Company report | `ashare-cli report 600519` |
+| Catalogue the whole market (resumes by day) | `ashare-cli catalogue-disclosures --since 2026-01-01 --until 2026-10-16 --kind all --no-download-documents` |
+| Days catalogued, with shortfalls | `ashare-cli catalogue-days --kind all --problems` |
+| Re-catalogue busy days cut short by v2.0.2 | `ashare-cli recatalogue-busy-days --kind all` |
+| Check CNINFO's 3,000-result limit | `ashare-cli probe-cninfo-paging --day 2026-04-24` |
+| Why the quote list refuses requests | `ashare-cli diagnose-quote-list` |
 | Build a panel | `ashare-cli build-panel --unit year --start 2018-01-01 --as-of 2026-06-30` |
 | Event study | `ashare-cli event-study corporate_actions:CASH_DIVIDEND` |
 | Release | `ashare-cli release --pseudonymise --author "Your Name"` |
@@ -157,6 +162,36 @@ Pseudonymised data are still personal information in law. Read the [compliance n
 
 To run the daily update automatically on weekdays, use **Operations** › Schedule, or `ashare-cli schedule --enable --at 18:30` (Windows Task Scheduler; elsewhere the command prints a cron line). Scheduling is never switched on without your action.
 
+### The whole-market catalogue (v2.0.3)
+
+Without a security code, "Catalogue announcements" works on the whole market:
+
+- **One query per period.** CNINFO is asked once per period for the whole market, not once per exchange.
+- **Busy days.** CNINFO returns at most 3,000 announcements (100 pages) to one query. A day with more than that is split by announcement category, and a category still over the limit by board, until every announcement arrives.
+- **Checked counts.** For every day, the announcements stored are compared with CNINFO's own total. A day that falls short is recorded as SHORTFALL and listed at the end; it is not reported as done.
+- **Resuming.** Finished days are remembered. Running the same action again, after Stop or an error, carries on with the first unfinished day; tick "Fetch finished days again" (`--refresh`) to fetch them anyway. Today is never treated as finished, because announcements are still being published.
+- **Errors.** An error affects only the days of the period that failed. Those days are recorded as FAILED, the run carries on, and the end of the output lists them; running again retries only them. Three failed periods in a row stop the run.
+- **Earlier catalogues.** Catalogues made with v2.0.2 or earlier may be missing announcements on days with more than 3,000 (in 2026: late March, most of April and late August). "Re-catalogue busy days" (`recatalogue-busy-days`) finds those days and fetches them again; `--list` shows them first.
+
+`catalogue-days` shows each day's status (DONE, SHORTFALL, FAILED, or OPEN for today) with CNINFO's total and the number stored. For several consecutive quiet days fetched together, CNINFO gives only the total for the whole period, so the per-day total is left blank.
+
+### Listing dates and panels (v2.0.3)
+
+- **Listing dates.** These come from Eastmoney's public quote list, read during "Update the company list". If the list refuses requests, "Diagnose the quote list" (`diagnose-quote-list`) tries each way of asking (about six requests) and reports what each returned. A way that works is remembered and used first from then on. The download keeps every page fetched that day, so a run that stops part-way carries on where it stopped, and the listing dates already fetched are applied. A company is set to "not in the quote list" only from a complete list.
+- **Companies in each row.** "Build a panel" now has a setting for this (`--universe-basis`):
+  - `listing`: a company is in a row when its listing record covers the row date.
+  - `auto` (the default): as `listing`; and, for yearly rows only, a company whose listing record is incomplete (no listing date, or delisted on an unknown date) also counts as listed in a year when it published a periodic report for that year. For point-in-time rows, the report must have been published by the row's cut-off.
+  - `report-evidence`: yearly rows from report evidence alone.
+
+  The `universe_basis` column records which applies to each row: LISTING_RECORD or REPORT_EVIDENCE.
+- **Empty panels.** A panel with no rows is not written. The command says why, for example missing listing dates, filters that exclude every company, or dates that give no rows, and what to do. It then ends with an error, so the desktop shows "Last action failed".
+
+### PDF reader messages (v2.0.3)
+
+The PDF reader used for text extraction warns about unusual fonts and damaged cross-reference tables, often thousands of times in a large run. These messages are no longer printed one by one. At the end of the command, one line counts them by kind and document, and the details go to `logs/pdf_warnings_*.txt` in the data folder.
+
+The common font message ("fontTools is required ...") does not affect the text when the font declares a standard encoding, as almost all do; see `docs/font_check_v2.0.3.md`. Messages for fonts without a standard encoding are counted separately, and their documents are listed first in the details file, so that figures from them can be checked.
+
 ## 8. Updates
 
 The program contacts no update server unless you enter one under **Settings** (or set `ASHARE_UPDATE_URL`). The check then reports whether a newer version is published, with its download address and SHA-256 hash; it never downloads or installs anything itself.
@@ -164,6 +199,8 @@ The program contacts no update server unless you enter one under **Settings** (o
 ## 9. Troubleshooting
 
 - **A step returns nothing.** Check first that the company list is not empty (Getting started shows the count); almost every step works on that list. Then run the Self-test. Sources change their pages and interfaces without notice; the report says which check failed.
+- **Panels are empty, or "Update the company list" adds no listing dates.** Run "Diagnose the quote list" (`diagnose-quote-list`). If every way of asking is refused (HTTP 5xx), Eastmoney may be refusing automated requests from your network; try later or from another network. Meanwhile, yearly panels can include companies by report evidence (the default, `--universe-basis auto`, once the reports are catalogued).
+- **A catalogue reports SHORTFALL days.** Run "Re-catalogue busy days" or `catalogue-disclosures ... --retry-shortfalls`. If the same days still fall short, keep the output of `catalogue-days --problems` and `probe-cninfo-paging` and report it.
 - **"Update the company list" fails with HTTP 404.** CNINFO has moved its list. Run the Self-test and report the result; meanwhile, if you know the new address, set the environment variable `ASHARE_CNINFO_STOCK_LIST_URL` to it.
 - **"Database is locked".** Another copy of the program, or a scheduled update, is writing. Wait for it to finish.
 - **A figure looks wrong.** Open it under **Review** or with `ashare-cli trace TABLE ID`: the trace shows the document, page, raw text, extraction method and checks. Correct it there; the original is kept.

@@ -1,6 +1,21 @@
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _isolated_paths(tmp_path, monkeypatch):
+    """v2.0.3: no test writes into the working folder (database, archives, logs)."""
+    import os
+    if not os.environ.get("ASHARE_TEST_DB_URL"):
+        monkeypatch.setenv("ASHARE_DB", str(tmp_path / "test.db"))
+    monkeypatch.setenv("ASHARE_RAW_DIR", str(tmp_path / "raw"))
+    monkeypatch.setenv("ASHARE_DISCLOSURE_DIR", str(tmp_path / "disclosures"))
+    monkeypatch.setenv("ASHARE_MARKET_RAW_DIR", str(tmp_path / "market_raw"))
+    monkeypatch.setenv("ASHARE_LOG_DIR", str(tmp_path / "logs"))
+    yield
+    from ashare.models import reset_init_cache
+    reset_init_cache()
+
+
 @pytest.fixture
 def db(tmp_path, monkeypatch):
     """Isolated database and archive directories for integration tests."""

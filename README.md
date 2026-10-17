@@ -1,6 +1,16 @@
-# China A-share Company Intelligence v2.0.2
+# China A-share Company Intelligence v2.0.3
 
-A provenance-preserving research data system for SSE Main Board, STAR Market, SZSE Main Board and ChiNext companies. The architecture is set out in `ashare_scraper_build_plan.md`.
+A provenance-preserving research data system for SSE Main Board, STAR Market, SZSE Main Board and ChiNext companies. The architecture is set out in `ashare_scraper_build_plan.md`. Changes by version, and the findings behind them, are in `CHANGELOG.md`; the live-run findings are in `docs/live_run_findings_v2.0.2.md`.
+
+v2.0.3 makes the **whole-market catalogue complete and resumable**, and **panels no longer silently empty** (live-run findings 1, 3 to 6, 12 to 15):
+
+- **Busy days.** CNINFO appears to return at most 3,000 announcements (100 pages) to one query, so v2.0.2 lost announcements on days with more, and then paged on to 2,000 pages. Paging now stops when a page brings nothing new. A day over the limit is split by announcement category (and a category over it by board). Each day's stored count is checked against CNINFO's total, and a gap is recorded and reported as SHORTFALL rather than passing as done. `recatalogue-busy-days` fetches again the days earlier versions cut short; `probe-cninfo-paging` checks the limit directly (pages 1, 100, 101 and 150 of 24 April 2026; four requests).
+- **One query, resume, errors per day.** One market-wide query per period instead of one per exchange (CNINFO ignored the exchange, so v2.0.2 fetched everything twice). Finished days are recorded (`catalogue_days`, migration 0003), so a rerun after Stop or an error carries on with the first unfinished day. An error marks only that period's days as FAILED, the run continues, and the failed days are listed; `catalogue-days` shows each day's status. Progress lines now appear within a busy day as well as within long queries.
+- **Quote list and panels.** The Eastmoney quote list (listing dates) refused every request in the live runs. It is now tried in several ways (other host names, a browser's Referer, http, a smaller page size), always with the program's own user agent, and the way that works is remembered. `diagnose-quote-list` reports what each way returned. The download is resumable and a partial list is applied. "Build a panel" refuses to write a panel with no rows and says why and what to do. For yearly panels, a company with an incomplete listing record counts as listed in a year when it published a periodic report for that year; such rows are marked `universe_basis = REPORT_EVIDENCE`.
+- **PDF reader messages.** The flood of pypdf warnings (2.1 MB of a 2.2 MB log) is now one summary line per command, with details in `logs/`. The fontTools font warning was checked against an embedded CFF font: figures are not lost when the font declares a standard encoding, as 2,408 of the 2,428 live warnings did, so fontTools is not bundled (`docs/font_check_v2.0.3.md`).
+- **Desktop.** An action that ended with an error code (a refused panel, failed catalogue days) was shown as finished; it is now shown as failed. The new commands are on the Disclosures and Universe pages.
+
+Live confirmation is still needed for the paging limit, the quote-list variants and the re-catalogue (see `CHANGELOG.md`, "Still to confirm live").
 
 v2.0.2 fixes what the **second live run** found:
 
@@ -203,8 +213,8 @@ v1.0 completed the integrated company-intelligence layer (build plan, section 11
 
 ### Ready-built programs
 
-- `AShareScraper-2.0.2-setup.exe` installs both programs (desktop and command line) and the documentation for the current user. No administrator rights and no Python are needed.
-- `AShareScraper-2.0.2-portable.zip` holds the same folder without the command line, and `ashare-cli-2.0.2-portable-addon.zip` adds `ashare-cli.exe` (unzip both into the same place; they share the `_internal` folder). Run `AShareScraper\AShareScraper.exe`. The portable copy is split only to keep each download under 30 MB; the installer contains both programs.
+- `AShareScraper-2.0.3-setup.exe` installs both programs (desktop and command line) and the documentation for the current user. No administrator rights and no Python are needed.
+- `AShareScraper-2.0.3-portable.zip` holds the same folder without the command line, and `ashare-cli-2.0.3-portable-addon.zip` adds `ashare-cli.exe` (unzip both into the same place; they share the `_internal` folder). Run `AShareScraper\AShareScraper.exe`. The portable copy is split only to keep each download under 30 MB; the installer contains both programs.
 
 The build was produced with Windows CPython 3.12 and PyInstaller. It passed the full test suite on Windows Python, and both executables were exercised end to end before release. It is unsigned: Windows SmartScreen may show "Windows protected your PC", in which case choose **More info → Run anyway**. Some antivirus products are wary of unsigned PyInstaller programs; if yours quarantines it, rebuild it locally as below, or sign it (see `docs/developer_guide.md`).
 

@@ -971,6 +971,29 @@ class HighWaterMark(Base):
     __table_args__ = (UniqueConstraint("source", "scope", "kind", name="uq_high_water_mark"),)
 
 
+class CatalogueDay(Base):
+    """v2.0.3: one row per announcement kind and calendar day of the
+    market-wide catalogue, so that a rerun resumes and every shortfall or
+    failure is recorded against the exact day.
+
+    status: DONE (everything CNINFO reported was stored), SHORTFALL (fewer
+    stored than CNINFO's total, even after splitting the day), FAILED (an
+    error; retried on the next run)."""
+    __tablename__ = "catalogue_days"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    kind: Mapped[str] = mapped_column(String(40))
+    day: Mapped[str] = mapped_column(String(10), index=True)
+    status: Mapped[str] = mapped_column(String(12))
+    expected: Mapped[int | None] = mapped_column(Integer)      # CNINFO's total for this day (single-day queries)
+    stored: Mapped[int | None] = mapped_column(Integer)        # distinct announcements received for this day
+    window: Mapped[str | None] = mapped_column(String(25))     # the query window that covered the day
+    method: Mapped[str | None] = mapped_column(String(60))     # WINDOW / DAY / CATEGORY_SPLIT / PLATE_SPLIT
+    queries: Mapped[int | None] = mapped_column(Integer)
+    error: Mapped[str | None] = mapped_column(Text)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime)
+    __table_args__ = (UniqueConstraint("kind", "day", name="uq_catalogue_day"),)
+
+
 class Source(Base):
     __tablename__ = "sources"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

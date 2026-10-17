@@ -72,6 +72,9 @@ SECTIONS = [
            "Downloads CNINFO's official stock lists (about 5,000 companies). Takes under a minute."),
          A("Check the company list", "validate-universe", [], "Confirms each code matches its exchange and board."),
          A("Count by board", "universe-stats"),
+         A("Diagnose the quote list", "diagnose-quote-list", [],
+           "Listing dates come from Eastmoney's public quote list. If 'Update the company list' reports no listing "
+           "dates, this tries each way of asking (about six requests) and says which works and what to do."),
          A("Look up a company", "show-company", [CODE_REQ]),
          A("Read listing events from announcements", "extract-listing-events", [CODE_OPT()],
            "IPOs, delistings, and name, code and board changes, from catalogued announcements (use kind 'all')."),
@@ -123,12 +126,32 @@ SECTIONS = [
              F("until", "To", "date", TODAY, "--until", required=True),
              F("kind", "Type", "choice:" + KINDS, "reports", "--kind",
                "'reports' = periodic reports. Use 'all' before extracting regulatory events."),
-             CODE_OPT("Blank = whole market: exchange-wide queries, a few hundred requests."),
+             CODE_OPT("Blank = whole market: one market-wide query per period, busy days split so that nothing "
+                      "is cut off."),
              F("download", "Download documents", "bool", True, ("--download-documents", "--no-download-documents"),
                "For the whole market this is many hours; untick it to catalogue first, then use 'Download "
                "catalogued documents' for the kinds you need."),
+             F("refresh", "Fetch finished days again", "bool", False, ("--refresh", None),
+               "Whole market: by default days already finished are skipped, so a rerun carries on where the last "
+               "one stopped. Tick to fetch them again."),
          ], "Start with one company to check the connection, then widen. Progress appears below as it runs, and "
-            "Stop ends it safely; running it again resumes."),
+            "Stop ends it safely; running it again carries on from the first unfinished day. Each day's count is "
+            "checked against CNINFO's total, and days that fall short or fail are listed at the end."),
+         A("Re-catalogue busy days", "recatalogue-busy-days", [
+             F("kind", "Type", "choice:" + KINDS, "all", "--kind"),
+             F("since", "From", "date", "", "--since", "Optional"),
+             F("until", "To", "date", "", "--until", "Optional")],
+           "Fetches again the days that earlier versions cut short at 3,000 announcements (in 2026: late March, "
+           "most of April, late August), and any day recorded as short or failed. Each day is split by category "
+           "so that every announcement arrives."),
+         A("Which days are catalogued", "catalogue-days", [
+             F("kind", "Type", "choice:" + KINDS, "all", "--kind"),
+             F("problems", "Only days not complete", "bool", True, ("--problems", None))],
+           "Each day's status (DONE, SHORTFALL, FAILED, OPEN for today), with CNINFO's total and the number stored."),
+         A("Check CNINFO's paging limit", "probe-cninfo-paging", [
+             F("day", "Busy day", "date", "2026-04-24", "--day")],
+           "Four requests: reads pages 1, 100, 101 and 150 of a busy day to see whether one query stops at 3,000 "
+           "results. Keep the output for the record."),
          A("Download catalogued documents", "download-documents", [
              F("kinds", "Kinds", "choice:annual_report;annual_report,interim_report;"
                "annual_report,interim_report,quarterly_report;sustainability_report", "annual_report", "--kinds"),
@@ -380,9 +403,13 @@ SECTIONS = [
              F("exclude_financials", "Exclude financial firms", "bool", False, ("--exclude-financials", None)),
              F("formats", "Formats", "choice:csv,dta;csv;csv,dta,parquet", "csv,dta", "--formats",
                "dta = Stata; parquet needs pyarrow"),
+             F("universe_basis", "Companies in each row", "choice:auto,listing,report-evidence", "auto",
+               "--universe-basis", "auto = listed on the date by its listing record, or (yearly rows) published a "
+               "report for that year; marked in the universe_basis column"),
              F("name", "Name", "text", "panel", "--name")],
            "Writes to the panels folder: the data, a codebook (Markdown and HTML), R loader and a manifest. Opens the "
-           "explorer when done.", after="explore"),
+           "explorer when done. A panel with no rows is not written; the output says why and what to do.",
+           after="explore"),
          A("List panel variables", "panel-variables", [
              F("group", "Group", "choice:,financial,derived,ratio,market,governance,human_capital,segments,"
                "ownership,index,listing,industry,regulatory", "", "--group")]),
@@ -670,7 +697,9 @@ def run_command(argv: list[str], stream=None) -> tuple[int, str]:
     code = 0
     with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
         try:
-            app(argv, standalone_mode=False)
+            rv = app(argv, standalone_mode=False)
+            if isinstance(rv, int) and not isinstance(rv, bool):    # typer.Exit(code) returns its code here
+                code = rv
         except SystemExit as exc:
             code = exc.code if isinstance(exc.code, int) else 1
         except Cancelled as exc:

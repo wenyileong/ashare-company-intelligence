@@ -69,7 +69,7 @@ app = typer.Typer(help="China A-share company research data collector", pretty_e
 
 # Commands that work on the company list and do nothing useful without it.
 _NEEDS_UNIVERSE = {
-    "catalogue-disclosures", "download-documents", "acquire-market", "daily-update", "job-create", "extract-financials",
+    "catalogue-disclosures", "recatalogue-busy-days", "download-documents", "acquire-market", "daily-update", "job-create", "extract-financials",
     "extract-corporate-actions", "extract-regulatory-events", "extract-management", "extract-segments",
     "extract-subsidiaries", "extract-human-capital", "extract-esg", "extract-top-holders", "extract-control",
     "extract-pledges", "extract-transactions", "extract-listing-events", "build-panel", "market-snapshots",
@@ -92,6 +92,9 @@ def _progress(text: str) -> None:
 @app.callback()
 def _before(ctx: typer.Context):
     """China A-share company research data collector."""
+    from . import pdfwarnings                     # v2.0.3: one summary line instead of a flood (finding 5)
+    pdfwarnings.install()
+    ctx.call_on_close(lambda: pdfwarnings.finish(ctx.invoked_subcommand or "", _progress))
     if ctx.invoked_subcommand in _NEEDS_UNIVERSE:
         try:
             from sqlalchemy import func
@@ -136,6 +139,10 @@ def update_universe_cmd(
         if odd:
             print(f"  unrecognised codes: {', '.join(odd[:20])}")
     st = result.get("status") or {}
+    if st and not st.get("LISTED") and not st.get("quote_list_complete", True):    # finding 12
+        print(f"Status: could not be determined from the quote list ({st.get('DELISTED', 0)} delisted, recognised "
+              "by name). " + (f"Note: {st['note']}" if st.get("note") else ""))
+        return
     print(f"Status: {st.get('LISTED', 0)} listed, {st.get('DELISTED', 0)} delisted (by name), "
           f"{st.get('NOT_IN_QUOTE_LIST', 0)} not in the quote list; {st.get('listing_dates_added', 0)} listing dates "
           "added." + (f" Note: {st['note']}" if st.get("note") else ""))
@@ -212,21 +219,115 @@ def catalogue_disclosures_cmd(
     max_pages: int = typer.Option(10000, help="Maximum pages per company"),
     per_company: bool = typer.Option(False, "--per-company", help="Whole market: query each company "
                                                                   "separately (slow; the v2.0 method)"),
+    refresh: bool = typer.Option(False, "--refresh", help="Whole market: fetch again days already finished "
+                                                          "(by default a rerun carries on where the last one stopped)"),
+    retry_shortfalls: bool = typer.Option(False, "--retry-shortfalls",
+                                          help="Whole market: fetch again days recorded as short of CNINFO's total"),
 ):
-    """Catalogue announcements from CNINFO for one company or the whole market, optionally downloading documents."""
+    """Catalogue announcements from CNINFO for one company or the whole market, optionally downloading documents.
+
+    Whole market (v2.0.3): one market-wide query per window; busy days are split so that every announcement
+    arrives; each day's count is checked against CNINFO's total; finished days are remembered, so running the
+    same action again carries on from the first unfinished day."""
     init_db()
     print(f"[cyan]Cataloguing CNINFO disclosures: {since} to {until}, kind={kind}...[/cyan]")
     result = catalogue_disclosures(
         since=since, until=until, kind=kind, security_code=security_code,
         download_documents=download_documents, max_pages=max_pages, progress=_progress,
-        mode="company" if per_company else "auto",
+        mode="company" if per_company else "auto", refresh=refresh, retry_shortfalls=retry_shortfalls,
     )
+    _report_catalogue(result)
+
+
+def _report_catalogue(result: dict) -> None:
     errors = result.pop("errors", [])
+    shortfalls = result.pop("days_shortfall", [])
+    failed = result.pop("days_failed", [])
     print(result)
-    if errors:
+    if shortfalls:
+        print(f"[red]{len(shortfalls)} day(s) are short of CNINFO's total (recorded as SHORTFALL):[/red]")
+        for s in shortfalls[:30]:
+            print(f"  {s['day']}: {s['stored']:,} of {s['expected']:,}")
+        print("Run again with --retry-shortfalls (or 'Re-catalogue busy days') to try these days again; if the gap "
+              "remains, please report it with the log.")
+    if failed:
+        print(f"[red]{len(failed)} day(s) failed: {', '.join(failed[:40])}{' ...' if len(failed) > 40 else ''}[/red]")
+        print("Run the same action again to retry only these days.")
+    elif errors:
         print(f"[yellow]Errors: {len(errors)} (run the same action again to retry)[/yellow]")
         for error in errors[:20]:
             print(error)
+    if failed or shortfalls or result.get("stopped_early"):
+        raise typer.Exit(code=1)
+
+
+@app.command("diagnose-quote-list")
+def diagnose_quote_list_cmd():
+    """Why the public quote list (listing dates, daily snapshot) refuses requests: tries each request variant once
+    (about six requests) and reports what each returned (finding 4)."""
+    from .quotelist import diagnose
+    r = diagnose()
+    for e in r["results"]:
+        if e.get("ok"):
+            print(f"  [green]{e['variant']}: answered[/green], {e['total']:,} securities; e.g. {e['sample']}")
+        else:
+            print(f"  [red]{e['variant']}: {e['error']}[/red]")
+    print(r["verdict"])
+    if not r["working"]:
+        raise typer.Exit(code=1)
+
+
+@app.command("recatalogue-busy-days")
+def recatalogue_busy_days_cmd(
+    kind: str = typer.Option("all", help="Kind of announcement, as in catalogue-disclosures"),
+    since: str = typer.Option(None, help="Only days from this date (YYYY-MM-DD)"),
+    until: str = typer.Option(None, help="Only days up to this date (YYYY-MM-DD)"),
+    threshold: int = typer.Option(2500, help="Days catalogued before v2.0.3 with at least this many stored "
+                                             "announcements count as busy"),
+    list_only: bool = typer.Option(False, "--list", help="Only list the days, do not fetch"),
+):
+    """Fetch again the busy days that earlier versions cut short at 3,000 announcements (finding 6).
+
+    Busy days are days recorded as SHORTFALL or FAILED, and days catalogued before v2.0.3 whose stored
+    announcements reach the threshold (in the 2026 runs: late March, most of April, late August)."""
+    from .market_catalogue import busy_days, recatalogue_busy_days
+    init_db()
+    if list_only:
+        days = busy_days(kind, since, until, threshold)
+        print(f"{len(days)} busy day(s): {', '.join(days) if days else 'none'}")
+        return
+    _report_catalogue(recatalogue_busy_days(kind, since, until, threshold, progress=_progress))
+
+
+@app.command("catalogue-days")
+def catalogue_days_cmd(kind: str = typer.Option("all"), since: str = typer.Option(None),
+                       until: str = typer.Option(None),
+                       problems: bool = typer.Option(False, "--problems", help="Only days not complete")):
+    """Which days the market-wide catalogue has finished, with stored and expected counts."""
+    from collections import Counter
+    from .market_catalogue import day_status
+    init_db()
+    rows = day_status(kind, since, until)
+    print("Status: " + (", ".join(f"{k} {v}" for k, v in sorted(Counter(r["status"] for r in rows).items()))
+                        or "no days recorded yet"))
+    if problems:
+        rows = [r for r in rows if r["status"] not in ("DONE",)]
+    _table(rows, ["day", "status", "expected", "stored", "method", "error"])
+
+
+@app.command("probe-cninfo-paging")
+def probe_cninfo_paging_cmd(day: str = typer.Option("2026-04-24", help="A busy day (more than 3,000 "
+                                                                       "announcements)")):
+    """Check whether one CNINFO query stops at 3,000 results (4 requests; finding 6)."""
+    from .market_catalogue import probe_paging
+    r = probe_paging(day)
+    print(f"{r['day']}: CNINFO reports {r['total']:,} announcements.")
+    for p, i in r["pages"].items():
+        print(f"  page {p}: {i['items']} items, more to come: {i['has_more']}")
+    for k in ("overlap_101_with_100", "new_on_101", "new_on_150"):
+        if k in r:
+            print(f"  {k.replace('_', ' ')}: {r[k]}")
+    print(f"[bold]{r['verdict']}[/bold]: {r['explanation']}")
 
 
 @app.command("download-documents")
@@ -1456,17 +1557,32 @@ def build_panel_cmd(variables: str = typer.Option(None, help="Comma-separated (d
                     lags: str = typer.Option(None, help="e.g. roa:1,ret:-1 (negative = lead)"),
                     with_dates: bool = typer.Option(False, "--with-dates", help="Add publication-date columns"),
                     formats: str = typer.Option("csv,dta", help="csv, dta, parquet"),
+                    universe_basis: str = typer.Option("auto", help="auto, listing or report-evidence: which "
+                                                       "companies a row covers (see the user guide)"),
                     out: str = typer.Option("panels", help="Output folder"), name: str = typer.Option("panel")):
-    """Build a research panel with a codebook and manifest."""
-    from .panel import build_panel, write_panel
+    """Build a research panel with a codebook and manifest.
+
+    A panel with no rows is not written: the command says why and what to do, and exits with an error."""
+    from .panel import build_panel, write_panel, EmptyPanel
     init_db()
     r = build_panel([v.strip() for v in variables.split(",")] if variables else None, unit, start, end, align,
                     pit_day, lag_days, as_of, [c.strip().zfill(6) for c in codes.split(",")] if codes else None,
                     index, [b.strip().upper() for b in boards.split(",")] if boards else None, exclude_financials,
                     min_class, reviewed_only, winsor,
-                    {k: int(v) for k, v in (x.split(":") for x in lags.split(","))} if lags else None, with_dates)
-    w = write_panel(r, out, name, tuple(f.strip() for f in formats.split(",")))
+                    {k: int(v) for k, v in (x.split(":") for x in lags.split(","))} if lags else None, with_dates,
+                    universe_basis)
+    try:
+        w = write_panel(r, out, name, tuple(f.strip() for f in formats.split(",")))
+    except EmptyPanel as exc:
+        print(f"[red]Not written: the panel has no rows, because {exc}[/red]")
+        print({"dropped": r["dropped"]} if r["dropped"] else "")
+        raise typer.Exit(code=1)
     print({k: v for k, v in w.items() if k != "files"})
+    ev = sum(1 for row in r["rows"] if row.get("universe_basis") == "REPORT_EVIDENCE")
+    if ev:
+        print(f"[yellow]{ev:,} of {len(r['rows']):,} rows include a company by report evidence (it published a "
+              "periodic report for the year, but its listing record is incomplete); they are marked "
+              "universe_basis = REPORT_EVIDENCE.[/yellow]")
     for f in w["files"]:
         print(f"Written: {f}")
 

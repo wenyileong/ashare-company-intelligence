@@ -301,7 +301,9 @@ def select_xbrl_facts(facts: list[dict], period: str | None) -> list[dict]:
 
 def _pdf_text_pages(path: Path) -> list[str]:
     from .http import document_heartbeat
+    from .pdfwarnings import set_document
     document_heartbeat(path)
+    set_document(path)
     reader = PdfReader(str(path))
     pages = []
     for page in reader.pages:

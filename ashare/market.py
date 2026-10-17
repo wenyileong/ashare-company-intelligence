@@ -239,22 +239,18 @@ EASTMONEY_LIST_FS = "m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23"   # SZSE main, ChiNext, 
 def fetch_eastmoney_snapshot(trade_date: str, page_size: int = 100, max_pages: int = 100) -> list[dict]:
     """Today's bar for every listed A-share from the public quote list (one request per 100 securities).
 
-    Run after the close: the values are the day's final prices only then. The
-    endpoint and field codes follow Eastmoney's public list API and are
-    UNVERIFIED against the live site; the self-test checks them.
-    """
-    client = RateLimitedClient(USER_AGENT, MARKET_RPS)
+    Run after the close: the values are the day's final prices only then.
+    v2.0.3: uses the quote-list variant that answers (see ``quotelist``)."""
+    from .quotelist import _Pager, QuoteListError
+    pager = _Pager("f2,f3,f4,f5,f6,f8,f12,f13,f14,f15,f16,f17,f18")
     out = []
     try:
+        size = None
         for pn in range(1, max_pages + 1):
-            params = {"pn": pn, "pz": page_size, "po": 1, "np": 1, "fltt": 2, "invt": 2, "fid": "f12",
-                      "fs": EASTMONEY_LIST_FS, "fields": "f2,f3,f4,f5,f6,f8,f12,f13,f14,f15,f16,f17,f18",
-                      "ut": "bd1d9ddb04089700cf9c27f6f7426281"}
-            payload = client.get(EASTMONEY_LIST_URL, params=params).json()
-            data = (payload or {}).get("data") or {}
-            rows = data.get("diff") or []
-            if isinstance(rows, dict):
-                rows = list(rows.values())
+            try:
+                total, rows, size = pager.page(pn, size)
+            except QuoteListError as exc:
+                raise RuntimeError(f"quote list refused page {pn}: {exc}") from None
             for r in rows:
                 close = _num(r.get("f2"))
                 if close is None:          # suspended or no trade today
@@ -267,42 +263,19 @@ def fetch_eastmoney_snapshot(trade_date: str, page_size: int = 100, max_pages: i
                             "source": "EASTMONEY_PUBLIC",
                             "raw_json": json.dumps({"provider": "EASTMONEY_PUBLIC", "endpoint": "clist", "raw_record": r},
                                                    ensure_ascii=False)})
-            total = data.get("total") or 0
-            if not rows or pn * page_size >= total:
+            if not rows or pn * size >= total:
                 break
     finally:
-        client.close()
+        pager.close()
     return out
 
 
-def fetch_listing_info(page_size: int = 100, max_pages: int = 100) -> dict[str, dict]:
+def fetch_listing_info(page_size: int = 100, max_pages: int = 100, progress=None):
     """Listing date and current name of every security in the public quote list
-    (v2.0.2; field f26 is the listing date as YYYYMMDD). About 60 requests.
-    UNVERIFIED against the live site; the self-test's quote-list check covers
-    the endpoint."""
-    client = RateLimitedClient(USER_AGENT, MARKET_RPS)
-    out: dict[str, dict] = {}
-    try:
-        for pn in range(1, max_pages + 1):
-            params = {"pn": pn, "pz": page_size, "po": 1, "np": 1, "fltt": 2, "invt": 2, "fid": "f12",
-                      "fs": EASTMONEY_LIST_FS, "fields": "f12,f14,f26", "ut": "bd1d9ddb04089700cf9c27f6f7426281"}
-            payload = client.get(EASTMONEY_LIST_URL, params=params).json()
-            data = (payload or {}).get("data") or {}
-            rows = data.get("diff") or []
-            if isinstance(rows, dict):
-                rows = list(rows.values())
-            for r in rows:
-                code = str(r.get("f12") or "").zfill(6)
-                raw = str(r.get("f26") or "").strip()
-                ld = f"{raw[:4]}-{raw[4:6]}-{raw[6:8]}" if len(raw) == 8 and raw.isdigit() and raw != "00000000" \
-                    else None
-                out[code] = {"name": r.get("f14"), "listing_date": ld}
-            total = data.get("total") or 0
-            if not rows or pn * page_size >= total:
-                break
-    finally:
-        client.close()
-    return out
+    (field f26, YYYYMMDD). v2.0.3: resumable, tries several request variants,
+    and says how complete the result is (``.complete``, ``.note``)."""
+    from .quotelist import listing_info
+    return listing_info(progress=progress)
 
 
 def persist_snapshot(bars: list[dict]) -> dict:

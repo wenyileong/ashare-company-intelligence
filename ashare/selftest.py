@@ -183,23 +183,56 @@ def check_market_day(client, today: date) -> dict:
 
 
 def check_eastmoney_list(client) -> dict:
-    """v1.9: the whole-market quote list used for daily prices."""
-    from .market import EASTMONEY_LIST_URL, EASTMONEY_LIST_FS
+    """v1.9: the whole-market quote list used for daily prices and listing dates.
+    v2.0.3: tries the request variants in turn (finding 4) and names the one that answered."""
+    from .quotelist import VARIANTS, PATH, FS, UT, _describe, _remember
     check = "eastmoney_market_list"
 
     def run():
-        params = {"pn": 1, "pz": 100, "po": 1, "np": 1, "fltt": 2, "invt": 2, "fid": "f12", "fs": EASTMONEY_LIST_FS,
-                  "fields": "f2,f5,f12,f15,f16,f17", "ut": "bd1d9ddb04089700cf9c27f6f7426281"}
-        data = (client.get(EASTMONEY_LIST_URL, params=params).json() or {}).get("data") or {}
-        rows = data.get("diff") or []
-        if isinstance(rows, dict):
-            rows = list(rows.values())
-        if not rows:
-            return _result(check, "FAIL", "response lacks data.diff")
-        if "f12" not in rows[0] or "f2" not in rows[0]:
-            return _result(check, "FAIL", f"records lack f12/f2; keys: {sorted(rows[0])[:8]}")
-        total = data.get("total") or len(rows)
-        return _result(check, "PASS" if total > 3000 else "WARN", f"{total} securities listed")
+        failures, last = [], None
+        for name, base, headers, pz in VARIANTS:
+            params = {"pn": 1, "pz": pz, "po": 1, "np": 1, "fltt": 2, "invt": 2, "fid": "f12", "fs": FS,
+                      "fields": "f2,f5,f12,f15,f16,f17,f26", "ut": UT}
+            try:
+                data = (client.get(base + PATH, params=params, headers=headers).json() or {}).get("data") or {}
+            except Exception as exc:
+                failures.append(f"{name}: {_describe(exc)}")
+                last = exc
+                if _unreachable(exc) and not isinstance(exc, httpx.HTTPStatusError):
+                    raise                       # no network at all: one variant is enough to tell
+                continue
+            rows = data.get("diff") or []
+            if isinstance(rows, dict):
+                rows = list(rows.values())
+            if not rows:
+                failures.append(f"{name}: response lacks data.diff")
+                continue
+            if "f12" not in rows[0] or "f2" not in rows[0]:
+                return _result(check, "FAIL", f"records lack f12/f2; keys: {sorted(rows[0])[:8]}")
+            if not getattr(client, "offline", False):      # canned responses prove nothing about the live site
+                _remember(name)
+            total = data.get("total") or len(rows)
+            note = f" (variant '{name}'; refused: {'; '.join(failures)})" if failures else ""
+            return _result(check, "PASS" if total > 3000 else "WARN", f"{total} securities listed{note}")
+        if all("HTTP" in f for f in failures):
+            return _result(check, "FAIL", "every request variant was refused: " + "; ".join(failures)
+                           + ". Panels by date need listing dates; see 'Diagnose the quote list'.")
+        if last is not None:
+            raise last
+        return _result(check, "FAIL", "; ".join(failures))
+    return _call(check, run)
+
+
+def check_cninfo_paging(client, day: str = "2026-04-24") -> dict:
+    """v2.0.3 (finding 6): does one market-wide query stop at 3,000 results? Four requests."""
+    from types import SimpleNamespace
+    from .market_catalogue import probe_paging
+    check = "cninfo_paging_limit"
+
+    def run():
+        r = probe_paging(day, adapter=SimpleNamespace(http=client))
+        status = {"LIMIT_CONFIRMED": "PASS", "NO_LIMIT": "PASS"}.get(r["verdict"], "WARN")
+        return _result(check, status, f"{r['verdict']}: {r['explanation']} ({r['total']:,} on {day})")
     return _call(check, run)
 
 
@@ -279,6 +312,8 @@ def run_selftest(output_dir: str | Path | None = None, offline: bool = False,
         results += check_exchange_pages(client)
         results.append(check_eastmoney(client, today))
         results.append(check_eastmoney_list(client))
+        if reached:
+            results.append(check_cninfo_paging(client))
     finally:
         client.close()
     summary = {s: sum(1 for r in results if r["status"] == s)
@@ -342,6 +377,12 @@ def fixture_handler(request: httpx.Request) -> httpx.Response:
     if url.startswith(CNINFO_QUERY_URL):
         body = dict(httpx.QueryParams(request.content.decode()))
         cat = body.get("category", "")
+        if not body.get("stock") and body.get("seDate") == "2026-04-24~2026-04-24":   # a busy day, capped
+            page = min(int(body.get("pageNum", 1)), 100)
+            ann = [{"announcementTitle": f"公告{i}", "adjunctUrl": f"finalpage/b/{i}.PDF", "secCode": "600519",
+                    "announcementTime": 1777000000000, "announcementId": f"b{i}"}
+                   for i in range((page - 1) * 30, page * 30)]
+            return httpx.Response(200, json={"announcements": ann, "totalAnnouncement": 15382, "hasMore": True})
         if not body.get("stock"):      # market-wide query
             ann = [{"announcementTitle": f"示例公告{i}", "adjunctUrl": f"finalpage/x/{i}.PDF", "secCode": f"{600000 + i}",
                     "announcementTime": 1774800000000, "announcementId": f"m{i}"} for i in range(30)]

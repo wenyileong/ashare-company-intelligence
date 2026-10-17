@@ -128,7 +128,7 @@ def test_listing_dates_status_and_point_in_time_list(db):
     s.close()
 
 
-def test_listing_info_parses_quote_list():
+def test_listing_info_parses_quote_list(db):
     from ashare.market import fetch_listing_info
 
     def handler(request):

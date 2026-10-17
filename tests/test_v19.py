@@ -26,7 +26,7 @@ def _handler(calls):
             body = dict(httpx.QueryParams(request.content.decode()))
             day = body["seDate"].split("~")[0]
             col = body["column"]
-            codes = [c for c in CODES if (c.startswith("6")) == (col == "sse")]
+            codes = list(CODES)       # v2.0.3: live CNINFO ignores the column when the stock field is empty
             if body.get("stock"):
                 codes = [body["stock"].split(",")[0]]
             ann = []
@@ -89,7 +89,7 @@ def test_daily_update_is_incremental_and_complete(db, mocked):
     assert s.query(Disclosure).count() == len(docs)
     bars = s.query(MarketBar).filter_by(trade_date="2026-03-31").count()
     s.close()
-    assert bars == len(CODES) and n_queries == 4                # 2 days × 2 exchanges
+    assert bars == len(CODES) and n_queries == 2                # v2.0.3: one market-wide query per day
     assert any(m["kind"] == "daily_snapshot" for m in marks())
 
 

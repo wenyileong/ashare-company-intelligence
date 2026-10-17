@@ -104,49 +104,22 @@ def _wants_document(title: str, kind: str, policy: tuple[str, ...]) -> bool:
 
 def catalogue_market_day(day: str, kind: str = "all", download: bool = True,
                          policy: tuple[str, ...] = DOWNLOAD_KINDS_DEFAULT) -> dict:
-    """All announcements of one day, both exchanges, matched to known companies."""
-    from .disclosures import CNInfoDisclosureAdapter, store_downloaded, classify_title, clean_title
-    from .disclosures import persist_announcement
-    adapter = CNInfoDisclosureAdapter()
-    s = SessionLocal()
-    res = {"day": day, "announcements": 0, "matched": 0, "inserted": 0, "downloaded": 0, "unknown_codes": 0,
-           "requests": 0}
-    try:
-        by_code = {c.security_code: c for c in s.query(Company)}
-        for column in ("szse", "sse"):
-            for page_no, data, raw in adapter.query_market_pages(day, day, column=column, kind=kind):
-                res["requests"] += 1
-                from .storage import store_raw
-                from .config import CNINFO_QUERY_URL
-                store_raw("CNINFO", CNINFO_QUERY_URL, raw, {"content_type": "application/json", "scope": "market",
-                                                            "column": column, "day": day, "kind": kind,
-                                                            "page_num": page_no})
-                for item in data.get("announcements") or []:
-                    res["announcements"] += 1
-                    code = str(item.get("secCode") or "").zfill(6)
-                    c = by_code.get(code)
-                    if c is None:
-                        res["unknown_codes"] += 1
-                        continue
-                    res["matched"] += 1
-                    row, created = persist_announcement(s, c, item)
-                    res["inserted"] += created
-                    title = clean_title(item.get("announcementTitle")) or ""
-                    if download and row.document_url and not (row.local_path and Path(row.local_path).exists()) \
-                            and _wants_document(title, classify_title(title), policy):
-                        store_downloaded(adapter, c, row)
-                        res["downloaded"] += 1
-                        res["requests"] += 1
-                    s.commit()
-        return res
-    finally:
-        s.close()
-        adapter.close()
+    """All announcements of one day, matched to known companies (v2.0.3: one
+    market-wide query, split if the day is busy; recorded in catalogue_days)."""
+    from .market_catalogue import catalogue
+    r = catalogue(day, day, kind, download_documents=download, refresh=True)
+    return {"day": day, "announcements": r.get("announcements", 0),
+            "matched": r.get("inserted", 0) + r.get("updated", 0), "inserted": r.get("inserted", 0),
+            "downloaded": r.get("downloaded", 0), "unknown_codes": r.get("unmatched", 0),
+            "requests": r.get("queries", 0), "shortfall": r.get("days_shortfall", []),
+            "failed": r.get("days_failed", [])}
 
 
 def _handle_catalogue_day(item_key: str, params: dict) -> dict:
     r = catalogue_market_day(item_key, params.get("kind", "all"), params.get("download", True),
                              tuple(params.get("policy") or DOWNLOAD_KINDS_DEFAULT))
+    if r.get("failed"):            # v2.0.3: the engine records failures per day; the job retries the day
+        raise RuntimeError(f"catalogue failed for {item_key}")
     set_mark("CNINFO", "*", "announcements", item_key)
     return r
 

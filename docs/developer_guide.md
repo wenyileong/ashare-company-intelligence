@@ -103,7 +103,7 @@ The `db` fixture gives each test its own database and folders; with `ASHARE_TEST
 On Windows with Python 3.10 to 3.13, run `build_windows.bat`. It creates a build environment, runs the tests, builds both executables with PyInstaller (`packaging/ashare.spec`), builds the documentation (`packaging/build_docs.py`), signs the executables if a certificate is configured (`packaging/sign.bat`), builds the installer with NSIS if it is installed (`packaging/installer.nsi`), and writes a portable zip.
 
 - **Signing.** Set `ASHARE_SIGN_CERT` (a `.pfx` file) and, if needed, `ASHARE_SIGN_PASSWORD`, or set `ASHARE_SIGN_COMMAND` for a hardware token or cloud signing service. Without these the build continues unsigned. On Linux, `packaging/sign.sh` does the same with osslsigncode.
-- **Installer.** `makensis /DVERSION=2.0.2 packaging\installer.nsi`. The installer is per-user and includes both programs and the documentation.
+- **Installer.** `makensis /DVERSION=2.0.3 packaging\installer.nsi`. The installer is per-user and includes both programs and the documentation.
 - **Documentation.** `python packaging/build_docs.py --codebook` regenerates `docs/codebook.md` from the variable registry and converts every `docs/*.md` to HTML.
 - **Update check.** Publish a JSON file (`{"version", "url", "sha256", "notes"}`) at an HTTPS address and give users that address; the program never contacts it unless configured.
 
