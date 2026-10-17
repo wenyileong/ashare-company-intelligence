@@ -444,10 +444,20 @@ def test_font_check_figures_survive_without_fonttools(monkeypatch):
     """Finding 1: with a declared standard encoding (2,408 of the 2,428 live notices), pypdf without
     fontTools extracts the figures correctly; only a font with its own non-standard encoding and no
     declared encoding loses them, and those notices are counted separately."""
+    import importlib
     import io
-    import pypdf._font
     from pypdf import PdfReader
-    monkeypatch.setattr(pypdf._font, "HAS_FONTTOOLS", False)
+    patched = 0
+    for name in ("pypdf._font", "pypdf.generic._font"):          # 6.19 and 6.21 keep the flag in different places
+        try:
+            mod = importlib.import_module(name)
+        except ImportError:
+            continue
+        if hasattr(mod, "HAS_FONTTOOLS"):
+            monkeypatch.setattr(mod, "HAS_FONTTOOLS", False)
+            patched += 1
+    if not patched:
+        pytest.skip("this pypdf version has no fontTools switch to turn off")
     text = PdfReader(io.BytesIO(_cff_pdf(False, "WinAnsiEncoding"))).pages[0].extract_text().strip()
     assert text == "1,234,567.89"
     lost = PdfReader(io.BytesIO(_cff_pdf(True, None))).pages[0].extract_text().strip()

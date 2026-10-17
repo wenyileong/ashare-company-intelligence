@@ -92,7 +92,7 @@ New commands, also in the desktop under **2 Disclosures**:
   - they are lost only for a font with a non-standard built-in encoding and no declared encoding;
   - pdfium also fails in that case.
 
-  The test `test_font_check_figures_survive_without_fonttools` keeps this as a regression check.
+  The test `test_font_check_figures_survive_without_fonttools` keeps this as a regression check. It passes with pypdf 6.19 (the Windows build) and 6.21 (what `pip` installs today, used by CI), which keeps the fontTools switch in a different module but decodes the same way.
 
 ### Fixed
 

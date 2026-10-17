@@ -6,7 +6,7 @@
 
 ## What the warning means
 
-pypdf (version 6.19 in the build) issues the warning in one situation only, for a font with all three of these properties:
+pypdf (version 6.19 in the Windows build; the logic is the same in 6.21) issues the warning in one situation only, for a font with all three of these properties:
 
 - it is a simple Type1 font;
 - its program is embedded as a compact font (`/FontFile3`, subtype `Type1C`);
