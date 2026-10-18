@@ -31,7 +31,7 @@ MARKET_RAW_DIR = market_raw_dir()
 
 USER_AGENT = os.getenv(
     "ASHARE_USER_AGENT",
-    "AshareResearchDataCollector/2.0.3 (research use; replace-contact-before-production)",
+    "AshareResearchDataCollector/2.0.4 (research use; replace-contact-before-production)",
 )
 REQUEST_TIMEOUT = float(os.getenv("ASHARE_TIMEOUT", "30"))
 REQUESTS_PER_SECOND = float(os.getenv("ASHARE_RPS", "1"))

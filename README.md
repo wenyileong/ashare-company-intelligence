@@ -1,6 +1,19 @@
-# China A-share Company Intelligence v2.0.3
+# China A-share Company Intelligence v2.0.4
 
-A provenance-preserving research data system for SSE Main Board, STAR Market, SZSE Main Board and ChiNext companies. The architecture is set out in `ashare_scraper_build_plan.md`. Changes by version, and the findings behind them, are in `CHANGELOG.md`; the live-run findings are in `docs/live_run_findings_v2.0.2.md`.
+A provenance-preserving research data system for SSE Main Board, STAR Market, SZSE Main Board and ChiNext companies. The architecture is set out in `ashare_scraper_build_plan.md`. Changes by version, and the findings behind them, are in `CHANGELOG.md`; the live-run findings are in `docs/live_run_findings_v2.0.2.md` and `docs/live_run_findings_v2.0.3.md`.
+
+v2.0.4 is a patch that **closes the catalogue gaps on the busiest disclosure days** (live-run findings 20 to 34). The first live whole-market run under v2.0.3 confirmed CNINFO's 3,000-result limit and the resume, but left 12 days short. The causes were overlapping board codes, categories still over the limit on one board at the April deadline, announcements outside the Shanghai and Shenzhen boards, and rows repeated for several securities.
+
+- **Rows, not IDs.** A row is one announcement for one security; announcements listed for several securities are counted and no longer taken for a shortfall.
+- **A general splitter.** Busy queries are split by board (disjoint codes, or whole exchanges as a fallback, Beijing included), category, industry and batches of companies, and a query with up to 6,000 results is also read in both sort orders. Which filters CNINFO supports is checked as the run goes; only those that work are used, and a split that does not reach the whole is noted against the day.
+- **Gaps by board.** Only a gap within the enabled boards makes a day short; a gap shown to lie outside them is recorded but the day is complete. A gap that cannot be placed counts as within.
+- **Smaller changes:**
+  - an early stop for a last pass after a split;
+  - re-cataloguing only with a new method;
+  - recent totals rechecked;
+  - "Finished with gaps" (exit code 3) instead of "Failed";
+  - unmatched rows counted by reason;
+  - the new command `probe-cninfo-filters`.
 
 v2.0.3 makes the **whole-market catalogue complete and resumable**, and **panels no longer silently empty** (live-run findings 1, 3 to 6, 12 to 15):
 
@@ -213,8 +226,8 @@ v1.0 completed the integrated company-intelligence layer (build plan, section 11
 
 ### Ready-built programs
 
-- `AShareScraper-2.0.3-setup.exe` installs both programs (desktop and command line) and the documentation for the current user. No administrator rights and no Python are needed.
-- `AShareScraper-2.0.3-portable.zip` holds the same folder without the command line, and `ashare-cli-2.0.3-portable-addon.zip` adds `ashare-cli.exe` (unzip both into the same place; they share the `_internal` folder). Run `AShareScraper\AShareScraper.exe`. The portable copy is split only to keep each download under 30 MB; the installer contains both programs.
+- `AShareScraper-2.0.4-setup.exe` installs both programs (desktop and command line) and the documentation for the current user. No administrator rights and no Python are needed.
+- `AShareScraper-2.0.4-portable.zip` holds the same folder without the command line, and `ashare-cli-2.0.4-portable-addon.zip` adds `ashare-cli.exe` (unzip both into the same place; they share the `_internal` folder). Run `AShareScraper\AShareScraper.exe`. The portable copy is split only to keep each download under 30 MB; the installer contains both programs.
 
 The build was produced with Windows CPython 3.12 and PyInstaller. It passed the full test suite on Windows Python, and both executables were exercised end to end before release. It is unsigned: Windows SmartScreen may show "Windows protected your PC", in which case choose **More info → Run anyway**. Some antivirus products are wary of unsigned PyInstaller programs; if yours quarantines it, rebuild it locally as below, or sign it (see `docs/developer_guide.md`).
 

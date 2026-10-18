@@ -1,9 +1,9 @@
 # A-Share Company Intelligence Scraper
 ## Consolidated Build Plan and Data Pipeline
 
-**Current implemented release:** v2.0.3 (end state; section 18, with fixes from the first two live runs and the v2.0.2 live-run findings)  
-**Next planned releases:** v2.0.4 (patch: a complete catalogue on the busiest disclosure days; `docs/plan_v2.0.4.md`), then v2.1 (desktop language toggle, extraction speed, polish; `docs/plan_v2.1.md`, with the approved glossary `docs/glossary_zh_CN.md`). See section 18.14
-**Status:** v2.0.3 implemented and verified offline: 166 tests pass on Linux Python 3.12 (two skips), 163 against PostgreSQL 16 (five skips, three of them the SQLite-only migration fixtures), 164 on Windows CPython 3.12 under Wine (four skips) and 159 on Python 3.13 (seven skips). The company list (v2.0.1) has been confirmed live by the user (5,574 companies). The Windows installer was built and installed, used and uninstalled under Wine. The v2.0.3 changes to the live sources (CNINFO's paging limit, the Eastmoney quote-list variants and the busy-day re-catalogue) still need confirmation on a networked machine (`CHANGELOG.md`, "Still to confirm live"); the installer is unsigned because no certificate was available.
+**Current implemented release:** v2.0.4 (end state; section 18, with fixes from the live runs; section 18.14)  
+**Next planned release:** v2.1 (desktop language toggle, extraction speed, polish; `docs/plan_v2.1.md`, with the approved glossary `docs/glossary_zh_CN.md`). See section 18.14
+**Status:** v2.0.4 implemented and verified offline: 184 tests pass on Linux Python 3.12 (two skips), 181 against PostgreSQL 16 (five skips, three of them the SQLite-only migration fixtures), 182 on Windows CPython 3.12 under Wine (four skips) and 176 on Python 3.13 (eight skips). Confirmed live by the user so far: the company list (5,574 companies), CNINFO's 3,000-result limit, resume by day, the quote list, and a live self-test passing all 20 checks. The finer catalogue splits of v2.0.4 still need a live run (`CHANGELOG.md`, "Still to confirm live"). The installer is unsigned because no certificate was available.
 
 > **Correction to the v0.7 status line.** v0.7 was recorded as "consolidated and verified", but its session factory returned a `sessionmaker` rather than a session, so every database operation failed. Its tests covered only pure helper functions. The defects and fixes are listed under v0.7.1 below.
 
@@ -1394,10 +1394,10 @@ The end state (v2.0) is followed by maintenance releases driven by the user's li
 | v2.0.1 | Released | First live run: CNINFO company list moved | Section 18.10 |
 | v2.0.2 | Released | Second live run: market-wide catalogue, progress and Stop, listing dates | Section 18.10; `docs/live_run_findings_v2.0.2.md` (findings 1 to 19) |
 | v2.0.3 | Released, 17 October 2026 | Catalogue complete within CNINFO's 3,000-result limit, resumable by day, errors per day; empty panels refused; warning summary | `CHANGELOG.md`; `docs/live_run_findings_v2.0.3.md` (findings 20 to 34) |
-| v2.0.4 | Planned (patch) | Close the gaps on the busiest days | `docs/plan_v2.0.4.md` |
+| v2.0.4 | Released, 18 October 2026 | Close the gaps on the busiest days: rows per security, a general splitter checked live, gaps by board | `docs/plan_v2.0.4.md`; `CHANGELOG.md` |
 | v2.1 | Planned | Chinese desktop interface, extraction speed, polish | `docs/plan_v2.1.md`; `docs/glossary_zh_CN.md` |
 
-**v2.0.4 (patch).** The first live whole-market catalogue under v2.0.3 confirmed the limit and resumption, but left 12 days short. The causes:
+**v2.0.4 (patch; released 18 October 2026).** The first live whole-market catalogue under v2.0.3 confirmed the limit and resumption, but left 12 days short. The causes:
 - overlapping board codes;
 - categories still over 3,000 on one board on the April deadline days;
 - announcements outside the Shanghai and Shenzhen boards;

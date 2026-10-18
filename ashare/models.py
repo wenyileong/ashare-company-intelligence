@@ -991,6 +991,13 @@ class CatalogueDay(Base):
     queries: Mapped[int | None] = mapped_column(Integer)
     error: Mapped[str | None] = mapped_column(Text)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # v2.0.4: rows (announcement x security), gaps by board, split notes, strategy and window total
+    rows_multi: Mapped[int | None] = mapped_column(Integer)       # rows beyond the first for one announcement
+    gap_in_scope: Mapped[int | None] = mapped_column(Integer)     # rows missing within the enabled boards
+    gap_out_scope: Mapped[int | None] = mapped_column(Integer)    # rows missing outside them (e.g. Beijing)
+    partition: Mapped[str | None] = mapped_column(String(250))    # notes on splits that did not reach the total
+    strategy: Mapped[int | None] = mapped_column(Integer)         # catalogue strategy (2 = v2.0.4)
+    window_expected: Mapped[int | None] = mapped_column(Integer)  # CNINFO's total for the window, when fetched
     __table_args__ = (UniqueConstraint("kind", "day", name="uq_catalogue_day"),)
 
 

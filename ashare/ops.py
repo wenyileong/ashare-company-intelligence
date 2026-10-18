@@ -107,7 +107,7 @@ def catalogue_market_day(day: str, kind: str = "all", download: bool = True,
     """All announcements of one day, matched to known companies (v2.0.3: one
     market-wide query, split if the day is busy; recorded in catalogue_days)."""
     from .market_catalogue import catalogue
-    r = catalogue(day, day, kind, download_documents=download, refresh=True)
+    r = catalogue(day, day, kind, download_documents=download, refresh=True, recheck=False)
     return {"day": day, "announcements": r.get("announcements", 0),
             "matched": r.get("inserted", 0) + r.get("updated", 0), "inserted": r.get("inserted", 0),
             "downloaded": r.get("downloaded", 0), "unknown_codes": r.get("unmatched", 0),
@@ -343,6 +343,18 @@ def daily_update(until: str | None = None, prices: bool = True, extract: bool = 
     since = (date.fromisoformat(mark) + timedelta(days=1)).isoformat() if mark else \
         (date.fromisoformat(until) - timedelta(days=1)).isoformat()
     out = {"since": since, "until": until}
+    if get_mark("CNINFO", "*", "recheck") != until:
+        # v2.0.4 (finding 28): CNINFO's totals can grow after the fact; recheck the last 30 finished days once
+        # a day and fetch again any whose total has grown.
+        try:
+            from .market_catalogue import recheck_recent, catalogue
+            grown = recheck_recent("all", until, progress=progress)
+            if grown:
+                out["rechecked"] = catalogue(grown[0], grown[-1], "all", days=grown, refresh=True, recheck=False,
+                                             progress=progress, download_documents=True)
+            set_mark("CNINFO", "*", "recheck", until)
+        except Exception as exc:          # never block the daily update
+            out["recheck_error"] = repr(exc)
     if since <= until:
         j = create_job("catalogue_day", {"since": since, "until": until, "kind": "all", "download": True})
         out["catalogue"] = run_job(j, progress)

@@ -1,6 +1,10 @@
 # v2.0.4 patch plan: a complete catalogue on the busiest days
 
-**Status:** planned, 18 October 2026.
+**Status:** implemented as v2.0.4, 18 October 2026 (see `CHANGELOG.md`). Departures from the plan, decided during the build:
+- the engine checks every filter as it runs, as well as the separate probe command;
+- both sort orders were added as a split;
+- the early stop applies only after a split;
+- the outcome for gaps is exit code 3, not 2, because the command-line library uses 2 for usage errors.
 **Basis:** the v2.0.3 live-run findings 20 to 34 (`docs/live_run_findings_v2.0.3.md`).
 **Aim:** close the catalogue gaps on the busiest disclosure days (late March and the April annual-report deadline), before the v2.1 work begins. This is a patch: no interface language, speed or polish work belongs here.
 
@@ -58,7 +62,7 @@ The engine uses only the split dimensions the probe confirms. It also re-checks 
    - `recatalogue-busy-days` selects shortfall days whose strategy is older than the current one, and the days earlier versions cut short.
    - A day whose gap recurs unchanged under the current strategy is not fetched again. The command says plainly that the gap is a limit of CNINFO's search, not a network error.
 7. **Recheck recent totals.** At the start of each whole-market run and in the daily update, the totals of the last 30 finished days are compared with CNINFO's current totals (about 15 queries). A day whose total has grown is fetched again.
-8. **Outcome wording.** A run that finishes with gaps ends with exit code 2 and "Finished with gaps (N days; see the list)". The desktop shows that instead of "Failed". Exit code 1 stays for errors.
+8. **Outcome wording.** A run that finishes with gaps ends with exit code 3 and "Finished with gaps (N days; see the list)". The desktop shows that instead of "Failed". Exit code 1 stays for errors.
 9. **Unmatched announcements.** The count is split by reason (Beijing, B shares, bonds and funds, unknown code), and the counting is checked against the stored rows (finding 30).
 
 ## 4. Database
@@ -91,7 +95,7 @@ New tests cover:
 - **Early stop:** the last pass stops after 5 pages with nothing new.
 - **Re-catalogue:** skips days whose gap recurred under the current strategy.
 - **Recheck:** a day whose total grew is fetched again.
-- **Exit codes:** 2 for gaps and 1 for errors, with the desktop wording.
+- **Exit codes:** 3 for gaps and 1 for errors, with the desktop wording.
 - **Probe verdicts** for each test.
 
 The full matrix runs as for v2.0.3:

@@ -240,16 +240,28 @@ def catalogue_disclosures_cmd(
 
 
 def _report_catalogue(result: dict) -> None:
+    """Print a catalogue result. Exit codes: 0 complete; 3 finished with gaps (v2.0.4: a completed run with
+    days short of CNINFO's total is not a failure); 1 failed days or a stopped run."""
     errors = result.pop("errors", [])
     shortfalls = result.pop("days_shortfall", [])
+    outside = result.pop("days_gap_outside", [])
     failed = result.pop("days_failed", [])
+    held = result.pop("held", [])
     print(result)
+    if outside:
+        print(f"{len(outside)} day(s) are complete within the enabled boards but CNINFO also lists announcements "
+              "outside them that were not reached (for example the Beijing Stock Exchange when it is off):")
+        for s in outside[:15]:
+            print(f"  {s['day']}: {s['gap_out_scope']:,} outside the enabled boards")
     if shortfalls:
-        print(f"[red]{len(shortfalls)} day(s) are short of CNINFO's total (recorded as SHORTFALL):[/red]")
+        print(f"[red]{len(shortfalls)} day(s) have a gap within the enabled boards (recorded as SHORTFALL):[/red]")
         for s in shortfalls[:30]:
-            print(f"  {s['day']}: {s['stored']:,} of {s['expected']:,}")
-        print("Run again with --retry-shortfalls (or 'Re-catalogue busy days') to try these days again; if the gap "
-              "remains, please report it with the log.")
+            extra = f", {s['gap_out_scope']:,} outside them" if s.get("gap_out_scope") else ""
+            print(f"  {s['day']}: {s['stored']:,} of {s['expected']:,} rows; "
+                  f"{s.get('gap_in_scope', s['expected'] - s['stored']):,} missing within the enabled boards{extra}")
+        print("'Which days are catalogued' (catalogue-days --problems) shows the cause recorded for each day. "
+              "Re-cataloguing only helps after a change of method; if a gap remains, please report it with "
+              "the output of probe-cninfo-filters.")
     if failed:
         print(f"[red]{len(failed)} day(s) failed: {', '.join(failed[:40])}{' ...' if len(failed) > 40 else ''}[/red]")
         print("Run the same action again to retry only these days.")
@@ -257,8 +269,11 @@ def _report_catalogue(result: dict) -> None:
         print(f"[yellow]Errors: {len(errors)} (run the same action again to retry)[/yellow]")
         for error in errors[:20]:
             print(error)
-    if failed or shortfalls or result.get("stopped_early"):
+    if failed or result.get("stopped_early"):
         raise typer.Exit(code=1)
+    if shortfalls:
+        print(f"Finished with gaps: {len(shortfalls)} day(s) short within the enabled boards.")
+        raise typer.Exit(code=3)
 
 
 @app.command("diagnose-quote-list")
@@ -285,18 +300,23 @@ def recatalogue_busy_days_cmd(
     threshold: int = typer.Option(2500, help="Days catalogued before v2.0.3 with at least this many stored "
                                              "announcements count as busy"),
     list_only: bool = typer.Option(False, "--list", help="Only list the days, do not fetch"),
+    include_current: bool = typer.Option(False, "--include-current",
+                                         help="Also fetch again days whose gap recurred under the current method"),
 ):
-    """Fetch again the busy days that earlier versions cut short at 3,000 announcements (finding 6).
+    """Fetch again the busy days that earlier versions cut short (findings 6 and 26).
 
-    Busy days are days recorded as SHORTFALL or FAILED, and days catalogued before v2.0.3 whose stored
-    announcements reach the threshold (in the 2026 runs: late March, most of April, late August)."""
+    Busy days are failed days, days short of CNINFO's total under an earlier method (v2.0.3 or before), and
+    days catalogued before v2.0.3 whose stored announcements reach the threshold. Days whose gap recurred under
+    the current method are not fetched again unless --include-current is given, because repeating the same
+    queries cannot close a gap caused by a limit of CNINFO's search."""
     from .market_catalogue import busy_days, recatalogue_busy_days
     init_db()
     if list_only:
-        days = busy_days(kind, since, until, threshold)
+        days = busy_days(kind, since, until, threshold, include_current)
         print(f"{len(days)} busy day(s): {', '.join(days) if days else 'none'}")
         return
-    _report_catalogue(recatalogue_busy_days(kind, since, until, threshold, progress=_progress))
+    _report_catalogue(recatalogue_busy_days(kind, since, until, threshold, progress=_progress,
+                                            include_current=include_current))
 
 
 @app.command("catalogue-days")
@@ -312,7 +332,28 @@ def catalogue_days_cmd(kind: str = typer.Option("all"), since: str = typer.Optio
                         or "no days recorded yet"))
     if problems:
         rows = [r for r in rows if r["status"] not in ("DONE",)]
-    _table(rows, ["day", "status", "expected", "stored", "method", "error"])
+    _table(rows, ["day", "status", "expected", "stored", "gap_in_scope", "gap_out_scope", "rows_multi", "method",
+                  "partition", "error"])
+
+
+@app.command("probe-cninfo-filters")
+def probe_cninfo_filters_cmd(day: str = typer.Option("2026-04-29", help="A very busy day"),
+                             quiet_window: str = typer.Option("2026-01-09~2026-01-12",
+                                                              help="A quiet window with repeated rows")):
+    """Check which CNINFO search filters work for whole-market queries: board codes, industry, company batches
+    and sort orders, and why rows repeat (about 70 to 120 requests; v2.0.4)."""
+    from .market_catalogue import probe_filters
+    r = probe_filters(day, quiet_window=quiet_window)
+    print(f"{r['day']}: CNINFO reports {r.get('total', 0):,} announcements. Requests: {r.get('requests', 0)}.")
+    if r.get("largest"):
+        lg = r["largest"]
+        print(f"Largest category and board: {lg['category'].rstrip(';')} on {lg['plate']}: {lg['total']:,}")
+    for t in r["tests"]:
+        print(f"  [bold]{t['test']}[/bold]: {t['verdict']}; {t['detail']}")
+        if t.get("parts"):
+            print("      " + ", ".join(f"{k} {v:,}" for k, v in t["parts"].items()))
+    print("Keep this output with the run log; the catalogue checks the same things as it runs and uses only the "
+          "filters that work.")
 
 
 @app.command("probe-cninfo-paging")

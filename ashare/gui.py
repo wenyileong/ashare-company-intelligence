@@ -141,13 +141,18 @@ SECTIONS = [
              F("kind", "Type", "choice:" + KINDS, "all", "--kind"),
              F("since", "From", "date", "", "--since", "Optional"),
              F("until", "To", "date", "", "--until", "Optional")],
-           "Fetches again the days that earlier versions cut short at 3,000 announcements (in 2026: late March, "
-           "most of April, late August), and any day recorded as short or failed. Each day is split by category "
-           "so that every announcement arrives."),
+           "Fetches again failed days, days short under an earlier version, and days earlier versions cut short "
+           "at 3,000 announcements. Days whose gap recurred under the current method are not repeated, since the "
+           "same queries cannot close it."),
          A("Which days are catalogued", "catalogue-days", [
              F("kind", "Type", "choice:" + KINDS, "all", "--kind"),
              F("problems", "Only days not complete", "bool", True, ("--problems", None))],
            "Each day's status (DONE, SHORTFALL, FAILED, OPEN for today), with CNINFO's total and the number stored."),
+         A("Check CNINFO's search filters", "probe-cninfo-filters", [
+             F("day", "Very busy day", "date", "2026-04-29", "--day")],
+           "About 70 to 120 requests: checks which board codes, industry and company filters and sort orders work "
+           "for whole-market searches, and why some rows repeat. The catalogue checks the same things as it runs; "
+           "keep the output for the record."),
          A("Check CNINFO's paging limit", "probe-cninfo-paging", [
              F("day", "Busy day", "date", "2026-04-24", "--day")],
            "Four requests: reads pages 1, 100, 101 and 150 of a busy day to see whether one query stops at 3,000 "
@@ -1204,7 +1209,8 @@ class App(tk.Tk):
             elapsed = (_dt.datetime.now() - started).total_seconds()
             if out and not out.endswith("\n"):
                 self._log("\n")
-            self._log({0: "Done", 130: "Stopped"}.get(code, "Failed") + f" after {elapsed:.1f}s\n", "muted")
+            self._log({0: "Done", 3: "Finished with gaps", 130: "Stopped"}.get(code, "Failed")
+                      + f" after {elapsed:.1f}s\n", "muted")
             try:
                 with open(self.folder / "run_log.txt", "a", encoding="utf-8") as fh:
                     fh.write(f"\n=== {started.isoformat(timespec='seconds')}  v{__version__}  "
@@ -1252,7 +1258,8 @@ class App(tk.Tk):
         self.stop_btn.pack_forget()
         for b in self.run_buttons:
             b.state(["!disabled"])
-        self.status.set({0: "Ready", 130: "Stopped; run it again to resume"}.get(code, "Last action failed (see output)"))
+        self.status.set({0: "Ready", 3: "Finished with gaps (see the list in the output)",
+                         130: "Stopped; run it again to resume"}.get(code, "Last action failed (see output)"))
         if code == 0:
             self._maybe_chart(action, getattr(self, "_last_vals", {}))
         if code == 0 and action.get("after") == "explore":

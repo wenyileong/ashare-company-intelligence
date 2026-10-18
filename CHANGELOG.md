@@ -1,6 +1,116 @@
 # Change log
 
-This log records what changed in each version and the important findings behind the changes. The live-run findings that v2.0.3 addresses are kept in full in `docs/live_run_findings_v2.0.2.md` (findings 1 to 19). Earlier versions are described in `README.md` and in section 18 of `ashare_scraper_build_plan.md`.
+This log records what changed in each version and the important findings behind the changes. The live-run findings are kept in full in `docs/live_run_findings_v2.0.2.md` (findings 1 to 19) and `docs/live_run_findings_v2.0.3.md` (findings 20 to 34). Earlier versions are described in `README.md` and in section 18 of `ashare_scraper_build_plan.md`.
+
+## v2.0.4 (18 October 2026)
+
+**Aim:** close the catalogue gaps on the busiest disclosure days. The plan is in `docs/plan_v2.0.4.md`, and the findings behind it are 20 to 34 in `docs/live_run_findings_v2.0.3.md`.
+
+The first live whole-market catalogue under v2.0.3 confirmed the 3,000-result limit and the resume, but left 12 days short. The causes:
+- `sz` and `sh` cover whole exchanges, so the board split never isolated the main boards (finding 22);
+- categories still over 3,000 on one board on the April deadline days (23);
+- announcements on neither the Shanghai nor the Shenzhen board (24);
+- rows repeated for several securities (25).
+
+Whether CNINFO supports finer splits (separate main-board codes, the industry field, several companies at once, sort order) is not documented anywhere. v2.0.4 is therefore built to find out as it runs and to use only what works, rather than to assume.
+
+### Changed: the catalogue engine (`ashare/market_catalogue.py`)
+
+- **Rows, not announcement IDs (finding 25).** A row is one announcement for one security, keyed by announcement ID and security code. CNINFO's total counts rows, so the completeness check now compares like with like.
+  - Announcements listed for several securities are counted (`rows_multi`) and are no longer taken for a shortfall.
+  - Each listed company's row is stored. Storage was already one record per company and announcement.
+- **A general splitter (findings 22 and 23).** A query over 3,000 is split along the next dimension that reaches its total. The dimensions, in order of preference:
+  - board, by the disjoint codes (`szmb`, `szcy`, `shmb`, `shkcp`, `bj`), or by whole exchanges (`sz`, `sh`, `bj`) where those do not work;
+  - category;
+  - industry (the CSRC sections, in the `trade` field);
+  - batches of companies (`stock`, 150 at a time, halved while a batch is over the limit).
+
+  How each dimension is checked:
+  - The parts' totals are checked against the whole.
+  - A filter CNINFO ignores (every part reports the whole) or rejects (every part is empty) is not used again in the run.
+  - Categories are never switched off, since an empty category split can be legitimate.
+  - A split that does not reach the whole is noted against the day (`partition`).
+- **Both sort orders.** A query with up to 6,000 results is read newest-first and oldest-first. Whether CNINFO honours the order is detected on first use; if it does not, sorting is not tried again. A window under the limit that comes back short (rows moving between pages) is also read in both orders.
+- **Gaps by board (finding 24).** A gap is attributed to boards from CNINFO's board totals and the security codes of the rows received.
+  - Only a gap within the enabled boards makes a day SHORTFALL.
+  - A gap shown to lie outside them (for example Beijing when it is off) is recorded (`gap_out_scope`), and the day is DONE.
+  - A gap that cannot be placed counts as within the enabled boards, so a missing filter can never hide a shortfall.
+- **Early stop (finding 27).** After a split, the last pass over a query that cannot be read in full stops after five pages that bring nothing new. A query with no usable split is still read in full: in testing, an early stop there missed rows that came after a run of known ones.
+- **Re-catalogue only with a new method (finding 26).** Each day records the strategy that produced it.
+  - `recatalogue-busy-days` fetches failed days, days short under an earlier version, and days that versions before v2.0.3 cut short.
+  - A day whose gap recurred under the current method is held back with a plain explanation; `--include-current` overrides this.
+- **Recent totals rechecked (finding 28).** The totals of finished days in the last 30 days are rechecked (one query per recorded window), and grown days are fetched again. This happens at the start of a run that reaches those days, and once a day in the daily update.
+- **Unmatched rows by reason (finding 30).** Rows for securities outside the company list are counted by reason (Beijing, B shares, bonds and so on). The count is now of distinct rows, where v2.0.3 counted an announcement again for each overlapping split.
+- **Progress** lines appear every five parts of any split, not only categories.
+
+### Changed: commands and the desktop
+
+- **New command `probe-cninfo-filters --day 2026-04-29`** (desktop: **2 Disclosures** › Check CNINFO's search filters; about 70 to 120 requests). It reports a verdict for each of:
+  - both board schemes;
+  - the industry filter;
+  - company batches;
+  - the sort orders;
+  - the cause of repeated rows on a quiet window.
+- **Outcome wording (finding 29).** A catalogue that finishes with gaps within the enabled boards ends with "Finished with gaps" and exit code 3; the desktop shows "Finished with gaps" instead of "Failed". Failed days and stopped runs still end with exit code 1. Code 3 was chosen because the command-line library already uses 2 for usage errors.
+- **`catalogue-days` shows more:** the gap within and outside the enabled boards, rows for several securities, the method and the split notes.
+- **The daily update** rechecks recent totals once a day (a second run on the same day still sends no announcement query).
+
+### Database
+
+Migration `0004_v204_catalogue_detail` adds six columns to `catalogue_days`: `rows_multi`, `gap_in_scope`, `gap_out_scope`, `partition`, `strategy` and `window_expected`. Existing rows keep their values; days recorded by v2.0.3 have no strategy, so they count as produced by an earlier method.
+
+### Fixed during the build
+
+- **Categories switched off for the whole run.** A category split that came back empty for one part of a day (for example Beijing's uncategorised announcements) would have switched categories off for the rest of the run. Now only the board, industry and company filters are switched off on empty results.
+- **Early stop.** The early stop judged a page "idle" after its rows had already been recorded, so every page would have looked idle. It now judges each page before recording it, and applies only after a split (see above).
+
+### Findings from this build
+
+1. **The finer splits are still unverified live.** The engine was tested against a simulated CNINFO in every combination: each filter working, ignored, rejected, or the sort order honoured or not. In every combination, either every row arrived or the gap was recorded per board. Which combination the live service matches is shown by the first run's `filters` line, or by `probe-cninfo-filters`.
+2. **Without company batches or the sort order, some gaps remain possible.** Uncategorised announcements beyond 3,000 within one industry and board cannot be reached by any other means. They are recorded, and the probe's output will show whether a further dimension (for example a title keyword) is worth adding.
+3. **A gap that cannot be attributed counts against the dataset.** This is deliberately conservative. If the Beijing code does not work, unreached Beijing announcements make a day SHORTFALL even though they are outside the default scope.
+
+### Still to confirm live
+
+1. `ashare-cli probe-cninfo-filters --day 2026-04-29`: keep the output.
+2. `ashare-cli recatalogue-busy-days --kind all`: the 12 days short under v2.0.3 are fetched again with the new method.
+3. `ashare-cli catalogue-days --kind all --problems`: the expected result is no day with a gap within the enabled boards.
+
+### Testing
+
+- New tests in `tests/test_v204.py` (18) use a simulated CNINFO that reproduces the live behaviour (overlapping board codes, the 3,000 limit, uncategorised and Beijing announcements, rows for several securities), with switches for each unknown filter. They cover:
+  - the acceptance day shaped like 29 April with every filter working;
+  - the same day with only whole-exchange boards and company batches, and with industry only;
+  - unreachable rows recorded per board;
+  - both sort orders;
+  - a Beijing-only gap;
+  - the conservative rule;
+  - rows for several securities;
+  - unstable ordering with and without sort order;
+  - the early stop;
+  - the recent-total recheck;
+  - re-catalogue holding and overriding;
+  - v2.0.3 shortfalls fetched again;
+  - exit codes in the command line and the desktop;
+  - the probe verdicts;
+  - the migration.
+- Three v2.0.3 tests were updated where v2.0.4 deliberately changes behaviour (method names, and a current-method shortfall no longer re-catalogued by default).
+- An end-to-end run through the desktop's command path checked:
+  - Stop and resume;
+  - 29 April complete when only whole-exchange boards and company batches work;
+  - with company batches also off, the remaining 155 rows recorded and the run ending "Finished with gaps";
+  - the re-catalogue holding that day;
+  - the probe naming each filter's behaviour.
+- Results by platform:
+
+  | Platform | Passed | Skipped |
+  |---|---:|---:|
+  | Linux, Python 3.12 | 184 | 2 |
+  | PostgreSQL 16 | 181 | 5 (three are the SQLite-only migration fixtures) |
+  | Windows CPython 3.12 under Wine | 182 | 4 |
+  | Python 3.13 | 176 | 8 |
+
+  No test fails on any platform. A real v2.0.3 database was also upgraded to migration 0004: its recorded shortfall was kept and selected for re-cataloguing. The Windows executable reports version 2.0.4, passes the offline self-test (20 checks) and migrates a new database to 0004.
 
 ## v2.0.3 (17 October 2026)
 

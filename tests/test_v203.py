@@ -105,7 +105,7 @@ def test_busy_day_is_split_complete_and_queried_once(universe):
     r = _run(server, "2026-04-23", "2026-04-25", "all", progress=lines.append)
     st = {x["day"]: x for x in day_status("all")}
     assert st["2026-04-24"]["status"] == "DONE" and st["2026-04-24"]["expected"] == 6500
-    assert st["2026-04-24"]["stored"] == 6500 and st["2026-04-24"]["method"] == "CATEGORY_SPLIT"
+    assert st["2026-04-24"]["stored"] == 6500 and "CATEGORY" in st["2026-04-24"]["method"]
     assert r["announcements"] == 6620 and r["unmatched"] == 200 and not r["days_failed"]
     ids = _stored_ids()
     assert len(ids) == len(set(ids)) == 6620 - 200                       # every matched announcement, once
@@ -120,7 +120,7 @@ def test_uncategorised_announcements_are_recovered_by_board(universe):
     days = {"2026-04-29": make_items("2026-04-29", 4000, uncategorised=37)}
     r = _run(CNInfo(days), "2026-04-29", "2026-04-29", "all")
     st = day_status("all")[0]
-    assert (st["status"], st["stored"]) == ("DONE", 4000) and st["method"] == "CATEGORY_SPLIT+BOARD_REMAINDER"
+    assert (st["status"], st["stored"]) == ("DONE", 4000) and "CATEGORY" in st["method"]
     assert not r["days_shortfall"]
 
 
@@ -133,7 +133,8 @@ def test_shortfall_is_recorded_and_busy_days_listed(universe):
     (sf,) = r["days_shortfall"]
     assert sf["day"] == "2026-04-30" and sf["expected"] == 12000 and 12000 - 37 <= sf["stored"] < 12000
     assert day_status("all")[0]["status"] == "SHORTFALL"
-    assert busy_days("all") == ["2026-04-30"]
+    assert busy_days("all") == []                                   # v2.0.4: same method, so not repeated
+    assert busy_days("all", include_current=True) == ["2026-04-30"]
 
 
 def test_runaway_paging_stops_without_splitting_when_uncapped_kind_fits(universe):
