@@ -22,6 +22,8 @@
 
 v2.0.3 was verified against a simulated CNINFO only. Three checks on a networked machine come first, because their results may change the order of this plan.
 
+**Update, 18 October 2026.** The user's first live run (`docs/live_run_findings_v2.0.3.md`) confirmed the limit and the resume, but left 12 days short. The busiest April days lose announcements in categories that exceed 3,000 even per board, and the board codes overlap. Those fixes (findings 22 to 29) come before the work below, probably as a v2.0.4 patch. The quote-list check has not yet been run.
+
 | Check | Command | Expected | If not |
 |---|---|---|---|
 | Paging limit | `ashare-cli probe-cninfo-paging --day 2026-04-24` | `LIMIT_CONFIRMED` | Keep the output; the splitting logic is revisited before any other work |
