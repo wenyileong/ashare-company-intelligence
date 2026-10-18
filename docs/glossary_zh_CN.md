@@ -1,12 +1,12 @@
 # Interface glossary: English to Simplified Chinese (draft for review)
 
-**Status:** draft, 18 October 2026, for the user's review before any interface text is translated (v2.1 plan, section 3.4).
+**Status:** approved by the user on 18 October 2026. Every proposed rendering is adopted, including those in part 10. Rows that were marked for decision now record the settled choice. Two rows still need a fact confirmed during the build (the supervisory-board transition date, and the successor to the 2012 industry classification); the labels stay as settled meanwhile.
 
 **Rule.** Only official terms are used: those of the Company Law, the Securities Law, CSRC rules, exchange listing rules and business guides, CNINFO, and the wording of the reports themselves. Casual terms from financial portals and trading apps are not used, even where they are more common in everyday speech.
 
 **How to review.**
 - Each row gives a proposed rendering and its authority.
-- Rows marked **Decide** need a choice, usually because the law or rules changed recently, or because the term is the interface's own and has no official equivalent.
+- Rows marked **Settled** were open choices; the proposal was adopted on review.
 - The authority column names the kind of source; specific provisions should be confirmed during review.
 - Corrections can be written in the notes column.
 
@@ -25,16 +25,16 @@
 | ChiNext | 创业板 | SZSE | |
 | Security code | 证券代码 | Reports; CNINFO | Not 股票代码 |
 | Short name | 证券简称 | Reports; CNINFO | Not 股票简称 |
-| Full legal name | 公司全称 | Reports use 公司的中文名称 | **Decide**: 公司全称 (shorter) or 公司中文名称 |
+| Full legal name | 公司全称 | Reports use 公司的中文名称 | **Settled**: 公司全称 |
 | Listing date | 上市日期 | Exchange notices | |
-| Delisting | 终止上市 | Listing rules | **Decide**: 终止上市 (formal, as in the listing rules' decisions) or 退市 (also official, used in the rules' chapter titles and in 退市风险警示). Proposal: 终止上市 for the event and its date, 退市 only within fixed terms |
+| Delisting | 终止上市 | Listing rules | **Settled**: 终止上市 for the event and its date, 退市 only within fixed terms |
 | Risk warning | 风险警示 | Listing rules | |
 | ST (other risk warning) | 其他风险警示（ST） | Listing rules | |
 | *ST (delisting risk warning) | 退市风险警示（*ST） | Listing rules | |
 | Suspension / resumption | 停牌 / 复牌 | Exchange business rules | |
 | Trading day | 交易日 | Exchange rules | |
 | Trading calendar | 交易日历 | Exchange notices | |
-| Company list (the program's universe) | 上市公司名录 | Interface term | **Decide**: 上市公司名录, 公司列表 or 样本公司范围 (research usage) |
+| Company list (the program's universe) | 上市公司名录 | Interface term | **Settled**: 上市公司名录 |
 
 ## 2. Disclosure
 
@@ -69,7 +69,7 @@
 | Operating revenue | 营业收入 | Report format rules | Not 营收 |
 | Total profit | 利润总额 | As above | |
 | Net profit | 净利润 | As above | |
-| Net profit attributable to shareholders of the listed company | 归属于上市公司股东的净利润 | Report key-figures table | Short label in tables: 归母净利润 is **not** used (casual); **Decide** whether the full term fits table headers or a shorter official form is needed |
+| Net profit attributable to shareholders of the listed company | 归属于上市公司股东的净利润 | Report key-figures table | Short label in tables: 归母净利润 is **not** used (casual); **Settled**: the full term is used in table headers too, wrapped where necessary; no short form |
 | Net profit after non-recurring items | 扣除非经常性损益后的净利润 | As above | |
 | Total assets / total liabilities | 资产总计 / 负债合计 | Balance sheet line items | |
 | Owners' equity | 所有者权益（或股东权益） | As above | The statement heading is used as found |
@@ -96,20 +96,20 @@
 | English | Proposed | Authority | Notes |
 |---|---|---|---|
 | Profit distribution | 利润分配 | Company Law; reports | |
-| Cash dividend | 现金红利 | Distribution implementation announcements (派发现金红利) | 现金分红 is also official (CSRC 《上市公司监管指引第3号——上市公司现金分红》). **Decide**: 现金红利 for the per-share event, 现金分红 for the policy |
+| Cash dividend | 现金红利 | Distribution implementation announcements (派发现金红利) | 现金分红 is also official (CSRC 《上市公司监管指引第3号——上市公司现金分红》). **Settled**: 现金红利 for the per-share event, 现金分红 for the policy |
 | Equity distribution (implementation) | 权益分派 | Announcement titles (权益分派实施公告) | |
 | Bonus shares | 送红股 | Distribution announcements | |
 | Capitalisation of capital reserve | 资本公积金转增股本 | As above | Short form in tables: 转增 |
 | Record date | 股权登记日 | As above | |
 | Ex-rights / ex-dividend date | 除权（息）日 | As above | |
 | Rights issue | 配股 | CSRC issuance rules | |
-| Private placement | 向特定对象发行股票 | 《上市公司证券发行注册管理办法》 (2023) | Earlier documents: 非公开发行. **Decide**: label 向特定对象发行（原非公开发行） |
+| Private placement | 向特定对象发行股票 | 《上市公司证券发行注册管理办法》 (2023) | Earlier documents: 非公开发行. **Settled**: label 向特定对象发行（原非公开发行） |
 | Share repurchase | 回购股份 | Company Law; repurchase rules | |
 | Equity incentive | 股权激励 | 《上市公司股权激励管理办法》 | Sub-types: 限制性股票, 股票期权 |
 | Material asset restructuring | 重大资产重组 | 《上市公司重大资产重组管理办法》 | |
 | Related-party transaction | 关联交易 | Listing rules | |
 | External guarantee | 对外担保 | Listing rules | |
-| General meeting | 股东会 | Company Law (2023 revision, in force 1 July 2024) | Earlier documents: 股东大会. **Decide**: 股东会 for the interface, with source titles kept as found |
+| General meeting | 股东会 | Company Law (2023 revision, in force 1 July 2024) | Earlier documents: 股东大会. **Settled**: 股东会 for the interface, with source titles kept as found |
 
 ## 6. Governance
 
@@ -119,7 +119,7 @@
 | Director / independent director | 董事 / 独立董事 | Company Law; 《上市公司独立董事管理办法》 | |
 | Board secretary | 董事会秘书 | Company Law | |
 | Senior management | 高级管理人员 | Company Law | |
-| Board of supervisors / supervisor | 监事会 / 监事 | Company Law | Under the 2023 Company Law and the CSRC transitional arrangements, listed companies replace the board of supervisors with the board's audit committee (审计委员会). **Decide**: keep 监事会 for historical rosters and add 审计委员会; confirm the transition date |
+| Board of supervisors / supervisor | 监事会 / 监事 | Company Law | Under the 2023 Company Law and the CSRC transitional arrangements, listed companies replace the board of supervisors with the board's audit committee (审计委员会). **Settled**: keep 监事会 for historical rosters and add 审计委员会; confirm the transition date |
 | Audit committee | 审计委员会 | As above | |
 | Appointment / resignation | 聘任（选举）/ 辞职 | Announcements | 聘任 for officers, 选举 for directors elected by the meeting |
 
@@ -140,9 +140,9 @@
 | English | Proposed | Authority | Notes |
 |---|---|---|---|
 | Industry classification | 行业分类 | | |
-| CSRC industry classification | 证监会行业分类 | CSRC 《上市公司行业分类指引》（2012年修订） | Its successor standard (2023) is to be confirmed. **Decide** the label once confirmed |
+| CSRC industry classification | 证监会行业分类 | CSRC 《上市公司行业分类指引》（2012年修订） | **Settled**: label 证监会行业分类. Its successor standard (2023) is to be confirmed during the build |
 | Shenwan classification | 申万行业分类 | Shenwan Hongyuan (vendor) | A vendor term, named as such |
-| Index constituents | 指数样本 | CSI and exchange index methodologies | 成份股 is also used in exchange documents. **Decide** |
+| Index constituents | 指数样本 | CSI and exchange index methodologies | **Settled**: 指数样本 (成份股 is also used in exchange documents) |
 | CSI 300 | 沪深300 | China Securities Index | |
 | Close / open / high / low price | 收盘价 / 开盘价 / 最高价 / 最低价 | Exchange market data | |
 | Volume / turnover (value) | 成交量 / 成交金额 | As above | Not 成交额 |
@@ -169,17 +169,17 @@ These describe the program, not the market, so the choice is a matter of clarity
 
 | English | Proposed | Notes |
 |---|---|---|
-| Catalogue (announcements) | 编制公告目录 | **Decide**: 编制公告目录 or 收录公告 |
+| Catalogue (announcements) | 编制公告目录 | **Settled** |
 | Download documents | 下载文件 | |
 | Extract figures | 提取数据 | |
 | Validate / checks | 校验 / 检查 | |
 | Review (human) | 人工复核 | |
-| Findings (validation) | 校验发现 | **Decide** |
+| Findings (validation) | 校验发现 | **Settled** |
 | Provenance / trace to source | 来源追溯 | |
 | Panel (dataset) | 面板数据 | |
 | Variable | 变量 | |
-| Codebook | 变量说明手册 | **Decide**: 变量说明手册 or 编码手册 |
-| Point in time (alignment) | 时点对齐（按披露日） | **Decide** |
+| Codebook | 变量说明手册 | **Settled** |
+| Point in time (alignment) | 时点对齐（按披露日） | **Settled** |
 | Fiscal alignment | 按会计期间 | |
 | Winsorise | 缩尾处理 | Standard in Chinese empirical research |
 | Event study | 事件研究 | |
@@ -190,11 +190,11 @@ These describe the program, not the market, so the choice is a matter of clarity
 | Settings | 设置 | |
 | Stop | 停止 | |
 | Shortfall (catalogue) | 数量缺口 | |
-| Busy days | 公告密集日 | **Decide** |
+| Busy days | 公告密集日 | **Settled** |
 | Quote list (Eastmoney) | 行情列表 | Named as a vendor service |
 
 ## Review record
 
 | Date | Reviewer | Rows settled | Notes |
 |---|---|---|---|
-| | Leong, Wen Yi | | |
+| 18 October 2026 | Leong, Wen Yi | All rows; all proposals adopted, including part 10 | Supervisory-board transition date and the successor industry classification to be confirmed during the build |

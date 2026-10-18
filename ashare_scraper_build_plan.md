@@ -2,7 +2,7 @@
 ## Consolidated Build Plan and Data Pipeline
 
 **Current implemented release:** v2.0.3 (end state; section 18, with fixes from the first two live runs and the v2.0.2 live-run findings)  
-**Next planned release:** v2.1 (desktop language toggle, extraction speed, polish; see `docs/plan_v2.1.md` and the draft glossary `docs/glossary_zh_CN.md`)
+**Next planned releases:** v2.0.4 (patch: a complete catalogue on the busiest disclosure days; `docs/plan_v2.0.4.md`), then v2.1 (desktop language toggle, extraction speed, polish; `docs/plan_v2.1.md`, with the approved glossary `docs/glossary_zh_CN.md`). See section 18.14
 **Status:** v2.0.3 implemented and verified offline: 166 tests pass on Linux Python 3.12 (two skips), 163 against PostgreSQL 16 (five skips, three of them the SQLite-only migration fixtures), 164 on Windows CPython 3.12 under Wine (four skips) and 159 on Python 3.13 (seven skips). The company list (v2.0.1) has been confirmed live by the user (5,574 companies). The Windows installer was built and installed, used and uninstalled under Wine. The v2.0.3 changes to the live sources (CNINFO's paging limit, the Eastmoney quote-list variants and the busy-day re-catalogue) still need confirmation on a networked machine (`CHANGELOG.md`, "Still to confirm live"); the installer is unsigned because no certificate was available.
 
 > **Correction to the v0.7 status line.** v0.7 was recorded as "consolidated and verified", but its session factory returned a `sessionmaker` rather than a session, so every database operation failed. Its tests covered only pure helper functions. The defects and fixes are listed under v0.7.1 below.
@@ -1384,3 +1384,37 @@ Sizes are relative (S/M/L) and indicate build effort, not calendar time. v1.4 is
 | Licensing of vendor data (Wind, CSMAR, Shenwan, ESG ratings) | Redistribution breach | Licence tags and release filtering (v2.0) |
 | Personal information of officers and natural-person shareholders | PIPL exposure on release | Pseudonymisation option (v2.0) |
 | Same-name persons and entities | Wrong links | Credit-code matching first; name matching only with corroboration, flagged for review (v1.8) |
+
+### 18.14 Roadmap to v2.1
+
+The end state (v2.0) is followed by maintenance releases driven by the user's live runs. Each release's findings are recorded under `docs/` before any code changes, and each plan is recorded before its build.
+
+| Release | Status | Theme | Plan and findings |
+|---|---|---|---|
+| v2.0.1 | Released | First live run: CNINFO company list moved | Section 18.10 |
+| v2.0.2 | Released | Second live run: market-wide catalogue, progress and Stop, listing dates | Section 18.10; `docs/live_run_findings_v2.0.2.md` (findings 1 to 19) |
+| v2.0.3 | Released, 17 October 2026 | Catalogue complete within CNINFO's 3,000-result limit, resumable by day, errors per day; empty panels refused; warning summary | `CHANGELOG.md`; `docs/live_run_findings_v2.0.3.md` (findings 20 to 34) |
+| v2.0.4 | Planned (patch) | Close the gaps on the busiest days | `docs/plan_v2.0.4.md` |
+| v2.1 | Planned | Chinese desktop interface, extraction speed, polish | `docs/plan_v2.1.md`; `docs/glossary_zh_CN.md` |
+
+**v2.0.4 (patch).** The first live whole-market catalogue under v2.0.3 confirmed the limit and resumption, but left 12 days short. The causes:
+- overlapping board codes;
+- categories still over 3,000 on one board on the April deadline days;
+- announcements outside the Shanghai and Shenzhen boards;
+- rows repeated for several securities.
+
+The patch begins with a probe of CNINFO's filters (disjoint board codes, the industry field, company batches), and uses only the dimensions that probe confirms. The engine work then covers:
+- a general splitter that checks every partition against its parent total;
+- rows keyed by announcement ID and security code;
+- gaps reported by board, so that a gap outside the enabled boards does not count as a shortfall;
+- early stopping, a strategy-aware re-catalogue, rechecks of recent totals, and a "Finished with gaps" outcome.
+
+Acceptance: re-cataloguing the 12 days leaves no gap within the enabled boards.
+
+**v2.1.**
+- **Workstream A:** an English / Simplified Chinese toggle for the desktop application only. It uses the official terminology of the approved glossary. Command-line output stays in English for now, and dataset contents are identical in both languages.
+- **Workstream B:** extraction speed. The live rate is about 9 seconds per document; the target is a median of 2 seconds or less, without loss of parser accuracy. The means are a text cache, pdfium text checked against the golden corpus, and parallel extraction.
+- **Workstream C:** the polish items from the v2.0.2 findings (7 to 11 and 16 to 18).
+- **Workstream D (if confirmed):** publication readiness (Zenodo metadata and a publish-ready report).
+
+**Later versions.** Translation of the command-line output, a Chinese user guide and chart captions.

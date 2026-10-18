@@ -1,6 +1,6 @@
 # v2.1 build plan
 
-**Status:** draft, 18 October 2026. To be confirmed after the v2.0.3 live checks (section 1) and the glossary review (section 3.4).
+**Status:** planned, 18 October 2026. The glossary is approved (section 3.4). The v2.0.3 live checks are done (section 1), and their remaining catalogue gaps go to the v2.0.4 patch (`docs/plan_v2.0.4.md`), which is built first.
 **Theme:** a Chinese-language desktop interface, faster extraction, and the remaining polish from the v2.0.2 live run.
 
 ## Contents
@@ -22,13 +22,13 @@
 
 v2.0.3 was verified against a simulated CNINFO only. Three checks on a networked machine come first, because their results may change the order of this plan.
 
-**Update, 18 October 2026.** The user's first live run (`docs/live_run_findings_v2.0.3.md`) confirmed the limit and the resume, but left 12 days short. The busiest April days lose announcements in categories that exceed 3,000 even per board, and the board codes overlap. Those fixes (findings 22 to 29) come before the work below, probably as a v2.0.4 patch. The quote-list check has not yet been run.
+**Results, 18 October 2026** (`docs/live_run_findings_v2.0.3.md`): the paging limit is confirmed and the quote list answers. Twelve days are still short of CNINFO's total, so the busy-day row below is not met. Its fix is the v2.0.4 patch, built before v2.1.
 
-| Check | Command | Expected | If not |
+| Check | Command | Expected | Result |
 |---|---|---|---|
-| Paging limit | `ashare-cli probe-cninfo-paging --day 2026-04-24` | `LIMIT_CONFIRMED` | Keep the output; the splitting logic is revisited before any other work |
-| Quote list | `ashare-cli diagnose-quote-list` | At least one variant answers | Panels by quarter or month still lack listing dates; an import route or a different source is added to v2.1 as a priority |
-| Busy days | `ashare-cli recatalogue-busy-days --kind all`, then `ashare-cli catalogue-days --kind all --problems` | No SHORTFALL days; 24 April stored 15,382 | Small persistent shortfalls point to missing category codes; that fix goes first |
+| Paging limit | `ashare-cli probe-cninfo-paging --day 2026-04-24` | `LIMIT_CONFIRMED` | **Met**: LIMIT_CONFIRMED in the live self-test (finding 33) |
+| Quote list | `ashare-cli diagnose-quote-list` | At least one variant answers | **Met**: the self-test lists 5,562 securities (finding 33). Listing dates still need fetching ("Update the company list") |
+| Busy days | `ashare-cli recatalogue-busy-days --kind all`, then `ashare-cli catalogue-days --kind all --problems` | No SHORTFALL days; 24 April stored 15,382 | **Not met**: 12 days short; 24 April stored 14,399 (findings 22 to 25). Fixed by v2.0.4 |
 
 ## 2. Scope
 
@@ -88,8 +88,8 @@ The interface uses official disclosure and regulatory terms only, as used by the
 
 Process:
 
-1. The draft glossary (`docs/glossary_zh_CN.md`) lists every recurring term with a proposed rendering, its authority and any decision needed.
-2. **The user reviews and settles the glossary before any translation is written.** Terms marked for decision are resolved first.
+1. The glossary (`docs/glossary_zh_CN.md`) lists every recurring term with its rendering and authority.
+2. **Done, 18 October 2026:** the user approved every proposed rendering, including the interface's own terms (part 10). Two facts are still to be confirmed during the build: the supervisory-board transition date, and the successor to the 2012 industry classification. The settled labels stand meanwhile.
 3. All interface strings are then translated from the settled glossary. A term outside the glossary is added to it, and reviewed, rather than translated ad hoc.
 4. The user reviews the full Chinese interface in a pre-release build (screenshots of every page, plus the build itself).
 
@@ -172,8 +172,8 @@ This workstream was offered after the question about publishing the dataset. It 
 
 ## 8. Order of work
 
-1. Section 1 live checks (user), and any fix they call for.
-2. Glossary review (user), in parallel with step 3.
+1. The v2.0.4 patch (`docs/plan_v2.0.4.md`) and its live acceptance.
+2. Glossary review: done.
 3. Workstream B (speed): profiling, text cache, pdfium comparison, parallel extraction.
 4. Workstream A (language): catalogue extraction from the existing interface, then translation from the settled glossary, then tests and screenshots for review.
 5. Workstream C (polish).
@@ -184,7 +184,7 @@ This workstream was offered after the question about publishing the dataset. It 
 
 | # | Decision | Owner | Default if not decided |
 |---|---|---|---|
-| 1 | Settle the glossary, including the terms marked for decision | User | Translation does not start |
+| 1 | Settle the glossary | User | **Done**, 18 October 2026: all proposals adopted |
 | 2 | Confirm Workstream D (publication readiness) | User | Left out of v2.1 |
 | 3 | Licences for the code and the data | User | Repository stays private, unlicensed |
 | 4 | Speed target (median 2 s or less per document) acceptable | User | Kept as the target |

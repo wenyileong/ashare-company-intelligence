@@ -1,12 +1,16 @@
 # v2.0.3 live-run findings
 
-**Source:** the user's desktop log of 18 October 2026, with three actions:
+**Source:** the user's desktop log of 18 October 2026 and a self-test report of the same day. The log has three catalogue actions:
 
 1. a whole-market catalogue, kind "all", 1 January to 18 October 2026: 291 days, 8 h 45 min, 22,036 queries;
 2. the same action run again;
 3. "Re-catalogue busy days", stopped by the user after 1 h 44 min.
 
-An "Extract figures from reports" action had started, but had printed nothing by the end of the log.
+A second copy of the log added three more actions (findings 32 to 34):
+
+- "Extract figures from reports", stopped after 19 minutes;
+- the live self-test;
+- "Download daily prices", which had just started.
 
 **Status:** findings only; no code has been changed. Numbering continues from the v2.0.2 findings (`docs/live_run_findings_v2.0.2.md`, findings 1 to 19).
 
@@ -25,7 +29,10 @@ An "Extract figures from reports" action had started, but had printed nothing by
 | 28 | CNINFO's totals change after the fact | Medium (finished days can grow) | Confirmed |
 | 29 | A completed run with shortfalls is shown as "Failed" | Low (wording) | Confirmed |
 | 30 | "Unmatched" is exactly 24,000 | Low | To check |
-| 31 | The probe and quote-list checks were not run; the extraction step produced no output | Information | Open |
+| 31 | The probe and quote-list checks were not run in the first log | Information | Closed by findings 32 and 33 |
+| 32 | Extraction still takes about 9 seconds per document; no PDF reader warnings in the first 125 documents | High (finding 2 unchanged) | Confirmed |
+| 33 | The live self-test passes all 20 checks: the quote list answers and the paging limit is confirmed | Information (finding 4 resolved) | Confirmed |
+| 34 | The whole-market price download had started, with no output yet, when the log ended | Information | Open |
 
 **Periodic reports are complete.** On every day, the periodic-report categories (年度报告, 半年度报告, 第一季度报告, 第三季度报告) stayed within the limit for each board, so no annual, interim or quarterly report was lost. The gaps fall in other announcement categories (finding 23) and on the Beijing board (finding 24).
 
@@ -171,11 +178,36 @@ This would also shorten the whole-market run, which took 8 h 45 min.
 
 **Assessment.** A round figure is possible by chance, but it is worth one check that unmatched announcements are counted, not capped.
 
-## 31. Checks still outstanding
+## 31. Checks outstanding in the first log
 
-- `probe-cninfo-paging` was not run. Finding 20 makes it less necessary, but its output would still be useful for the record.
-- `diagnose-quote-list` was not run, so the quote-list fix (finding 4) is still unverified, and panels by quarter or month may still lack listing dates.
-- "Extract figures from reports" had printed nothing when the log ended, so extraction speed (finding 2) and the PDF warning summary (finding 5) cannot yet be assessed from this log.
+In the first log, `probe-cninfo-paging` and `diagnose-quote-list` had not been run, and "Extract figures from reports" had printed nothing. The later self-test and log cover these (findings 32 and 33).
+
+## 32. Extraction speed unchanged; the warning summary is quiet
+
+**Evidence.**
+- "Extract figures from reports" read 125 documents in 1,150 seconds, about 9.2 seconds per document. The progress line still reads "0.1 per second" (finding 11).
+- No PDF reader summary line appeared.
+- A local check confirmed that the summary line is printed when an action is stopped. So these 125 documents raised no PDF reader messages at all, which is consistent with the v2.0.3 change.
+
+**Assessment.** Finding 2 stands. At this rate the whole market (tens of thousands of documents) would take days. This is v2.1 Workstream B.
+
+## 33. The live self-test passes all 20 checks
+
+**Evidence.** Self-test of 18 October 2026, version 2.0.3, live mode: verdict OK, 20 passed.
+- `eastmoney_market_list`: 5,562 securities listed. The quote list now answers.
+- `cninfo_paging_limit`: LIMIT_CONFIRMED (15,382 announcements on 24 April).
+- CNINFO's list holds 6,261 records (2,472 Shanghai, 3,104 Shenzhen), and the market-day query, document download, exchange pages and daily bars all pass.
+
+**Assessment.**
+- Finding 4 (the quote list refusing every request) is resolved on the user's network. The first variant, the original request, answered, so the earlier 502 errors were probably temporary or specific to the network at the time.
+- Listing dates can now be fetched by running "Update the company list" again. Panels by quarter or month should then have rows without the report-evidence fallback.
+- The paging probe confirms finding 20 directly.
+
+## 34. Daily prices: run started
+
+**Evidence.** "Download daily prices" (1 January to 18 October 2026, unadjusted) had started when the log ended, with no output yet.
+
+**To check.** Whether it prints progress, and whether it completes. It makes one request per company, about 5,500, so roughly an hour and a half at the polite rate.
 
 ## What this means for the v2.0.3 success criteria
 
@@ -183,7 +215,7 @@ This would also shorten the whole-market run, which took 8 h 45 min.
 |---|---|
 | 24 April stored in full (15,382) | **Not met:** 14,399 stored (93.6%). Up to 967 of the missing rows are on neither board, probably Beijing (finding 24); the rest are lost to the limit (finding 23) |
 | Stop and restart continue from the last finished day | **Met** (finding 21) |
-| A panel with rows, or a refusal with the reason | Not tested in this log |
+| A panel with rows, or a refusal with the reason | Not tested yet. The quote list now answers (finding 33), so listing dates can be fetched first |
 
 ## Suggested order for the next build
 
@@ -197,4 +229,4 @@ This would also shorten the whole-market run, which took 8 h 45 min.
 3. **Findings 26, 27 and 29.** A re-catalogue only with a new strategy, an early stop for the last pass, and clearer outcome wording.
 4. **Finding 28.** Recheck the totals of recent days.
 
-These items come before the v2.1 work in `docs/plan_v2.1.md`, as its section 1 provides, because they concern missing data.
+These items form the v2.0.4 patch (`docs/plan_v2.0.4.md`), which comes before the v2.1 work in `docs/plan_v2.1.md` because they concern missing data.
