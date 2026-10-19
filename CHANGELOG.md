@@ -14,6 +14,18 @@ The first live whole-market catalogue under v2.0.3 confirmed the 3,000-result li
 
 Whether CNINFO supports finer splits (separate main-board codes, the industry field, several companies at once, sort order) is not documented anywhere. v2.0.4 is therefore built to find out as it runs and to use only what works, rather than to assume.
 
+### Licence (19 October 2026)
+
+- **The licence.** A-share Company Intelligence is now licensed under the **PolyForm Strict License 1.0.0**: noncommercial use only, no distribution and no changes, without warranty. `LICENSE.md` holds the licensor and copyright line (Leong, Wen Yi), then the licence text exactly as the PolyForm Project publishes it; a test checks the text against the published file's checksum.
+- **Where it appears.**
+  - The README has a "Licence" section.
+  - `CITATION.cff` gives `license: PolyForm-Strict-1.0.0`.
+  - `READ_ME_FIRST.txt` and the third-party notices name the licence.
+  - Every download includes `LICENSE.md`.
+  - The installer shows the licence on an "I Agree" page before installing, matching the licence's acceptance clause.
+  - The uninstaller removes the file.
+- **Bundled components.** These keep their own licences. The notices state that the PolyForm Strict licence does not apply to them.
+
 ### Packaging addendum (19 October 2026): third-party notices
 
 The executables bundle the Python runtime and some thirty libraries, whose MIT, BSD, Apache and PSF licences permit redistribution only with their copyright and licence notices. The first v2.0.4 downloads included almost none of these notices. The installer and portable zips were rebuilt to include them; the programs themselves are unchanged.

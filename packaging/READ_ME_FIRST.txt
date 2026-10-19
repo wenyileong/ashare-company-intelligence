@@ -40,6 +40,10 @@ Command line
 
 Keep the whole folder together: the programs need the _internal folder.
 
+Licence
+  A-share Company Intelligence is licensed under the PolyForm Strict License 1.0.0 (LICENSE.md):
+  noncommercial use only; no distribution and no changes. Copyright Leong, Wen Yi.
+
 Third-party components
   The program bundles third-party components (the Python runtime and libraries such as
   pypdf, PDFium, SQLAlchemy and httpx). Each keeps its own licence; THIRD_PARTY_NOTICES.txt

@@ -28,6 +28,7 @@ jobs:
       - name: Add quick-start note, documentation and third-party notices
         run: |
           copy packaging\READ_ME_FIRST.txt dist\AShareScraper\
+          copy LICENSE.md dist\AShareScraper\
           python packaging\build_docs.py dist\AShareScraper\docs
           python packaging\third_party_notices.py build\ashare dist\AShareScraper\THIRD_PARTY_NOTICES.txt
       - name: Installer

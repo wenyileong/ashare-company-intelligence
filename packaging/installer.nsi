@@ -54,6 +54,7 @@ VIAddVersionKey "LegalCopyright" "Research software; see docs\compliance.md"
 !define MUI_FINISHPAGE_SHOWREADME_TEXT "Open the user guide"
 !define MUI_FINISHPAGE_SHOWREADME_NOTCHECKED
 !insertmacro MUI_PAGE_WELCOME
+!insertmacro MUI_PAGE_LICENSE "${DIST}\LICENSE.md"
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_COMPONENTS
 !insertmacro MUI_PAGE_INSTFILES
@@ -129,6 +130,7 @@ Section "Uninstall"
   Delete "$INSTDIR\ashare-cli.exe"
   Delete "$INSTDIR\READ_ME_FIRST.txt"
   Delete "$INSTDIR\THIRD_PARTY_NOTICES.txt"
+  Delete "$INSTDIR\LICENSE.md"
   Delete "$INSTDIR\Uninstall.exe"
   RMDir "$INSTDIR"
   DeleteRegKey HKCU "${KEY}"

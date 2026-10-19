@@ -43,6 +43,7 @@ pyinstaller --noconfirm --clean packaging\ashare.spec --distpath dist --workpath
 dist\AShareScraper\ashare-cli.exe version || (echo The built CLI did not start. & pause & exit /b 1)
 for /f %%v in ('dist\AShareScraper\ashare-cli.exe version') do set "VER=%%v"
 copy /y packaging\READ_ME_FIRST.txt dist\AShareScraper\ >nul
+copy /y LICENSE.md dist\AShareScraper\ >nul
 python packaging\third_party_notices.py build\ashare dist\AShareScraper\THIRD_PARTY_NOTICES.txt || (echo Third-party notices incomplete; not packaging. & pause & exit /b 1)
 python packaging\build_docs.py dist\AShareScraper\docs || (pause & exit /b 1)
 call packaging\sign.bat dist\AShareScraper\AShareScraper.exe || (pause & exit /b 1)
