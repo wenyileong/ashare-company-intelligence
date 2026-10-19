@@ -27,6 +27,7 @@ The executables bundle the Python runtime and some thirty libraries, whose MIT, 
   - the Microsoft runtime.
 - **How it is generated.** `packaging/third_party_notices.py` runs on every build (`build_windows.bat` and the GitHub Windows build). It reads PyInstaller's record of what was bundled, so it lists exactly what ships. It stops the build if a component has no licence text, or if the notices for the bundled Python version are missing.
 - **Source code.** The notices say where each component's source code is available. certifi's Mozilla Public License 2.0 requires this.
+- **Installer.** The installer installs the notices and the uninstaller removes them; tested under Wine.
 - **README and quick-start note.** The README now has a "Third-party components" section, stating that bundled components keep their own licences. `READ_ME_FIRST.txt` points to the notices.
 - **Tests.** New tests in `tests/test_third_party_notices.py` check:
   - that the notices list what the build bundled;
