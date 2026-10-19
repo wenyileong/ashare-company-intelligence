@@ -14,6 +14,26 @@ The first live whole-market catalogue under v2.0.3 confirmed the 3,000-result li
 
 Whether CNINFO supports finer splits (separate main-board codes, the industry field, several companies at once, sort order) is not documented anywhere. v2.0.4 is therefore built to find out as it runs and to use only what works, rather than to assume.
 
+### Packaging addendum (19 October 2026): third-party notices
+
+The executables bundle the Python runtime and some thirty libraries, whose MIT, BSD, Apache and PSF licences permit redistribution only with their copyright and licence notices. The first v2.0.4 downloads included almost none of these notices. The installer and portable zips were rebuilt to include them; the programs themselves are unchanged.
+
+- **The notices file.** Every download now includes `THIRD_PARTY_NOTICES.txt`. It lists each bundled component with its version, and reproduces its licence texts and copyright notices in full. The 31 components include:
+  - the Python 3.12.7 runtime;
+  - the software Python incorporates, such as OpenSSL under the Apache License 2.0, expat, libffi, zlib and libmpdec, taken from CPython's own `Doc/license.rst` at v3.12.7;
+  - pypdfium2, with the licences of everything compiled into PDFium (FreeType, ICU, libjpeg-turbo, libpng, OpenJPEG, zlib and others);
+  - Tcl/Tk;
+  - the PyInstaller bootloader;
+  - the Microsoft runtime.
+- **How it is generated.** `packaging/third_party_notices.py` runs on every build (`build_windows.bat` and the GitHub Windows build). It reads PyInstaller's record of what was bundled, so it lists exactly what ships. It stops the build if a component has no licence text, or if the notices for the bundled Python version are missing.
+- **Source code.** The notices say where each component's source code is available. certifi's Mozilla Public License 2.0 requires this.
+- **README and quick-start note.** The README now has a "Third-party components" section, stating that bundled components keep their own licences. `READ_ME_FIRST.txt` points to the notices.
+- **Tests.** New tests in `tests/test_third_party_notices.py` check:
+  - that the notices list what the build bundled;
+  - that the program's own package is left out;
+  - that a missing licence text stops the build;
+  - that the Python 3.12 notices cover OpenSSL, expat, libffi, zlib and libmpdec.
+
 ### Changed: the catalogue engine (`ashare/market_catalogue.py`)
 
 - **Rows, not announcement IDs (finding 25).** A row is one announcement for one security, keyed by announcement ID and security code. CNINFO's total counts rows, so the completeness check now compares like with like.

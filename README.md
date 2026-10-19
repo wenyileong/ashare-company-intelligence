@@ -703,6 +703,12 @@ v1.3 adds `human_capital_observations`, `esg_observations` and `esg_ratings`. v1
 - **Requirements.** `pandas` and `pydantic` were listed but never used, and have been removed. Development requirements are now in `requirements-dev.txt`.
 - **Error messages.** The command line now prints a one-line error, for example on a network failure, instead of a traceback. Set `ASHARE_DEBUG=1` for the full traceback.
 
+## Third-party components
+
+The Windows downloads bundle third-party components: the Python runtime (with the software it incorporates, such as OpenSSL, SQLite, expat and zlib), Tcl/Tk, PyInstaller's bootloader, and libraries including pypdf, pypdfium2 with PDFium, SQLAlchemy, Alembic, httpx, lxml, Beautiful Soup, Typer and Rich. **Bundled components keep their own licences.** Nothing in the terms on which this program is made available changes the terms on which they are licensed.
+
+Every download includes `THIRD_PARTY_NOTICES.txt`, which lists each bundled component with its version, and reproduces its licence text and copyright notices in full. The file is generated during each build by `packaging/third_party_notices.py`, from PyInstaller's own record of what was bundled. The build stops if any component lacks a licence text, so a download never ships with a notice missing. The source code of each component is available from its home page or from the Python Package Index; the notices give the details.
+
 ## Acknowledgements
 
 The software was designed and directed by Wen Yi Leong. Its code, tests and documentation were written with Claude (Anthropic), an AI assistant, working to the author's build plan and the findings of the author's live runs. Commits are made in the author's name; this section is the record of Claude's contribution.

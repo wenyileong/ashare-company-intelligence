@@ -25,10 +25,11 @@ jobs:
         run: pyinstaller --noconfirm --clean packaging\ashare.spec --distpath dist --workpath build
       - name: Smoke test
         run: dist\AShareScraper\ashare-cli.exe version
-      - name: Add quick-start note and documentation
+      - name: Add quick-start note, documentation and third-party notices
         run: |
           copy packaging\READ_ME_FIRST.txt dist\AShareScraper\
           python packaging\build_docs.py dist\AShareScraper\docs
+          python packaging\third_party_notices.py build\ashare dist\AShareScraper\THIRD_PARTY_NOTICES.txt
       - name: Installer
         shell: pwsh
         run: |

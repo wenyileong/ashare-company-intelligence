@@ -39,3 +39,8 @@ Command line
     ashare-cli release --pseudonymise
 
 Keep the whole folder together: the programs need the _internal folder.
+
+Third-party components
+  The program bundles third-party components (the Python runtime and libraries such as
+  pypdf, PDFium, SQLAlchemy and httpx). Each keeps its own licence; THIRD_PARTY_NOTICES.txt
+  lists them with their versions and reproduces their licence and copyright notices.
