@@ -1,6 +1,6 @@
 # Interface glossary: English to Simplified Chinese (draft for review)
 
-**Status:** approved by the user on 18 October 2026. Every proposed rendering is adopted, including those in part 10. Rows that were marked for decision now record the settled choice. Two rows still need a fact confirmed during the build (the supervisory-board transition date, and the successor to the 2012 industry classification); the labels stay as settled meanwhile.
+**Status:** approved by the author on 18 October 2026. Every proposed rendering is adopted, including those in part 10. Rows that were marked for decision now record the settled choice. Two rows still need a fact confirmed during the build (the supervisory-board transition date, and the successor to the 2012 industry classification); the labels stay as settled meanwhile.
 
 **Rule.** Only official terms are used: those of the Company Law, the Securities Law, CSRC rules, exchange listing rules and business guides, CNINFO, and the wording of the reports themselves. Casual terms from financial portals and trading apps are not used, even where they are more common in everyday speech.
 

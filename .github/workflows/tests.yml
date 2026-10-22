@@ -1,6 +1,9 @@
 # Runs the test suite and the parser accuracy gate on every push.
 name: tests
 on: [push, pull_request]
+# Read-only token: the workflows only build and test (v2.0.5).
+permissions:
+  contents: read
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -9,8 +12,10 @@ jobs:
       matrix:
         python-version: ["3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
       # The synthetic test PDFs use a standard CJK font that is not embedded, so
@@ -34,7 +39,7 @@ jobs:
           PY
       - name: Keep the test report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pytest-report-${{ matrix.python-version }}
           path: pytest-report.xml

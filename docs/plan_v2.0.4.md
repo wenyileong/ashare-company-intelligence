@@ -126,4 +126,4 @@ These need no new build:
 - CHANGELOG.md with changes and findings.
 - The user guide section on the whole-market catalogue updated.
 - Windows build, installer and portable zips.
-- Commits in the user's name only.
+- Commits in the author's name only.

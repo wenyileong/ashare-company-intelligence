@@ -2,6 +2,22 @@
 
 This log records what changed in each version and the important findings behind the changes. The live-run findings are kept in full in `docs/live_run_findings_v2.0.2.md` (findings 1 to 19) and `docs/live_run_findings_v2.0.3.md` (findings 20 to 34). Earlier versions are described in `README.md` and in section 18 of `ashare_scraper_build_plan.md`.
 
+## v2.0.5 (22 October 2026)
+
+**Aim:** prepare the public repository and the first public release. No collection or extraction logic changed, and no database migration is needed.
+
+- **User agent.** The default user agent was `AshareResearchDataCollector/2.0.4 (research use; replace-contact-before-production)`. It now follows the package version and names the repository: `AshareResearchDataCollector/2.0.5 (research use; +https://github.com/wenyileong/ashare-company-intelligence)`. `ASHARE_USER_AGENT` still replaces it, and the compliance note asks researchers running larger collections to add their own contact details.
+- **Request-rate ceiling.** `ASHARE_RPS` and `ASHARE_MARKET_RPS` could set any rate. Every client now runs at between 0.1 and 2 requests per second (`MAX_REQUESTS_PER_SECOND`), so a mistyped setting cannot put load on the sources. The default stays at 1.
+- **Repository documents.**
+  - A disclaimer in the README: no affiliation with the sources, no warranty of accuracy, not investment or legal advice, and the responsibility of the person running the program.
+  - `CONTRIBUTING.md`: issues are welcome; pull requests are not accepted, since the licence permits no changes.
+  - `SECURITY.md`: private reporting through GitHub, supported versions and scope.
+  - Where the documents meant the author, "the user" now reads "the author"; "the user" remains where it means anyone running the program.
+- **Workflows.** `actions/checkout`, `actions/setup-python` and `actions/upload-artifact` moved from v4/v5 (Node 20, past its end of life) to v7 (Node 24). Both workflows now run with a read-only token and do not keep the checkout credentials.
+- **Release.** The first public release carries `SHA256SUMS.txt`. The downloads are not yet code-signed.
+
+**Tests.** `tests/test_v205.py` (4 tests): the default user agent, its override, the ceiling and the floor.
+
 ## v2.0.4 (18 October 2026)
 
 **Aim:** close the catalogue gaps on the busiest disclosure days. The plan is in `docs/plan_v2.0.4.md`, and the findings behind it are 20 to 34 in `docs/live_run_findings_v2.0.3.md`.
@@ -255,7 +271,7 @@ New commands, also in the desktop under **2 Disclosures**:
 
 ### Still to confirm live
 
-These need the user's network. The build environment cannot reach CNINFO or Eastmoney.
+These need the author's network. The build environment cannot reach CNINFO or Eastmoney.
 
 1. `ashare-cli probe-cninfo-paging --day 2026-04-24`: expected verdict LIMIT_CONFIRMED.
 2. `ashare-cli diagnose-quote-list`: which variant, if any, answers.

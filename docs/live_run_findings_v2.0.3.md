@@ -1,10 +1,10 @@
 # v2.0.3 live-run findings
 
-**Source:** the user's desktop log of 18 October 2026 and a self-test report of the same day. The log has three catalogue actions:
+**Source:** the author's desktop log of 18 October 2026 and a self-test report of the same day. The log has three catalogue actions:
 
 1. a whole-market catalogue, kind "all", 1 January to 18 October 2026: 291 days, 8 h 45 min, 22,036 queries;
 2. the same action run again;
-3. "Re-catalogue busy days", stopped by the user after 1 h 44 min.
+3. "Re-catalogue busy days", stopped by the author after 1 h 44 min.
 
 A second copy of the log added three more actions (findings 32 to 34):
 
@@ -48,7 +48,7 @@ A second copy of the log added three more actions (findings 32 to 34):
 - The first run recorded 291 days. Today (18 October) was kept OPEN.
 - The rerun printed "1 day(s) to fetch, 290 already finished (skipped)", fetched only 18 October and finished in 1.5 seconds.
 
-**Assessment.** Success criterion 2 of the v2.0.3 plan (stop, restart and continue) holds live. The re-catalogue was also stopped by the user, and ended cleanly with the "everything saved so far is kept" message.
+**Assessment.** Success criterion 2 of the v2.0.3 plan (stop, restart and continue) holds live. The re-catalogue was also stopped by the author, and ended cleanly with the "everything saved so far is kept" message.
 
 ## 22. Board codes overlap
 
@@ -140,7 +140,7 @@ If the repeated rows carry different security codes, the cause is the first, and
 - 21 to 23 April: 8,204, 7,324 and 12,610 again;
 - 9 to 12 January: 2,925 of a new total of 2,954.
 
-It ran for 1 h 44 min before the user stopped it at 24 April.
+It ran for 1 h 44 min before the author stopped it at 24 April.
 
 **Assessment.** The gaps are structural (findings 22 to 25), not transient, so repeating the same queries cannot help.
 
@@ -199,7 +199,7 @@ In the first log, `probe-cninfo-paging` and `diagnose-quote-list` had not been r
 - CNINFO's list holds 6,261 records (2,472 Shanghai, 3,104 Shenzhen), and the market-day query, document download, exchange pages and daily bars all pass.
 
 **Assessment.**
-- Finding 4 (the quote list refusing every request) is resolved on the user's network. The first variant, the original request, answered, so the earlier 502 errors were probably temporary or specific to the network at the time.
+- Finding 4 (the quote list refusing every request) is resolved on the author's network. The first variant, the original request, answered, so the earlier 502 errors were probably temporary or specific to the network at the time.
 - Listing dates can now be fetched by running "Update the company list" again. Panels by quarter or month should then have rows without the report-evidence fallback.
 - The paging probe confirms finding 20 directly.
 

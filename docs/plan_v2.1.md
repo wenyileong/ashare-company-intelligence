@@ -89,9 +89,9 @@ The interface uses official disclosure and regulatory terms only, as used by the
 Process:
 
 1. The glossary (`docs/glossary_zh_CN.md`) lists every recurring term with its rendering and authority.
-2. **Done, 18 October 2026:** the user approved every proposed rendering, including the interface's own terms (part 10). Two facts are still to be confirmed during the build: the supervisory-board transition date, and the successor to the 2012 industry classification. The settled labels stand meanwhile.
+2. **Done, 18 October 2026:** the author approved every proposed rendering, including the interface's own terms (part 10). Two facts are still to be confirmed during the build: the supervisory-board transition date, and the successor to the 2012 industry classification. The settled labels stand meanwhile.
 3. All interface strings are then translated from the settled glossary. A term outside the glossary is added to it, and reviewed, rather than translated ad hoc.
-4. The user reviews the full Chinese interface in a pre-release build (screenshots of every page, plus the build itself).
+4. The author reviews the full Chinese interface in a pre-release build (screenshots of every page, plus the build itself).
 
 ### 3.5 Implementation
 
@@ -113,14 +113,14 @@ Process:
 ### 3.7 Acceptance
 
 - Every page, action, field, dialog and status message appears in Chinese when 中文 is selected, with no English left except command output and the items listed in section 3.2.
-- The user has approved the glossary and the screenshots.
+- The author has approved the glossary and the screenshots.
 - The data-identity test passes.
 
 ## 4. Workstream B: extraction speed (finding 2)
 
 **Problem.** Extraction takes about 10 to 20 seconds per document, so the whole market would take days.
 
-**Target.** A median of 2 seconds or less per document on the user's machine, with no loss of parser accuracy. This target is still to be verified; it is not a measured result.
+**Target.** A median of 2 seconds or less per document on the author's machine, with no loss of parser accuracy. This target is still to be verified; it is not a measured result.
 
 **Measures:**
 
@@ -156,7 +156,7 @@ This workstream was offered after the question about publishing the dataset. It 
   - that no document text or PDFs are included;
   - that a data licence is set;
   - the dataset and software citations.
-- Prerequisite decisions for the user: a licence for the code and one for the data (CC BY 4.0 is the usual choice for data).
+- Prerequisite decisions for the author: a licence for the code and one for the data (CC BY 4.0 is the usual choice for data).
 
 ## 7. Testing and release
 
@@ -168,7 +168,7 @@ This workstream was offered after the question about publishing the dataset. It 
 - The parser accuracy report (golden corpus) is unchanged or better after the pdfium switch.
 - Windows build: executables, installer and portable zips (each under 30 MB), installed and uninstalled under Wine.
 - Version 2.1.0 everywhere it appears, CHANGELOG.md with changes and findings, and the user guide updated (language toggle, faster extraction).
-- Commits in the user's name only, with no assistant attribution (Claude is credited in the README acknowledgements).
+- Commits in the author's name only, with no assistant attribution (Claude is credited in the README acknowledgements).
 
 ## 8. Order of work
 

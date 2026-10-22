@@ -1,9 +1,9 @@
 # A-Share Company Intelligence Scraper
 ## Consolidated Build Plan and Data Pipeline
 
-**Current implemented release:** v2.0.4 (end state; section 18, with fixes from the live runs; section 18.14)  
+**Current implemented release:** v2.0.5 (v2.0.4 with the preparation for public release; end state; section 18, with fixes from the live runs; section 18.14)  
 **Next planned release:** v2.1 (desktop language toggle, extraction speed, polish; `docs/plan_v2.1.md`, with the approved glossary `docs/glossary_zh_CN.md`). See section 18.14
-**Status:** v2.0.4 implemented and verified offline: 184 tests pass on Linux Python 3.12 (two skips), 181 against PostgreSQL 16 (five skips, three of them the SQLite-only migration fixtures), 182 on Windows CPython 3.12 under Wine (four skips) and 176 on Python 3.13 (eight skips). Confirmed live by the user so far: the company list (5,574 companies), CNINFO's 3,000-result limit, resume by day, the quote list, and a live self-test passing all 20 checks. The finer catalogue splits of v2.0.4 still need a live run (`CHANGELOG.md`, "Still to confirm live"). The installer is unsigned because no certificate was available.
+**Status:** v2.0.5 (22 October 2026) prepares the public release: the user agent names the repository, the request rate has a ceiling of 2 per second, and the repository has a disclaimer, CONTRIBUTING.md and SECURITY.md; 192 tests pass on Linux Python 3.12 (two skips) and 184 on Python 3.13 (eight skips). v2.0.4 implemented and verified offline: 184 tests pass on Linux Python 3.12 (two skips), 181 against PostgreSQL 16 (five skips, three of them the SQLite-only migration fixtures), 182 on Windows CPython 3.12 under Wine (four skips) and 176 on Python 3.13 (eight skips). Confirmed live by the author so far: the company list (5,574 companies), CNINFO's 3,000-result limit, resume by day, the quote list, and a live self-test passing all 20 checks. The finer catalogue splits of v2.0.4 still need a live run (`CHANGELOG.md`, "Still to confirm live"). The installer is unsigned because no certificate was available.
 
 > **Correction to the v0.7 status line.** v0.7 was recorded as "consolidated and verified", but its session factory returned a `sessionmaker` rather than a session, so every database operation failed. Its tests covered only pure helper functions. The defects and fixes are listed under v0.7.1 below.
 
@@ -937,7 +937,7 @@ Network-unavailable environments must be reported as such rather than represente
 
 At v2.0 the program is complete against the end-state definition in section 18.1, with the exceptions below.
 
-1. **Live sources only partly exercised.** The build environment has no access to the sources; the first live run (by the user, v2.0) found the Shanghai stock list gone, fixed in v2.0.1. The other endpoints have not yet been confirmed live. The self-test (v1.4) is the live test and must be run once on a networked machine; the market-wide announcement query and the Eastmoney quote list (v1.9) in particular have been implemented from their documented parameters only.
+1. **Live sources only partly exercised.** The build environment has no access to the sources; the first live run (by the author, v2.0) found the Shanghai stock list gone, fixed in v2.0.1. The other endpoints have not yet been confirmed live. The self-test (v1.4) is the live test and must be run once on a networked machine; the market-wide announcement query and the Eastmoney quote list (v1.9) in particular have been implemented from their documented parameters only.
 2. **Calibration needs a real corpus.** The evaluation harness, calibration and gate are in place, but parser confidence uses default priors until a golden corpus of hand-verified real reports is evaluated. The synthetic corpus is a regression gate only.
 3. **Unsigned installer.** Signing hooks are in place; without a certificate, SmartScreen and some antivirus programs warn on first run.
 4. **Scanned documents and diagrams.** Documents without a text layer are not read (no OCR), and ownership diagrams (方框图) are usually images, so intermediate stakes in control chains must be imported.
@@ -1048,7 +1048,7 @@ These defaults apply until decided otherwise. Each can be changed without redesi
 |---|---|---|
 | Universe scope | SSE Main, STAR, SZSE Main, ChiNext; **BSE and B-shares excluded but supported as an option** (board codes and adapters added in v1.6, disabled by default) | Enabling them adds companies and share classes only, not schema |
 | Purpose | Personal research use, **with licence-aware and pseudonymised releases built anyway** (v2.0) | Publishing a dataset then requires no further engineering |
-| Live testing | Run by the user with the desktop application on their own PC (a "Self-test" page produces a report file to send back) | If network access becomes available in the build environment, the same tests run there automatically |
+| Live testing | Run by the author with the desktop application on their own PC (a "Self-test" page produces a report file to send back) | If network access becomes available in the build environment, the same tests run there automatically |
 
 ### 18.3 Release plan
 
@@ -1308,7 +1308,7 @@ Sizes are relative (S/M/L) and indicate build effort, not calendar time. v1.4 is
   6. Operable: met (v1.9).
   7. Distributable: met except signing.
 - **Acceptance.** A release built from a database holding vendor ratings and an unlabelled import contains none of either unless overridden (test `test_release_excludes_licensed_and_local_paths`). Installation, use and uninstallation were exercised under Wine; "without warnings" requires signing.
-- **v2.0.1: first live run.** The user's first run on a networked machine showed that CNINFO's Shanghai list (`sse_stock.json`) now returns 404, so the universe stayed empty and every downstream step returned nothing. CNINFO's `szse_stock.json` covers all mainland exchanges, so the adapter now reads that single list and infers the exchange from the code (address overridable with `ASHARE_CNINFO_STOCK_LIST_URL`); the self-test reports coverage per exchange; HTTP and network errors carry plain next steps; and commands warn when the company list is empty. This is the failure mode section 18.13 anticipated, and the reason the remaining endpoints still need the live self-test.
+- **v2.0.1: first live run.** The author's first run on a networked machine showed that CNINFO's Shanghai list (`sse_stock.json`) now returns 404, so the universe stayed empty and every downstream step returned nothing. CNINFO's `szse_stock.json` covers all mainland exchanges, so the adapter now reads that single list and infers the exchange from the code (address overridable with `ASHARE_CNINFO_STOCK_LIST_URL`); the self-test reports coverage per exchange; HTTP and network errors carry plain next steps; and commands warn when the company list is empty. This is the failure mode section 18.13 anticipated, and the reason the remaining endpoints still need the live self-test.
 - **v2.0.2: second live run.** With the company list loaded (5,574 companies), a whole-market "Catalogue announcements" with downloads appeared stuck: it issued one query per company and printed nothing until the end. The whole-market catalogue now uses exchange-wide queries in monthly windows (adaptive splitting), downloads run as a separate, estimated and resumable phase limited to the documents the extractors read, the desktop streams progress and has a Stop button (cooperative cancellation at every request and document read), and whole-market downloads ask first. The run also showed that the point-in-time universe treated every company as listed on every date (no listing dates in CNINFO's list, and delisted companies included): listing dates now come from the public quote list, delisted companies are recognised by their CNINFO short names, and `universe_at` excludes and counts companies whose dates are unknown. New code ranges (ChiNext 302, STAR CDR 689) are recognised; missing legal names are no longer validation problems.
 - **Bugs found during the build.**
   - Several extractors stored the local file path as `source_document`, which would have put the researcher's user name into releases; releases now replace it with the document URL.
@@ -1387,7 +1387,7 @@ Sizes are relative (S/M/L) and indicate build effort, not calendar time. v1.4 is
 
 ### 18.14 Roadmap to v2.1
 
-The end state (v2.0) is followed by maintenance releases driven by the user's live runs. Each release's findings are recorded under `docs/` before any code changes, and each plan is recorded before its build.
+The end state (v2.0) is followed by maintenance releases driven by the author's live runs. Each release's findings are recorded under `docs/` before any code changes, and each plan is recorded before its build.
 
 | Release | Status | Theme | Plan and findings |
 |---|---|---|---|

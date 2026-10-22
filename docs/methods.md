@@ -12,7 +12,7 @@ Sources are ranked by authority, and a lower-ranked source never silently replac
 2. **Public market feeds.** Daily prices and quotes come from a free public feed (Eastmoney). These data are not exchange-authoritative and are labelled as such; licensed price data can be imported instead and are then preferred.
 3. **Licensed and manual data.** Vendor data (for example ESG ratings, Shenwan industry classifications, index constituent files) and the researcher's own hand coding are imported from CSV files and keep their own source labels.
 
-Acquisition is polite and transparent: one request per second by default, an identifying user agent, no circumvention of authentication, CAPTCHAs, access controls or rate limits, and no use of licensed data beyond its licence. Every response and document is stored as received, with its URL, retrieval time and SHA-256 hash.
+Acquisition is polite and transparent: one request per second by default (never more than two, whatever the settings), an identifying user agent, no circumvention of authentication, CAPTCHAs, access controls or rate limits, and no use of licensed data beyond its licence. Every response and document is stored as received, with its URL, retrieval time and SHA-256 hash.
 
 ## 2. Provenance
 

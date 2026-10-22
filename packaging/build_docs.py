@@ -151,6 +151,7 @@ def build(out: Path) -> list[Path]:
         shutil.copy2(p, out / p.name)
         written.append(h)
     shutil.copy2(ROOT / "CITATION.cff", out / "CITATION.cff")
+    shutil.copy2(ROOT / "CHANGELOG.md", out / "CHANGELOG.md")   # v2.0.5: was copied by hand
     return written
 
 

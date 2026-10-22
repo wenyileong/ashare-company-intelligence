@@ -27,7 +27,7 @@ Findings 1 to 12 come from log A, with figures updated from log B where it adds 
 | 13 | "Running it again resumes" is not true for the catalogue: every run restarts at the start date | High (hours repeated per restart) | Confirmed |
 | 14 | An error inside a split window abandons the rest of the month, and the error report hides what was done | High (silent gaps) | Confirmed |
 | 15 | No progress within a window: a busy day can run for over an hour with no output | Medium (looks stuck) | Confirmed |
-| 16 | Intermittent DNS failures on the user's connection ("getaddrinfo failed") | Medium (environmental) | Confirmed |
+| 16 | Intermittent DNS failures on the author's connection ("getaddrinfo failed") | Medium (environmental) | Confirmed |
 | 17 | The dataset explorer opens on an empty panel with blank output | Low | Confirmed |
 | 18 | `show-market` prints nothing at all when there are no prices | Low | Confirmed |
 | 19 | The layout extractor depends on the computer's CJK fonts when a PDF's fonts are not embedded | Medium (results can differ between machines) | Confirmed in GitHub CI and reproduced locally |
@@ -105,7 +105,7 @@ Findings 1 to 12 come from log A, with figures updated from log B where it adds 
 **Log B.** "Update the company list" was run again and failed the same way, this time on the very first page (`pn=1`), and two further panels again had 0 rows with all 5,576 companies excluded. A failure on every attempt, while the price-history service on another Eastmoney host (`push2his`) works, suggests a persistent problem rather than a passing fault. Possible causes, all inferred:
 - the quote-list service now refuses requests without browser-like headers (for example a Referer);
 - the access token parameter (`ut`) or the field list has changed;
-- the host is blocked or throttled from the user's network.
+- the host is blocked or throttled from the author's network.
 
 The self-test's quote-list check should show which.
 
@@ -234,7 +234,7 @@ That is consistent with CNINFO serving at most 100 pages (3,000 results) for one
 
 ## 13. "Running it again resumes" does not hold for the catalogue
 
-**Evidence (log B).** Each catalogue run started again from its start date and re-read days already stored. Three runs from 1 January repeated January to March each time. The user then worked round this by hand, moving the start date to 28 March, 11 April, 15 April and 24 April. The last run reported 77,305 of 81,060 announcements as "already known".
+**Evidence (log B).** Each catalogue run started again from its start date and re-read days already stored. Three runs from 1 January repeated January to March each time. The author then worked round this by hand, moving the start date to 28 March, 11 April, 15 April and 24 April. The last run reported 77,305 of 81,060 announcements as "already known".
 
 **Why it matters.**
 - Records are not duplicated, which is what the message promised.
@@ -268,11 +268,11 @@ That is consistent with CNINFO serving at most 100 pages (3,000 results) for one
 
 **For a future build.** Print a progress line every 50 pages or so, with the number fetched against the total and an estimated time left.
 
-## 16. Intermittent DNS failures on the user's connection
+## 16. Intermittent DNS failures on the author's connection
 
 **Evidence (log B).** "ConnectError('[Errno 11001] getaddrinfo failed')" in two runs. That is the Windows error for a failed name lookup, raised before any request reaches CNINFO.
 
-**Assessment.** Environmental (the user's network or DNS), not a program fault. The program behaved as designed: three failed windows in a row stopped the run with a plain message. With finding 14, though, each failure also abandoned the rest of its month.
+**Assessment.** Environmental (the author's network or DNS), not a program fault. The program behaved as designed: three failed windows in a row stopped the run with a plain message. With finding 14, though, each failure also abandoned the rest of its month.
 
 **For a future build.** For name-lookup failures, wait and retry for longer (for example up to five minutes) before counting the window as failed, since such outages are often brief.
 

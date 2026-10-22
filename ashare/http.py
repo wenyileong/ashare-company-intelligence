@@ -8,7 +8,7 @@ created afterwards; pass ``transport=`` to override for one client.
 import threading
 import time
 import httpx
-from .config import REQUEST_TIMEOUT
+from .config import REQUEST_TIMEOUT, MAX_REQUESTS_PER_SECOND
 
 _DEFAULT_TRANSPORT = None
 
@@ -75,7 +75,8 @@ def default_transport():
 class RateLimitedClient:
     def __init__(self, user_agent: str, requests_per_second: float = 1.0, transport=None,
                  retries: int = 3):
-        self.delay = 1.0 / max(requests_per_second, 0.1)
+        # At least 0.1 and at most MAX_REQUESTS_PER_SECOND requests a second (v2.0.5 ceiling).
+        self.delay = 1.0 / min(max(requests_per_second, 0.1), MAX_REQUESTS_PER_SECOND)
         self.last_request = 0.0
         self.retries = max(1, retries)
         transport = transport if transport is not None else _DEFAULT_TRANSPORT

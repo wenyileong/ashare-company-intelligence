@@ -1,6 +1,15 @@
-# China A-share Company Intelligence v2.0.4
+# China A-share Company Intelligence v2.0.5
 
 A provenance-preserving research data system for SSE Main Board, STAR Market, SZSE Main Board and ChiNext companies. The architecture is set out in `ashare_scraper_build_plan.md`. Changes by version, and the findings behind them, are in `CHANGELOG.md`; the live-run findings are in `docs/live_run_findings_v2.0.2.md` and `docs/live_run_findings_v2.0.3.md`.
+
+v2.0.5 is a maintenance release for the public repository. It changes no collection or extraction logic:
+
+- **User agent.** The default user agent names the program, its version and this repository, instead of a placeholder. Researchers running large collections should still add their own contact details with `ASHARE_USER_AGENT` (`docs/compliance.md`).
+- **Request-rate ceiling.** The request rate can be lowered but no longer raised above 2 requests per second, whatever `ASHARE_RPS` or `ASHARE_MARKET_RPS` say. The default stays at 1 request per second.
+- **Repository documents.** A disclaimer (below), `CONTRIBUTING.md` and `SECURITY.md`.
+- **Build workflows.** The GitHub workflows use the current versions of the checkout, Python set-up and artefact actions (Node 24), with a read-only token.
+
+The release downloads are not yet code-signed, so Windows may show "Windows protected your PC" on first run (choose **More info**, then **Run anyway**). Check each download against `SHA256SUMS.txt` on the release page.
 
 v2.0.4 is a patch that **closes the catalogue gaps on the busiest disclosure days** (live-run findings 20 to 34). The first live whole-market run under v2.0.3 confirmed CNINFO's 3,000-result limit and the resume, but left 12 days short. The causes were overlapping board codes, categories still over the limit on one board at the April deadline, announcements outside the Shanghai and Shenzhen boards, and rows repeated for several securities.
 
@@ -702,6 +711,15 @@ v1.3 adds `human_capital_observations`, `esg_observations` and `esg_ratings`. v1
 - **Timezone.** Announcement timestamps are converted with a fixed UTC+8 offset instead of `zoneinfo`, which needs the separate `tzdata` package on Windows. Without this change, disclosure cataloguing would have failed in the Windows build.
 - **Requirements.** `pandas` and `pydantic` were listed but never used, and have been removed. Development requirements are now in `requirements-dev.txt`.
 - **Error messages.** The command line now prints a one-line error, for example on a network failure, instead of a traceback. Set `ASHARE_DEBUG=1` for the full traceback.
+
+## Disclaimer
+
+A-share Company Intelligence is research software, provided as is and without warranty of any kind (see the licence). In particular:
+
+- **No affiliation.** The program is independent. It is not affiliated with, endorsed by or supported by CNINFO, the Shanghai, Shenzhen or Beijing stock exchanges, the China Securities Regulatory Commission, Eastmoney or any other source it reads.
+- **Accuracy.** Collected and extracted data may be incomplete, out of date or wrong: sources change without notice, and automated extraction from PDF documents makes mistakes. Verify any figure that matters against the original disclosure before relying on it.
+- **Not advice.** Nothing produced by the program is investment, financial or legal advice. The compliance note (`docs/compliance.md`) explains the design choices; it is not legal advice either.
+- **Responsibility of the person running it.** Whoever runs the program is responsible for complying with the sources' terms of use and with the law that applies to them, including data-protection law for the personal information that listed-company disclosures contain, and for any dataset they build or share.
 
 ## Licence
 

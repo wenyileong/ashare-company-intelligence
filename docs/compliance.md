@@ -6,7 +6,8 @@ This note explains the legal and ethical choices built into A-share Company Inte
 
 The program collects only material that the sources publish openly: the statutory disclosure platform CNINFO, the exchanges' public pages and a free public price feed. It is designed so that collection stays within what those sources permit:
 
-- one request per second by default, with retries backed off, and an identifying user agent that should be completed with the researcher's contact details (`ASHARE_USER_AGENT`);
+- one request per second by default, with retries backed off, and a ceiling of two requests per second that the settings (`ASHARE_RPS`, `ASHARE_MARKET_RPS`) cannot exceed (v2.0.5);
+- an identifying user agent, which by default names the program, its version and its public repository, and which should be completed with the researcher's contact details for larger collections (`ASHARE_USER_AGENT`);
 - no login, no circumvention of CAPTCHAs, authentication, access controls or rate limits, and no use of undocumented private interfaces beyond the public query endpoints used by the sources' own web pages;
 - the daily update queries the market as a whole (one query per exchange and day) rather than every company separately, which keeps the request volume to roughly a thousand requests a day.
 

@@ -5,12 +5,17 @@ on:
   workflow_dispatch:
   push:
     tags: ["v*"]
+# Read-only token: the workflows only build and test (v2.0.5).
+permissions:
+  contents: read
 jobs:
   build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Install
@@ -40,7 +45,7 @@ jobs:
           Compress-Archive -Path dist\AShareScraper -DestinationPath "AShareScraper-$v-portable.zip"
       # Signing: add the certificate as a secret and call packaging\sign.bat on
       # the executables (before the installer step) and on the installer.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: AShareScraper-windows
           path: |

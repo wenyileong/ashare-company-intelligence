@@ -96,7 +96,7 @@ python -m pytest -q                       # the whole suite, offline
 ASHARE_TEST_DB_URL=postgresql+psycopg://user:pass@localhost/test python -m pytest -q   # against PostgreSQL
 ```
 
-The `db` fixture gives each test its own database and folders; with `ASHARE_TEST_DB_URL` it recreates the PostgreSQL schema instead. Network access in tests goes through `httpx.MockTransport`, installed with `ashare.http.set_default_transport`. PDFs for tests are made with reportlab (`tests/helpers.make_pdf`). Live-source checks are not part of the suite: they are the self-test, run by the user.
+The `db` fixture gives each test its own database and folders; with `ASHARE_TEST_DB_URL` it recreates the PostgreSQL schema instead. Network access in tests goes through `httpx.MockTransport`, installed with `ashare.http.set_default_transport`. PDFs for tests are made with reportlab (`tests/helpers.make_pdf`). Live-source checks are not part of the suite: they are the self-test, run on a networked machine.
 
 ## 7. Building the Windows programs
 
@@ -111,8 +111,9 @@ PyInstaller does not cross-compile: build the Windows programs on Windows (a Win
 
 ## 8. Releasing a new version
 
-1. Raise `__version__` in `ashare/__init__.py`, the user agent in `config.py` and the first line of `packaging/READ_ME_FIRST.txt`.
+1. Raise `__version__` in `ashare/__init__.py` (the default user agent follows it), the version in `packaging/installer.nsi` and the first line of `packaging/READ_ME_FIRST.txt`.
 2. Add a migration if the schema changed, and a test.
 3. Update `README.md`, the build plan's status and `CITATION.cff`.
 4. Run the tests on SQLite and PostgreSQL, and the offline self-test.
-5. Build, sign, and publish the installer, its SHA-256 hash and the update JSON.
+5. Build and sign the installer and the portable zips, and write `SHA256SUMS.txt` for the downloads.
+6. Create the GitHub release for the tag `vX.Y.Z`, attach the downloads, `LICENSE.md`, `THIRD_PARTY_NOTICES.txt` and `SHA256SUMS.txt`, and publish the update JSON if one is used.

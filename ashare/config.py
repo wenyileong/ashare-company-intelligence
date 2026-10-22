@@ -29,11 +29,19 @@ RAW_DIR = raw_dir()
 DISCLOSURE_DIR = disclosure_dir()
 MARKET_RAW_DIR = market_raw_dir()
 
+from . import __version__ as _VERSION
+
+PROJECT_URL = "https://github.com/wenyileong/ashare-company-intelligence"
+# The default identifies the program and where to find it. A researcher running large collections should add
+# their own contact details with ASHARE_USER_AGENT (docs/compliance.md).
 USER_AGENT = os.getenv(
     "ASHARE_USER_AGENT",
-    "AshareResearchDataCollector/2.0.4 (research use; replace-contact-before-production)",
+    f"AshareResearchDataCollector/{_VERSION} (research use; +{PROJECT_URL})",
 )
 REQUEST_TIMEOUT = float(os.getenv("ASHARE_TIMEOUT", "30"))
+# v2.0.5: the request rate can be lowered but never raised above this ceiling, whatever ASHARE_RPS or
+# ASHARE_MARKET_RPS say, so that a mistyped setting cannot put load on the sources.
+MAX_REQUESTS_PER_SECOND = 2.0
 REQUESTS_PER_SECOND = float(os.getenv("ASHARE_RPS", "1"))
 
 CNINFO_QUERY_URL = os.getenv(
