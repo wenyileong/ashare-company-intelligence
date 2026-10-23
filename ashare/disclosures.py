@@ -314,6 +314,8 @@ def store_downloaded(adapter, company: Company, row) -> str:
     target = target_dir / f"{digest}{ext}"
     if not target.exists():
         target.write_bytes(content)
+    if row.sha256 != digest:
+        row.extracted_version = None        # v2.0.6: a new or changed document is read again
     row.local_path = str(target)
     row.sha256 = digest
     row.content_type = response.headers.get("content-type")

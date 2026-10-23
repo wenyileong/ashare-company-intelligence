@@ -241,32 +241,28 @@ def fetch_eastmoney_snapshot(trade_date: str, page_size: int = 100, max_pages: i
 
     Run after the close: the values are the day's final prices only then.
     v2.0.3: uses the quote-list variant that answers (see ``quotelist``)."""
-    from .quotelist import _Pager, QuoteListError
-    pager = _Pager("f2,f3,f4,f5,f6,f8,f12,f13,f14,f15,f16,f17,f18")
+    from .quotelist import fetch_pages
+    # v2.0.6: read through fetch_pages, so that a list longer than one query returns is read board by board
+    # (findings 50 and 57). Not cached: prices change during the day.
+    r = fetch_pages("f2,f3,f4,f5,f6,f8,f12,f13,f14,f15,f16,f17,f18", "snapshot", max_pages=max_pages,
+                    use_cache=False, min_rows=0)
+    if not r["complete"]:
+        detail = r.get("error") or "; ".join(f"{b['name']}: {b.get('error')}" for b in r["parts"].values()
+                                             if b.get("error"))
+        raise RuntimeError(f"quote list incomplete ({len(r['rows']):,} securities): {detail or 'no answer'}")
     out = []
-    try:
-        size = None
-        for pn in range(1, max_pages + 1):
-            try:
-                total, rows, size = pager.page(pn, size)
-            except QuoteListError as exc:
-                raise RuntimeError(f"quote list refused page {pn}: {exc}") from None
-            for r in rows:
-                close = _num(r.get("f2"))
-                if close is None:          # suspended or no trade today
-                    continue
-                out.append({"code": str(r.get("f12")).zfill(6), "trade_date": trade_date, "close": close,
-                            "open": _num(r.get("f17")), "high": _num(r.get("f15")), "low": _num(r.get("f16")),
-                            "prev_close": _num(r.get("f18")), "pct_change": _num(r.get("f3")),
-                            "change": _num(r.get("f4")), "volume": _num(r.get("f5")), "amount": _num(r.get("f6")),
-                            "turnover_rate": _num(r.get("f8")), "adjustment": "none", "volume_unit": "LOTS_100_SHARES",
-                            "source": "EASTMONEY_PUBLIC",
-                            "raw_json": json.dumps({"provider": "EASTMONEY_PUBLIC", "endpoint": "clist", "raw_record": r},
-                                                   ensure_ascii=False)})
-            if not rows or pn * size >= total:
-                break
-    finally:
-        pager.close()
+    for r in r["rows"]:
+        close = _num(r.get("f2"))
+        if close is None:          # suspended or no trade today
+            continue
+        out.append({"code": str(r.get("f12")).zfill(6), "trade_date": trade_date, "close": close,
+                    "open": _num(r.get("f17")), "high": _num(r.get("f15")), "low": _num(r.get("f16")),
+                    "prev_close": _num(r.get("f18")), "pct_change": _num(r.get("f3")),
+                    "change": _num(r.get("f4")), "volume": _num(r.get("f5")), "amount": _num(r.get("f6")),
+                    "turnover_rate": _num(r.get("f8")), "adjustment": "none", "volume_unit": "LOTS_100_SHARES",
+                    "source": "EASTMONEY_PUBLIC",
+                    "raw_json": json.dumps({"provider": "EASTMONEY_PUBLIC", "endpoint": "clist", "raw_record": r},
+                                           ensure_ascii=False)})
     return out
 
 

@@ -173,7 +173,7 @@ The reported total also varied between requests for the same window: 2,954 in th
 
 ## 51. Extraction prints no progress and does not resume
 
-**Evidence.** "Extract figures from reports" printed only its first line and was stopped after 5 min 37 s: "Stopped: stopped by the user; everything saved so far is kept, and running it again resumes". The code of `extract-financials` prints nothing until it has finished every company. The line every 25 documents belongs to a different command (the disclosure pipeline). On a new run it starts again at the first company and reads every downloaded document again. Facts already saved are updated, not duplicated.
+**Evidence.** "Extract figures from reports" printed only its first line and was stopped after 5 min 37 s: "Stopped: stopped by the user; everything saved so far is kept, and running it again resumes". The code of `extract-financials` reports no progress of its own. (Correction, made during the v2.0.6 build: a counter does print "... N documents read" every 25 reads, but it counts each read of a document's text, and extraction reads each PDF several times, so it appears only after about every eight documents, with no total or estimate. In 5 min 37 s it may not have appeared at all.) On a new run it starts again at the first company and reads every downloaded document again. Facts already saved are updated, not duplicated.
 
 **Assessment.** The Stop message is wrong for this command, and finding 42's statement about progress lines was wrong. A long extraction gives no sign of progress, and stopping it throws away its place. A patch should:
 - print progress: documents done and remaining, seconds per document, and an estimated finish;

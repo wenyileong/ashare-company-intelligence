@@ -163,7 +163,7 @@ Pseudonymised data are still personal information in law. Read the [compliance n
 
 To run the daily update automatically on weekdays, use **Operations** › Schedule, or `ashare-cli schedule --enable --at 18:30` (Windows Task Scheduler; elsewhere the command prints a cron line). Scheduling is never switched on without your action.
 
-### The whole-market catalogue (v2.0.3, extended in v2.0.4)
+### The whole-market catalogue (v2.0.3, extended in v2.0.4 and v2.0.6)
 
 Without a security code, "Catalogue announcements" works on the whole market:
 
@@ -172,9 +172,12 @@ Without a security code, "Catalogue announcements" works on the whole market:
   - board: the separate codes for the Shenzhen main board, ChiNext, the Shanghai main board, STAR and Beijing; or, where those codes do not work, the two whole exchanges and Beijing;
   - announcement category;
   - industry;
-  - batches of companies.
+  - for manufacturing, its divisions (if CNINFO accepts them);
+  - batches of companies, sent with each company's own exchange;
+  - as a last resort, single companies seen in the query (at most 1,500 queries for one busy day).
 
-  A query with up to 6,000 results is also read newest-first and oldest-first.
+  Splits come first. Reading a query newest-first and oldest-first is only a last pass, because rows move between pages in CNINFO's time order.
+- **Short quiet days.** A query under the limit that comes back short is read again in parts: a period of quiet days day by day, and a day board by board, since smaller queries lose fewer rows. Paging goes on past a page that only repeats earlier rows, and stops after five such pages or at page 100.
 - **Only splits that work are used.** Which of these CNINFO supports is checked as the run goes: a filter CNINFO ignores, or that returns nothing, is not used again. A split whose parts do not reach the whole is noted against the day.
 - **Rows.** CNINFO lists an announcement once for each security it concerns. The counts are of these rows, so an announcement for two securities is no longer mistaken for a missing one.
 - **Checked counts, by board.** For every day, the rows stored are compared with CNINFO's own total.
@@ -192,7 +195,7 @@ Without a security code, "Catalogue announcements" works on the whole market:
   - days that versions before v2.0.3 cut short at 3,000.
 
   A day whose gap recurred under the current method is not repeated, because the same queries cannot close it; `--include-current` overrides this. `--list` shows the days first.
-- **Checking CNINFO's filters.** "Check CNINFO's search filters" (`probe-cninfo-filters`, about 70 to 120 requests) reports which board codes, industry and company filters and sort orders work, and why some rows repeat.
+- **Checking CNINFO's filters.** "Check CNINFO's search filters" (`probe-cninfo-filters`, about 150 to 220 requests) reports which board codes, industry filters (with manufacturing divisions), company queries and sort orders work, and why some rows repeat. The company test uses companies that have announcements in the query, and tests one, two, three and up to ten together, so that a failure shows where it starts.
 
 `catalogue-days` shows each day's status (DONE, SHORTFALL, FAILED, or OPEN for today) with:
 - CNINFO's total and the rows stored;
@@ -201,11 +204,12 @@ Without a security code, "Catalogue announcements" works on the whole market:
 - the method;
 - notes on any split that did not reach the whole.
 
-For several consecutive quiet days fetched together, CNINFO gives only the total for the whole period, so the per-day total is left blank.
+Several consecutive quiet days fetched together share one total and one gap, so they are shown as one row, for example "2026-01-09~2026-01-12 (window)", and counted once in the status line. "One row per day" (`--by-day`) lists the days separately, with the per-day total left blank. The summary at the end of a run counts today as "kept open", not as finished.
 
-### Listing dates and panels (v2.0.3)
+### Listing dates and panels (v2.0.3, extended in v2.0.6)
 
-- **Listing dates.** These come from Eastmoney's public quote list, read during "Update the company list". If the list refuses requests, "Diagnose the quote list" (`diagnose-quote-list`) tries each way of asking (about six requests) and reports what each returned. A way that works is remembered and used first from then on. The download keeps every page fetched that day, so a run that stops part-way carries on where it stopped, and the listing dates already fetched are applied. A company is set to "not in the quote list" only from a complete list.
+- **Listing dates.** These come from Eastmoney's public quote list, read during "Update the company list". If the list refuses requests, "Diagnose the quote list" (`diagnose-quote-list`) tries each way of asking (about six requests), then page 11 of the whole list and of one board, and reports what each returned. A way that works is remembered and used first from then on. The download keeps every page fetched that day, so a run that stops part-way carries on where it stopped, and the listing dates already fetched are applied. A company is set to "not in the quote list" only from a complete list.
+- **A list longer than one query returns (v2.0.6).** In October 2026 the list stopped after 1,000 companies on every run, probably because one query returns at most 1,000 rows. When the whole list stops part-way, it is read one board at a time, each board in both code orders, which covers up to 2,000 companies a board. A page that fails is retried after 30 seconds and again after two minutes; the quote list is asked no more than once every two seconds. When the list is still incomplete, the note says which board fell short and why. The daily price snapshot is read the same way.
 - **Companies in each row.** "Build a panel" now has a setting for this (`--universe-basis`):
   - `listing`: a company is in a row when its listing record covers the row date.
   - `auto` (the default): as `listing`; and, for yearly rows only, a company whose listing record is incomplete (no listing date, or delisted on an unknown date) also counts as listed in a year when it published a periodic report for that year. For point-in-time rows, the report must have been published by the row's cut-off.
@@ -213,6 +217,10 @@ For several consecutive quiet days fetched together, CNINFO gives only the total
 
   The `universe_basis` column records which applies to each row: LISTING_RECORD or REPORT_EVIDENCE.
 - **Empty panels.** A panel with no rows is not written. The command says why, for example missing listing dates, filters that exclude every company, or dates that give no rows, and what to do. It then ends with an error, so the desktop shows "Last action failed".
+
+### Extracting figures (v2.0.6)
+
+"Extract figures from reports" (`extract-financials`) first counts the documents to read, then reports progress every 25 documents and at least once a minute, for example "250 of 9,800 documents; 8.7 s each; about 23 h 05 min left". Each document read is marked with the extractor's version, so a stopped run continues with the next document when run again; "Read documents again" (`--again`) reads them all. A document downloaded again with new content is read again. The default, `--kind reports`, reads the periodic reports; `all` reads every downloaded document, most of which carry no financial statements. Extraction reads only documents already downloaded: catalogue with downloads, or use "Download documents", first.
 
 ### PDF reader messages (v2.0.3)
 

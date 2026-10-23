@@ -62,6 +62,10 @@ class Disclosure(Base):
     file_size: Mapped[int | None] = mapped_column(Integer)
     sha256: Mapped[str | None] = mapped_column(String(64), index=True)
     text_layer: Mapped[str | None] = mapped_column(String(12))  # v1.5: FULL / PARTIAL / NONE (scanned)
+    # v2.0.6: the financial extractor version that last read the document (with or without facts), so that a
+    # stopped extraction continues with the next document
+    extracted_version: Mapped[str | None] = mapped_column(String(40))
+    extracted_at: Mapped[datetime | None] = mapped_column(DateTime)
     source: Mapped[str | None] = mapped_column(String(100))
     retrieved_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     raw_json: Mapped[str | None] = mapped_column(Text)

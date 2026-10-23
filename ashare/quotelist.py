@@ -18,20 +18,37 @@ This module
   carries on at page 41, and a partial list is still applied (listing dates
   for the companies it holds; "not in the quote list" only from a complete
   list).
+
+v2.0.6 (findings 50 and 57): the live list stopped at page 10 of 56 on every
+run, so only about 1,000 companies received listing dates. The probable cause
+is that Eastmoney serves at most the first 1,000 rows of one query. The list
+is therefore also read **in parts**: one board at a time, each in both code
+orders, which covers up to 2,000 companies a board. A page that fails is
+retried after a pause; the error is reported; once a query has stopped at the
+same page after its retries, that row limit is remembered for the day, so the
+parts do not wait for it again. The quote list is paced at no more than one
+request every two seconds.
 """
 from __future__ import annotations
 
 import json
 import math
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import httpx
 
 from .config import USER_AGENT, MARKET_RPS, market_raw_dir
-from .http import RateLimitedClient, Cancelled
+from .http import RateLimitedClient, Cancelled, check_cancel
 
 FS = "m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23"        # SZSE main, ChiNext, SSE main, STAR
+# v2.0.6: the boards one at a time (code, fs filter, name)
+BOARD_FS = (("szmb", "m:0+t:6", "Shenzhen main board"), ("szcy", "m:0+t:80", "ChiNext"),
+            ("shmb", "m:1+t:2", "Shanghai main board"), ("shkcp", "m:1+t:23", "STAR Market"))
+ORDERS = (1, 0)                 # po=1: codes descending; po=0: ascending
+RETRY_WAITS = (30, 120)         # seconds before the second and third attempt at a failed page
+QUOTE_RPS = min(MARKET_RPS, 0.5)
 UT = "bd1d9ddb04089700cf9c27f6f7426281"
 PATH = "/api/qt/clist/get"
 BROWSER_HEADERS = {"Referer": "https://quote.eastmoney.com/center/gridlist.html",
@@ -88,14 +105,14 @@ class _Pager:
 
     def __init__(self, fields: str, retries: int = 2):
         self.fields = fields
-        self.client = RateLimitedClient(USER_AGENT, MARKET_RPS, retries=retries)
+        self.client = RateLimitedClient(USER_AGENT, QUOTE_RPS, retries=retries)
         self.variants = _ordered_variants()
         self.errors: list[str] = []
         self.variant = None
 
-    def _get(self, variant, pn, pz):
+    def _get(self, variant, pn, pz, fs: str = FS, po: int = 1):
         name, base, headers, _ = variant
-        params = {"pn": pn, "pz": pz, "po": 1, "np": 1, "fltt": 2, "invt": 2, "fid": "f12", "fs": FS,
+        params = {"pn": pn, "pz": pz, "po": po, "np": 1, "fltt": 2, "invt": 2, "fid": "f12", "fs": fs,
                   "fields": self.fields, "ut": UT}
         r = self.client.get(base + PATH, params=params, headers=headers)
         payload = r.json()
@@ -107,14 +124,14 @@ class _Pager:
             rows = list(rows.values())
         return int(data.get("total") or 0), rows
 
-    def page(self, pn: int, pz: int | None = None):
+    def page(self, pn: int, pz: int | None = None, fs: str = FS, po: int = 1):
         """(total, rows, page size) for page ``pn``; tries the variants in turn."""
         order = [self.variant] if self.variant else []
         order += [v for v in self.variants if v is not self.variant]
         for v in order:
             size = pz or v[3]
             try:
-                total, rows = self._get(v, pn, size)
+                total, rows = self._get(v, pn, size, fs, po)
                 if self.variant is not v:
                     self.variant = v
                     _remember(v[0])
@@ -136,7 +153,8 @@ def _describe(exc) -> str:
 
 
 def diagnose() -> dict:
-    """Try page 1 of every variant once (about six requests) and report each result."""
+    """Try page 1 of every variant once (about six requests), then page 11 with the variant that answered (two
+    requests), and report each result."""
     client = RateLimitedClient(USER_AGENT, MARKET_RPS, retries=1)
     pager = _Pager("f12,f14,f26")
     pager.client.close()
@@ -156,12 +174,38 @@ def diagnose() -> dict:
             except Exception as exc:
                 entry.update(ok=False, error=_describe(exc))
             results.append(entry)
+        # v2.0.6 (finding 57): does the list stop after the first 1,000 rows of one query? Page 11 of the whole
+        # list, and page 11 of the Shanghai main board, with the variant that answered (two requests).
+        deep = []
+        if working:
+            v = next(x for x in VARIANTS if x[0] == working)
+            for label, fs in (("whole list", FS), ("Shanghai main board", BOARD_FS[2][1])):
+                entry = {"variant": f"{working}, page 11 of the {label}", "url": v[1] + PATH, "deep": True}
+                try:
+                    total, rows = pager._get(v, 11, 100, fs, 1)
+                    entry.update(ok=bool(rows), total=total, rows=len(rows),
+                                 sample=", ".join(f"{r.get('f12')} {r.get('f14')}" for r in rows[:2]),
+                                 **({} if rows else {"error": "no rows"}))
+                except Cancelled:
+                    raise
+                except Exception as exc:
+                    entry.update(ok=False, error=_describe(exc))
+                deep.append(entry)
+            results += deep
     finally:
         client.close()
     if working:
         _remember(working)
         verdict = (f"The quote list answers with variant '{working}'; it is remembered and used first from now on. "
                    "Run 'Update the company list' again to fetch listing dates.")
+        whole = deep[0] if deep else None
+        listed = next((e.get("total") or 0 for e in results if e.get("ok") and not e.get("deep")), 0)
+        if whole is not None and not whole.get("ok") and listed > 1000:
+            verdict += (" Page 11 is refused although the list holds more than 1,000 rows, so one query probably returns at "
+                        "most 1,000 rows; the program then reads the list board by board, in both code orders.")
+        elif whole is not None and not whole.get("ok"):
+            verdict += (" Page 11 was refused (" + (whole.get("error") or "no rows") + "); the program reads the "
+                        "list board by board when the whole list stops part-way.")
     elif all("HTTP 5" in (r.get("error") or "") for r in results):
         verdict = ("Every variant was refused by Eastmoney's servers (HTTP 5xx). The service may be refusing "
                    "automated requests from this network, or be down. Try again later or from another network; "
@@ -178,56 +222,213 @@ def _cache_path(kind: str) -> Path:
     return _cache_dir() / f"{kind}_{_china_today()}.json"
 
 
-def fetch_pages(fields: str, kind: str, progress=None, max_pages: int = 400) -> dict:
+def _wait(seconds: float) -> None:
+    """Sleep, ending early if the user presses Stop."""
+    end = time.monotonic() + seconds
+    while True:
+        check_cancel()
+        left = end - time.monotonic()
+        if left <= 0:
+            return
+        time.sleep(min(1.0, left))
+
+
+def _page_with_retry(pager: _Pager, pn: int, pz, fs: str, po: int):
+    """One page, retried after RETRY_WAITS when every variant fails (no waiting offline)."""
+    try:
+        return pager.page(pn, pz, fs, po)
+    except QuoteListError as exc:
+        last = exc
+    for w in RETRY_WAITS:
+        if not pager.client.offline:
+            _wait(w)
+        try:
+            return pager.page(pn, pz, fs, po)
+        except QuoteListError as exc:
+            last = exc
+    raise last
+
+
+def _read_query(pager: _Pager, part: dict, fs: str, po: int, save, progress=None, label: str = "",
+                max_pages: int = 400, row_cap: int | None = None, retry: bool = True) -> str | None:
+    """Read one query into ``part`` ({"pages", "total", "page_size", "error"}), resuming from its cached pages.
+    Returns the error that stopped it, or None. With ``row_cap``, pages beyond the cap are not requested."""
+    pn = 1
+    while pn <= max_pages:
+        size = part.get("page_size")
+        if str(pn) in part["pages"]:
+            if part.get("total") is not None and size and pn * size >= part["total"]:
+                return None
+            pn += 1
+            continue
+        if row_cap is not None and size and (pn - 1) * size >= row_cap:
+            part["error"] = f"page {pn}: beyond the {row_cap:,} rows one query returns"
+            save()
+            return part["error"]
+        try:
+            fn = _page_with_retry if retry else (lambda p, n, z, f, o: p.page(n, z, f, o))
+            total, rows, size = fn(pager, pn, size, fs, po)
+        except QuoteListError as exc:
+            part["error"] = f"page {pn}: {exc}"
+            part["failed_page"] = pn
+            save()
+            return part["error"]
+        part["total"], part["page_size"] = total, size
+        part["pages"][str(pn)] = rows
+        part["error"] = None
+        save()
+        if progress and pn % 10 == 0:
+            progress(f"  quote list{label}: page {pn} of {math.ceil(total / size) if size else '?'}")
+        if not rows or pn * size >= total:
+            return None
+        pn += 1
+    return None
+
+
+def _cap_path() -> Path:
+    return _cache_dir() / f"row_cap_{_china_today()}.json"
+
+
+def _known_cap():
+    try:
+        return int(json.loads(_cap_path().read_text(encoding="utf-8"))["row_cap"])
+    except Exception:
+        return None
+
+
+def _remember_cap(cap: int) -> None:
+    try:
+        _cap_path().parent.mkdir(parents=True, exist_ok=True)
+        _cap_path().write_text(json.dumps({"row_cap": cap}), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _contiguous(part: dict) -> int:
+    n = 0
+    while str(n + 1) in part.get("pages", {}):
+        n += 1
+    return n
+
+
+def _rows(part: dict) -> list[dict]:
+    return [r for k in sorted(part.get("pages", {}), key=int) for r in part["pages"][k]]
+
+
+def _part_complete(part: dict) -> bool:
+    total, size = part.get("total"), part.get("page_size")
+    if not total or not size:
+        return part.get("total") == 0
+    return all(str(p) in part["pages"] for p in range(1, math.ceil(total / size) + 1))
+
+
+def fetch_pages(fields: str, kind: str, progress=None, max_pages: int = 400, use_cache: bool = True,
+                min_rows: int = COMPLETE_MIN) -> dict:
     """Every page of the quote list for ``fields``, resuming from today's cache.
 
-    Returns ``{"rows": [...], "total": n, "complete": bool, "pages": k,
-    "variant": name, "errors": [...]}``. Pages already fetched today are not
-    fetched again; a failure stops the run but keeps what was fetched."""
+    Returns ``{"rows": [...], "total": n, "complete": bool, "pages": k, "expected_pages": m,
+    "variant": name, "error": str|None, "errors": [...], "parts": {...}}``. Pages already fetched
+    today are not fetched again; a failure stops that query but keeps what was fetched.
+
+    v2.0.6: when the whole list stops part-way, it is read one board at a time in both code orders
+    (see the module notes), and the rows are merged by code."""
     path = _cache_path(kind)
-    cache = {"pages": {}, "total": None, "page_size": None}
-    try:
-        cache.update(json.loads(path.read_text(encoding="utf-8")))
-    except Exception:
-        pass
+    cache = {"pages": {}, "total": None, "page_size": None, "parts": {}, "row_cap": None}
+    if use_cache:
+        try:
+            cache.update(json.loads(path.read_text(encoding="utf-8")))
+        except Exception:
+            pass
+    cache.setdefault("parts", {})
+    if cache.get("row_cap") is None:
+        cache["row_cap"] = _known_cap()          # confirmed earlier today, perhaps by another download
+
+    def save():
+        if not use_cache:
+            return
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
+        except OSError:
+            pass
+
     pager = _Pager(fields)
     error = None
+    parts_used = False
     try:
-        pn = 1
-        while pn <= max_pages:
-            if str(pn) in cache["pages"]:
-                pn += 1
-                if cache["total"] is not None and (pn - 1) * cache["page_size"] >= cache["total"]:
-                    break
-                continue
+        cap = cache.get("row_cap")
+        # A limit confirmed earlier today is tried once more without pauses: if the page beyond it now answers,
+        # the limit is dropped.
+        error = _read_query(pager, cache, FS, 1, save, progress, "", max_pages, retry=cap is None)
+        size = cache.get("page_size")
+        if cap is not None and size and _contiguous(cache) * size > cap:
+            cache["row_cap"] = None
             try:
-                total, rows, size = pager.page(pn, cache["page_size"])
-            except QuoteListError as exc:
-                error = str(exc)
-                break
-            cache["total"], cache["page_size"] = total, size
-            cache["pages"][str(pn)] = rows
-            try:
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
+                _cap_path().unlink()
             except OSError:
                 pass
-            if progress and pn % 10 == 0:
-                progress(f"  quote list: page {pn} of {math.ceil(total / size) if size else '?'}")
-            if not rows or pn * size >= total:
-                break
-            pn += 1
+            save()
+        if not _part_complete(cache) and cache["pages"]:
+            # The whole list stopped part-way. A stop at a page after earlier pages answered (and after the
+            # retries) may be the number of rows one query returns; it is confirmed when a board stops at the
+            # same number of rows, and is then remembered for today.
+            size = cache.get("page_size")
+            candidate = _contiguous(cache) * size if size else None
+            parts_used = True
+            for code, fs, name in BOARD_FS:
+                codes: set = set()
+                btotal = None
+                for po in ORDERS:
+                    if btotal is not None and len(codes) >= btotal:
+                        break
+                    part = cache["parts"].setdefault(f"{code}:{po}", {"pages": {}, "total": None,
+                                                                       "page_size": None, "error": None})
+                    label = f" ({name}, {'descending' if po else 'ascending'})"
+                    err = _read_query(pager, part, fs, po, save, progress, label, max_pages,
+                                      row_cap=cache.get("row_cap"), retry=False)
+                    if err and part.get("failed_page"):
+                        before = (part["failed_page"] - 1) * (part.get("page_size") or 0)
+                        if candidate and before == candidate:
+                            cache["row_cap"] = candidate            # the same limit: confirmed, no waiting
+                            _remember_cap(candidate)
+                            save()
+                        else:                                       # a different stop: retry after pauses
+                            _read_query(pager, part, fs, po, save, progress, label, max_pages,
+                                        row_cap=cache.get("row_cap"), retry=True)
+                    btotal = part.get("total") if part.get("total") is not None else btotal
+                    codes |= {str(r.get("f12")) for r in _rows(part)}
     finally:
         pager.close()
-    rows = [r for k in sorted(cache["pages"], key=int) for r in cache["pages"][k]]
+    merged: dict = {}
+    for r in _rows(cache):
+        merged[str(r.get("f12"))] = r
+    board_info = {}
+    for code, fs, name in BOARD_FS:
+        codes, btotal, berr = set(), None, None
+        for po in ORDERS:
+            part = cache["parts"].get(f"{code}:{po}")
+            if not part:
+                continue
+            for r in _rows(part):
+                merged.setdefault(str(r.get("f12")), r)
+                codes.add(str(r.get("f12")))
+            btotal = part.get("total") if part.get("total") is not None else btotal
+            berr = berr or part.get("error")
+        if btotal is not None or codes:
+            board_info[code] = {"name": name, "total": btotal, "rows": len(codes),
+                                "complete": btotal is not None and len(codes) >= btotal,
+                                "error": None if btotal is not None and len(codes) >= btotal else berr}
+    rows = list(merged.values())
     total = cache["total"] or 0
     size = cache["page_size"] or 100
     expected_pages = math.ceil(total / size) if total else None
-    complete = bool(expected_pages) and all(str(p) in cache["pages"] for p in range(1, expected_pages + 1)) \
-        and len({str(r.get("f12")) for r in rows}) >= COMPLETE_MIN
+    whole_complete = _part_complete(cache) and bool(expected_pages)
+    boards_complete = len(board_info) == len(BOARD_FS) and all(b["complete"] for b in board_info.values())
+    complete = (whole_complete or boards_complete) and len({str(r.get("f12")) for r in rows}) >= min_rows
     return {"rows": rows, "total": total, "complete": complete, "pages": len(cache["pages"]),
             "expected_pages": expected_pages, "variant": pager.variant[0] if pager.variant else None,
-            "error": error, "errors": pager.errors}
+            "error": error, "errors": pager.errors, "parts": board_info, "parts_used": parts_used,
+            "row_cap": cache.get("row_cap")}
 
 
 class ListingInfo(dict):
@@ -246,12 +447,23 @@ def listing_info(progress=None) -> ListingInfo:
         ld = f"{raw[:4]}-{raw[4:6]}-{raw[6:8]}" if len(raw) == 8 and raw.isdigit() and raw != "00000000" else None
         out[code] = {"name": row.get("f14"), "listing_date": ld}
     out.complete, out.total = r["complete"], r["total"]
+    out.parts = r.get("parts", {})
+    out.row_cap = r.get("row_cap")
+    if r.get("parts_used") and r["complete"]:
+        out.note = (f"quote list read board by board ({len(out):,} companies), because one query returns at most "
+                    f"{r['row_cap']:,} rows" if r.get("row_cap") else
+                    f"quote list read board by board ({len(out):,} companies)")
     if not r["complete"]:
         if not r["rows"]:
             out.note = ("the quote list refused every request (" + (r["error"] or "no answer") + "); run "
                         "'Diagnose the quote list' (ashare-cli diagnose-quote-list) to see why")
         else:
-            out.note = (f"quote list incomplete: {r['pages']} of {r['expected_pages'] or '?'} pages fetched "
-                        f"({len(out)} companies); their listing dates were applied. Run 'Update the company list' "
-                        "again to fetch the rest (pages already fetched today are kept)")
+            boards = "; ".join(f"{b['name']} {b['rows']:,} of {format(b['total'], ',') if b['total'] is not None else '?'}"
+                               + (f" ({b['error']})" if b.get("error") else "")
+                               for b in r.get("parts", {}).values())
+            out.note = (f"quote list incomplete: {len(out):,} companies fetched"
+                        + (f" (whole list: {r['error']})" if r.get("error") else "")
+                        + (f"; by board: {boards}" if boards else "")
+                        + ". Their listing dates were applied. Run 'Update the company list' again later to fetch "
+                          "the rest (what was fetched today is kept), or 'Diagnose the quote list' to see why")
     return out

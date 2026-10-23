@@ -146,7 +146,9 @@ SECTIONS = [
            "same queries cannot close it."),
          A("Which days are catalogued", "catalogue-days", [
              F("kind", "Type", "choice:" + KINDS, "all", "--kind"),
-             F("problems", "Only days not complete", "bool", True, ("--problems", None))],
+             F("problems", "Only days not complete", "bool", True, ("--problems", None)),
+             F("by_day", "One row per day", "bool", False, ("--by-day", None),
+               "Normally a window of quiet days, read as one query, is one row with its total and gap.")],
            "Each day's status (DONE, SHORTFALL, FAILED, OPEN for today), with CNINFO's total and the number stored."),
          A("Check CNINFO's search filters", "probe-cninfo-filters", [
              F("day", "Very busy day", "date", "2026-04-29", "--day")],
@@ -176,7 +178,11 @@ SECTIONS = [
               "(high confidence); otherwise figures are read from PDF text (medium or low confidence).",
      "actions": [
          A("Extract figures from reports", "extract-financials", [
-             CODE_OPT(), F("kind", "Reports", "choice:reports,annual,interim,quarterly,all", "reports", "--kind")]),
+             CODE_OPT(), F("kind", "Reports", "choice:reports,annual,interim,quarterly,all", "reports", "--kind",
+                           "'reports' reads the periodic reports; 'all' reads every downloaded document, most of "
+                           "which carry no financial statements."),
+             F("again", "Read documents again", "bool", False, ("--again", None),
+               "Normally documents already read are skipped, so a stopped run continues where it stopped.")]),
          A("Check balance sheets", "validate-financials", [CODE_OPT()],
            "Tests assets = liabilities + equity for each report; failures are flagged, never changed."),
          A("Show a company's figures", "show-financials", [
@@ -691,6 +697,22 @@ class _Tee(io.StringIO):
             self._pending = ""
 
 
+# v2.0.6 (finding 51): what running a stopped command again does, said only where it is true.
+RESUME_NOTES = {
+    "catalogue-disclosures": "running it again resumes with the first unfinished day",
+    "recatalogue-busy-days": "running it again resumes with the first unfinished day",
+    "download-documents": "running it again downloads only the documents still missing",
+    "extract-financials": "documents read so far are saved; running it again continues with the rest",
+    "update-universe": "quote-list pages fetched today are kept; running it again continues",
+    "job-run": "running the job again resumes where it stopped",
+}
+
+
+def stop_message(argv: list[str], exc) -> str:
+    note = RESUME_NOTES.get(argv[0] if argv else "")
+    return f"Stopped: {exc}" + (f"; {note}" if note else "")
+
+
 def run_command(argv: list[str], stream=None) -> tuple[int, str]:
     """Run one CLI command in-process and capture its output; with *stream*,
     each line is also passed on as it is written."""
@@ -709,7 +731,7 @@ def run_command(argv: list[str], stream=None) -> tuple[int, str]:
             code = exc.code if isinstance(exc.code, int) else 1
         except Cancelled as exc:
             code = 130
-            print(f"Stopped: {exc}")
+            print(stop_message(argv, exc))
         except Exception as exc:
             code = 1
             msg = getattr(exc, "format_message", None)

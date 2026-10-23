@@ -43,7 +43,7 @@ def document_heartbeat(path=None, every: int = 25) -> None:
     _READ["n"] += 1
     if _READ["t0"] is None:
         _READ["t0"] = time.monotonic()
-    if _READ["n"] % every == 0:
+    if _READ["n"] % every == 0 and not _READ.get("quiet"):
         import sys
         rate = _READ["n"] / max(time.monotonic() - _READ["t0"], 1e-6)
         sys.stdout.write(f"... {_READ['n']} documents read ({rate:.1f} per second)\n")
@@ -57,9 +57,23 @@ def reset_heartbeat() -> None:
     _READ.update(n=0, t0=None)
 
 
+class quiet_heartbeat:
+    """v2.0.6: within this block the heartbeat still lets Stop end the work but prints nothing; for commands that
+    report their own progress per document (the heartbeat counts each read of a document's text)."""
+
+    def __enter__(self):
+        self._was = _READ.get("quiet", False)
+        _READ["quiet"] = True
+        return self
+
+    def __exit__(self, *exc):
+        _READ["quiet"] = self._was
+        return False
+
+
 def check_cancel() -> None:
     if _CANCEL.is_set():
-        raise Cancelled("stopped by the user; everything saved so far is kept, and running it again resumes")
+        raise Cancelled("stopped by the user; everything saved so far is kept")
 
 
 def set_default_transport(transport) -> None:

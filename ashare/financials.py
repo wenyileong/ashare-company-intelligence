@@ -518,38 +518,88 @@ def persist_facts(company: Company, disclosure: Disclosure, facts: Iterable[dict
         session.close()
 
 
-def extract_financials(security_code: str | None = None, kind: str = "reports", limit: int | None = None) -> dict:
+# v2.0.6: raise when the extraction logic changes, so that documents are read again by the new version.
+EXTRACTOR_VERSION = "financials-1"
+
+
+def _duration(seconds: float) -> str:
+    seconds = int(round(seconds))
+    if seconds < 90:
+        return f"{seconds} s"
+    minutes = seconds // 60
+    if minutes < 90:
+        return f"{minutes} min"
+    return f"{minutes // 60} h {minutes % 60:02d} min"
+
+
+def extract_financials(security_code: str | None = None, kind: str = "reports", limit: int | None = None,
+                       again: bool = False, progress=None) -> dict:
+    """Read financial facts from downloaded documents.
+
+    v2.0.6 (findings 42 and 51): counts the documents first and reports progress (documents done and left,
+    seconds per document, an estimated finish) every 25 documents and at least once a minute. Each document
+    read is marked with ``EXTRACTOR_VERSION``, so a stopped run continues with the next document; ``again``
+    reads every document regardless."""
+    import time
+    from .http import quiet_heartbeat
+    say = progress or (lambda m: None)
     session = SessionLocal()
-    totals = {"companies": 0, "documents": 0, "facts_inserted": 0, "facts_updated": 0, "skipped": 0, "errors": []}
+    totals = {"companies": 0, "documents": 0, "facts_inserted": 0, "facts_updated": 0, "skipped": 0,
+              "already_read": 0, "missing_files": 0, "to_read": 0, "errors": []}
     try:
-        q = session.query(Company)
+        q = (session.query(Disclosure, Company).join(Company, Disclosure.company_id == Company.id)
+             .filter(Disclosure.local_path.isnot(None)))
         if security_code:
             q = q.filter(Company.security_code == security_code.zfill(6))
-        companies = q.order_by(Company.security_code).all()
-        for company in companies:
-            totals["companies"] += 1
-            dq = session.query(Disclosure).filter(Disclosure.company_id == company.id, Disclosure.local_path.isnot(None))
-            # v0.7 filtered on kinds ("annual", "interim"...) that the
-            # classifier never produces, so no report was ever extracted.
-            if kind == "reports":
-                dq = dq.filter(Disclosure.kind.in_(REPORT_KINDS))
-            elif kind != "all":
-                dq = dq.filter(Disclosure.kind == _KIND_ALIASES.get(kind, kind))
-            docs = dq.order_by(Disclosure.announcement_date).all()
-            if limit:
-                docs = docs[:limit]
-            for disclosure in docs:
-                try:
-                    facts = extract_document(company, disclosure)
-                    if not facts:
-                        totals["skipped"] += 1
-                        continue
-                    result = persist_facts(company, disclosure, facts)
-                    totals["documents"] += 1
-                    totals["facts_inserted"] += result["inserted"]
-                    totals["facts_updated"] += result["updated"]
-                except Exception as exc:
-                    totals["errors"].append({"code": company.security_code, "disclosure_id": disclosure.id, "error": repr(exc)})
+        # v0.7 filtered on kinds ("annual", "interim"...) that the
+        # classifier never produces, so no report was ever extracted.
+        if kind == "reports":
+            q = q.filter(Disclosure.kind.in_(REPORT_KINDS))
+        elif kind != "all":
+            q = q.filter(Disclosure.kind == _KIND_ALIASES.get(kind, kind))
+        rows = q.order_by(Company.security_code, Disclosure.announcement_date, Disclosure.id).all()
+        if limit:
+            kept, per = [], {}
+            for d, c in rows:
+                per[c.id] = per.get(c.id, 0) + 1
+                if per[c.id] <= limit:
+                    kept.append((d, c))
+            rows = kept
+        todo = [(d, c) for d, c in rows if again or d.extracted_version != EXTRACTOR_VERSION]
+        totals["already_read"] = len(rows) - len(todo)
+        totals["to_read"] = n = len(todo)
+        totals["companies"] = len({c.id for _, c in todo})
+        say(f"{n:,} document(s) to read from {totals['companies']:,} companies"
+            + (f"; {totals['already_read']:,} already read by this version are skipped (--again reads them too)"
+               if totals["already_read"] else ""))
+        t0 = last = time.monotonic()
+        with quiet_heartbeat():
+            for i, (disclosure, company) in enumerate(todo, 1):
+                if not Path(disclosure.local_path).exists():
+                    totals["missing_files"] += 1
+                else:
+                    try:
+                        facts = extract_document(company, disclosure)
+                        if facts:
+                            result = persist_facts(company, disclosure, facts)
+                            totals["documents"] += 1
+                            totals["facts_inserted"] += result["inserted"]
+                            totals["facts_updated"] += result["updated"]
+                        else:
+                            totals["skipped"] += 1
+                        disclosure.extracted_version = EXTRACTOR_VERSION
+                        disclosure.extracted_at = utcnow()
+                        session.commit()
+                    except Exception as exc:
+                        session.rollback()
+                        totals["errors"].append({"code": company.security_code, "disclosure_id": disclosure.id,
+                                                 "error": repr(exc)})
+                now = time.monotonic()
+                if i % 25 == 0 or now - last >= 60 or i == n:
+                    each = (now - t0) / i
+                    left = f"; about {_duration(each * (n - i))} left" if i < n else ""
+                    say(f"  {i:,} of {n:,} documents; {each:.1f} s each{left}")
+                    last = now
         return totals
     finally:
         session.close()

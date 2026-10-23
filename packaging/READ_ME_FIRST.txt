@@ -1,8 +1,8 @@
-A-share Company Intelligence v2.0.5
+A-share Company Intelligence v2.0.6
 =================================
 
 Install
-  Run AShareScraper-2.0.5-setup.exe (no administrator rights needed), or
+  Run AShareScraper-2.0.6-setup.exe (no administrator rights needed), or
   unzip the portable zip (and its command-line add-on) into one folder.
   Both routes give the desktop application
   (AShareScraper.exe) and the command line (ashare-cli.exe).

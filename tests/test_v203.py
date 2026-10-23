@@ -109,7 +109,8 @@ def test_busy_day_is_split_complete_and_queried_once(universe):
     assert r["announcements"] == 6620 and r["unmatched"] == 200 and not r["days_failed"]
     ids = _stored_ids()
     assert len(ids) == len(set(ids)) == 6620 - 200                       # every matched announcement, once
-    assert {c["column"] for c in server.calls} == {"szse"}                 # one market-wide query, not per exchange
+    # one market-wide query, not per exchange (company queries, v2.0.6, carry their own exchange)
+    assert {c["column"] for c in server.calls if not c.get("stock")} == {"szse"}
     assert max(int(c["pageNum"]) for c in server.calls) <= 101             # no runaway paging
     assert len(server.calls) < 6620 / 30 + 60
     assert any("category 5 of 26 done" in x for x in lines)               # progress within a busy day
@@ -201,7 +202,7 @@ def test_today_is_never_finished(universe):
     from ashare.market_catalogue import day_status, _china_today
     today = _china_today()
     r = _run(CNInfo({today: make_items(today, 5)}), today, today, "all")
-    assert day_status("all")[0]["status"] == "OPEN" and r["days_done"] == 1
+    assert day_status("all")[0]["status"] == "OPEN" and r["days_done"] == 0 and r["days_open"] == 1  # v2.0.6
 
 
 def test_recatalogue_busy_days_from_earlier_versions(universe):
@@ -293,7 +294,7 @@ def test_quote_list_download_resumes_and_partial_list_is_applied(db, universe):
     set_default_transport(httpx.MockTransport(handler))
     try:
         info = listing_info()
-        assert not info.complete and len(info) == 300 and "3 of 31 pages" in info.note
+        assert not info.complete and len(info) == 300 and "300 companies fetched" in info.note
         st = enrich_listing_status(info)
         assert st["NOT_IN_QUOTE_LIST"] == 0 and st["listing_dates_added"] > 0 and not st["quote_list_complete"]
         handler2, calls2 = _quote_server(refuse=())

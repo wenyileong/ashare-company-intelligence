@@ -103,7 +103,7 @@ The `db` fixture gives each test its own database and folders; with `ASHARE_TEST
 On Windows with Python 3.10 to 3.13, run `build_windows.bat`. It creates a build environment, runs the tests, builds both executables with PyInstaller (`packaging/ashare.spec`), builds the documentation (`packaging/build_docs.py`), signs the executables if a certificate is configured (`packaging/sign.bat`), builds the installer with NSIS if it is installed (`packaging/installer.nsi`), and writes a portable zip.
 
 - **Signing.** Set `ASHARE_SIGN_CERT` (a `.pfx` file) and, if needed, `ASHARE_SIGN_PASSWORD`, or set `ASHARE_SIGN_COMMAND` for a hardware token or cloud signing service. Without these the build continues unsigned. On Linux, `packaging/sign.sh` does the same with osslsigncode.
-- **Installer.** `makensis /DVERSION=2.0.4 packaging\installer.nsi`. The installer is per-user and includes both programs and the documentation.
+- **Installer.** `makensis /DVERSION=X.Y.Z packaging\installer.nsi`, with the version being built. The installer is per-user and includes both programs and the documentation.
 - **Documentation.** `python packaging/build_docs.py --codebook` regenerates `docs/codebook.md` from the variable registry and converts every `docs/*.md` to HTML.
 - **Update check.** Publish a JSON file (`{"version", "url", "sha256", "notes"}`) at an HTTPS address and give users that address; the program never contacts it unless configured.
 
@@ -113,7 +113,8 @@ PyInstaller does not cross-compile: build the Windows programs on Windows (a Win
 
 1. Raise `__version__` in `ashare/__init__.py` (the default user agent follows it), the version in `packaging/installer.nsi` and the first line of `packaging/READ_ME_FIRST.txt`.
 2. Add a migration if the schema changed, and a test.
-3. Update `README.md`, the build plan's status and `CITATION.cff`.
-4. Run the tests on SQLite and PostgreSQL, and the offline self-test.
-5. Build and sign the installer and the portable zips, and write `SHA256SUMS.txt` for the downloads.
-6. Create the GitHub release for the tag `vX.Y.Z`, attach the downloads, `LICENSE.md`, `THIRD_PARTY_NOTICES.txt` and `SHA256SUMS.txt`, and publish the update JSON if one is used.
+3. If the financial extraction changed, raise `EXTRACTOR_VERSION` in `ashare/financials.py` (v2.0.6), so that documents read by the earlier version are read again; otherwise a rerun skips them.
+4. Update `README.md`, `CHANGELOG.md`, the build plan's status and `CITATION.cff`.
+5. Run the tests on SQLite and PostgreSQL, and the offline self-test.
+6. Build and sign the installer and the portable zips, and write `SHA256SUMS.txt` for the downloads.
+7. Create the GitHub release for the tag `vX.Y.Z`, attach the downloads, `LICENSE.md`, `THIRD_PARTY_NOTICES.txt` and `SHA256SUMS.txt`, and publish the update JSON if one is used.

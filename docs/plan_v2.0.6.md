@@ -1,6 +1,10 @@
 # v2.0.6 patch plan: listing dates, extraction you can follow, and the last catalogue gaps
 
-**Status:** planned, 23 October 2026; not yet built.
+**Status:** implemented as v2.0.6, 23 October 2026 (see `CHANGELOG.md`). Departures from the plan, decided during the build:
+- **The row limit.** It is taken as confirmed only when a board stops at the same number of rows as the whole list, and a limit remembered for the day is tried once more on the next run.
+- **Sorting.** A sorted request that fails leaves a recorded gap for its query instead of failing the day.
+- **Single companies.** These are used even when company batches fail, provided that single companies return rows.
+- **Today.** The summary's "kept open" wording also applies to the current day in the daily update.
 **Basis:** the v2.0.5 live-run findings 35 to 57 (`docs/live_run_findings_v2.0.5.md`): three logs of 23 October 2026, including `probe-cninfo-filters` for 29 April.
 **Aim:** a patch before v2.1, in order of importance:
 1. listing dates for the whole company list, so that panels can use the point-in-time universe;

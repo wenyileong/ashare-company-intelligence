@@ -75,9 +75,16 @@ def items_for(day, n, rcjy_share=0.0, uncategorised=0, bse_uncategorised=0, mult
 
 
 class LiveCNInfo:
-    def __init__(self, items, disjoint="yes", trade="yes", stock="yes", sort="yes", unstable=False, bj="yes"):
+    """``stock``: "yes" (batches and single companies work), "no" (several at once return nothing; single
+    companies work), "ignore" (several at once are ignored), "never" (no company filter works). v2.0.6:
+    ``exchange="ignore"`` makes ``sz``/``sh`` ignored; ``column_strict`` makes a company query return nothing
+    unless it is sent with the company's own exchange; ``division`` ("yes"/"no") whether manufacturing
+    divisions are accepted as an industry."""
+    def __init__(self, items, disjoint="yes", trade="yes", stock="yes", sort="yes", unstable=False, bj="yes",
+                 exchange="yes", column_strict=False, division="no"):
         self.items, self.bj = items, bj
         self.disjoint, self.trade, self.stock, self.sort, self.unstable = disjoint, trade, stock, sort, unstable
+        self.exchange, self.column_strict, self.division = exchange, column_strict, division
         self.calls = []
 
     def __call__(self, request):
@@ -94,13 +101,23 @@ class LiveCNInfo:
         if plate:
             if (plate in ("szmb", "shmb") and self.disjoint == "zero") or (plate == "bj" and self.bj == "no"):
                 sel = []
+            elif plate in ("sz", "sh") and self.exchange == "ignore":
+                pass
             elif not (plate in ("szmb", "shmb") and self.disjoint == "ignore"):
                 sel = [it for it in sel if board(it["secCode"]) in PLATE[plate]]
         if trade and self.trade == "yes":
-            sel = [it for it in sel if it["_trade"] == trade]
+            if trade in CSRC_SECTIONS:
+                sel = [it for it in sel if it["_trade"] == trade]
+            elif self.division == "yes":
+                sel = [it for it in sel if it["_trade"] == CSRC_SECTIONS[2] and it.get("_division") == trade]
+            else:
+                sel = []
         if stock:
             codes = {p.split(",")[0] for p in stock.split(";")}
-            if len(codes) > 1 and self.stock == "no":
+            column = body.get("column", "")
+            if self.stock == "never" or (len(codes) > 1 and self.stock == "no"):
+                sel = []
+            elif self.column_strict and any(("sse" if c.startswith("6") else "szse") != column for c in codes):
                 sel = []
             elif not (len(codes) > 1 and self.stock == "ignore"):
                 sel = [it for it in sel if it["secCode"] in codes]
@@ -183,8 +200,8 @@ def test_complete_without_disjoint_boards_industry_or_sort(universe):
     st = day_status("all")[0]
     assert st["status"] == "DONE" and st["gap_in_scope"] == 0, st
     assert _expected_in_scope(items) <= _stored()
-    assert r["filters"].get("trade") is False and r["filters"].get("sort") is False
-    assert "STOCK" in st["method"]
+    assert r["filters"].get("trade") is False
+    assert "STOCK" in st["method"] and "SORT_BOTH" not in st["method"]     # v2.0.6: splits before sorting
 
 
 def test_complete_with_industry_only(universe):
@@ -202,7 +219,7 @@ def test_unreachable_rows_are_recorded_not_lost_silently(universe):
     """No filter beyond category and whole-exchange board works: the gap is recorded per board."""
     from ashare.market_catalogue import day_status
     items = _april29()
-    r = _run(LiveCNInfo(items, disjoint="zero", trade="ignore", stock="no", sort="ignore"), DAY, DAY, "all")
+    r = _run(LiveCNInfo(items, disjoint="zero", trade="ignore", stock="never", sort="ignore"), DAY, DAY, "all")
     st = day_status("all")[0]
     assert st["status"] == "SHORTFALL" and st["gap_in_scope"] > 0
     assert st["stored"] + st["gap_in_scope"] + st["gap_out_scope"] == st["expected"]
@@ -227,11 +244,11 @@ def test_sort_both_on_a_single_category_day(universe):
     items = items_for(day, 4500, rcjy_share=0.0)
     for it in items:
         it["_cat"] = "category_ndbg_szsh"
-    server = LiveCNInfo(items, disjoint="zero", trade="ignore", stock="no", sort="yes")
+    server = LiveCNInfo(items, disjoint="ignore", exchange="ignore", trade="ignore", stock="never", sort="yes")
     r = _run(server, day, day, "annual")
     st = day_status("annual")[0]
     assert st["status"] == "DONE" and st["stored"] == 4500 and "SORT_BOTH" in st["method"]
-    assert r["filters"].get("sort") is True
+    assert any(k.startswith("sort[") and v is True for k, v in r["filters"].items())
 
 
 def test_beijing_only_gap_leaves_the_day_done(universe):
@@ -275,11 +292,21 @@ def test_unstable_ordering_is_recovered_by_reading_both_orders(universe):
     assert st["status"] == "DONE" and st["stored"] == 2950 and "SORT_BOTH" in st["method"]
 
 
-def test_unstable_ordering_without_sort_is_a_recorded_gap(universe):
+def test_unstable_ordering_without_sort_is_recovered_by_boards(universe):
+    """v2.0.6 (finding 39): a short day under the limit is read again board by board."""
     from ashare.market_catalogue import day_status
     day = "2026-01-09"
     items = items_for(day, 2950)
     _run(LiveCNInfo(items, unstable=True, sort="ignore"), day, day, "all")
+    st = day_status("all")[0]
+    assert st["status"] == "DONE" and st["stored"] == 2950 and "BOARDS" in st["method"]
+
+
+def test_unstable_ordering_without_sort_or_boards_is_a_recorded_gap(universe):
+    from ashare.market_catalogue import day_status
+    day = "2026-01-09"
+    items = items_for(day, 2950)
+    _run(LiveCNInfo(items, unstable=True, sort="ignore", disjoint="zero"), day, day, "all")
     st = day_status("all")[0]
     assert st["status"] == "SHORTFALL" and st["gap_in_scope"] > 0
 
@@ -313,7 +340,7 @@ def test_recent_totals_are_rechecked(universe):
 def test_recatalogue_holds_days_whose_gap_recurred(universe):
     from ashare.market_catalogue import recatalogue_busy_days, day_status
     items = _april29()
-    server = LiveCNInfo(items, disjoint="zero", trade="ignore", stock="no", sort="ignore")
+    server = LiveCNInfo(items, disjoint="zero", trade="ignore", stock="never", sort="ignore")
     _run(server, DAY, DAY, "all")
     assert day_status("all")[0]["status"] == "SHORTFALL"
     set_default_transport(httpx.MockTransport(server))
@@ -350,7 +377,7 @@ def test_exit_codes_and_desktop_wording(universe, tmp_path, monkeypatch):
     from typer.testing import CliRunner
     from ashare.cli import app
     items = _april29()
-    set_default_transport(httpx.MockTransport(LiveCNInfo(items, disjoint="zero", trade="ignore", stock="no",
+    set_default_transport(httpx.MockTransport(LiveCNInfo(items, disjoint="zero", trade="ignore", stock="never",
                                                          sort="ignore")))
     try:
         res = CliRunner().invoke(app, ["catalogue-disclosures", "--since", DAY, "--until", DAY, "--kind", "all"])
@@ -381,7 +408,8 @@ def test_probe_filters_verdicts(universe):
     finally:
         set_default_transport(None)
     assert r == {"boards_disjoint": "PARTITION", "boards_exchange": "PARTITION", "industry": "PARTITION",
-                 "company_batches": "WORKS", "sort_orders": "HONOURED", "repeated_rows": "ROWS_PER_SECURITY"}
+                 "manufacturing_divisions": "REJECTED", "company_batches": "WORKS", "sort_orders": "HONOURED",
+                 "repeated_rows": "ROWS_PER_SECURITY"}
     set_default_transport(httpx.MockTransport(LiveCNInfo(items, disjoint="zero", trade="ignore", stock="no",
                                                          sort="ignore", unstable=True)))
     try:
@@ -389,7 +417,8 @@ def test_probe_filters_verdicts(universe):
     finally:
         set_default_transport(None)
     assert r["boards_disjoint"] in ("PARTIAL", "REJECTED") and r["industry"] == "IGNORED"
-    assert r["company_batches"] in ("FAILS", "NO_DATA") and r["sort_orders"] == "IGNORED"
+    assert r["company_batches"] == "SINGLES_ONLY" and r["sort_orders"] == "IGNORED"
+    assert r["manufacturing_divisions"] == "IGNORED"
 
 
 def test_migration_adds_catalogue_detail_columns(db):

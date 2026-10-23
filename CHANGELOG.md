@@ -1,6 +1,79 @@
 # Change log
 
-This log records what changed in each version and the important findings behind the changes. The live-run findings are kept in full in `docs/live_run_findings_v2.0.2.md` (findings 1 to 19) `docs/live_run_findings_v2.0.3.md` (findings 20 to 34) and `docs/live_run_findings_v2.0.5.md` (findings 35 to 51, the first live runs of the v2.0.4 catalogue engine). Earlier versions are described in `README.md` and in section 18 of `ashare_scraper_build_plan.md`.
+This log records what changed in each version and the important findings behind the changes. The live-run findings are kept in full in `docs/live_run_findings_v2.0.2.md` (findings 1 to 19) `docs/live_run_findings_v2.0.3.md` (findings 20 to 34) and `docs/live_run_findings_v2.0.5.md` (findings 35 to 57, the first live runs of the v2.0.4 catalogue engine). Earlier versions are described in `README.md` and in section 18 of `ashare_scraper_build_plan.md`.
+
+## v2.0.6 (23 October 2026)
+
+**Aim:** listing dates for the whole company list, an extraction that can be followed and resumed, and the last catalogue gaps. The plan is in `docs/plan_v2.0.6.md`, and the findings behind it are 35 to 57 in `docs/live_run_findings_v2.0.5.md`, from three live logs of 23 October 2026.
+
+**What the live runs showed.** The v2.0.4 engine closed the April gaps from 11,597 rows to 20, and the disjoint board codes, categories and industries partition exactly. Three problems remained:
+- the quote list stopped at page 10 of 56 on every run, so only about 1,000 companies had listing dates;
+- extraction gave no useful progress and started again from the beginning, although its Stop message said it resumed;
+- 33 rows were still missing: on 29 April one query (日常经营, Shenzhen main board, manufacturing) held 3,024 rows with no working filter to split it, and on 9 to 12 January rows moved between pages.
+
+### Listing dates (findings 50 and 57)
+
+- **The list in parts.** When the whole list stops part-way, it is read one board at a time (Shenzhen main board, ChiNext, Shanghai main board, STAR), each in both code orders. This covers up to 2,000 companies a board, if, as is probable, one query returns at most 1,000 rows.
+- **The row limit.** A limit is taken as confirmed when a board stops at the same number of rows as the whole list. It is then remembered for the day, so that the boards are not waited on; the next run tries once more beyond it.
+- **Retries.** A page that fails is retried after 30 seconds and again after two minutes.
+- **Pace.** The quote list is asked at most once every two seconds.
+- **Messages.** The note says how many companies were fetched, which board fell short, and the error, which was kept but not printed before.
+- **Diagnosis.** `diagnose-quote-list` also requests page 11 of the whole list and of the Shanghai main board, and says whether the list appears to stop at 1,000 rows.
+- **Prices.** The daily price snapshot is read the same way, and fails with the reason instead of storing part of the market.
+
+### Extraction (findings 42 and 51)
+
+- **Progress.** `extract-financials` counts the documents first. It then reports every 25 documents and at least once a minute: documents done, seconds per document and an estimated finish.
+- **Resume.** Each document read is marked with the extractor version (`EXTRACTOR_VERSION`, migration `0005_v206_extraction_state`: `extracted_version` and `extracted_at` on `disclosures`). A rerun skips documents already read, so a stopped run continues. `--again` (desktop: "Read documents again") reads them all, and a document downloaded again with new content is read again.
+- **Stop wording.** The Stop message now says what running the command again does, and only where that is true. Before, every command said it resumed.
+- **The heartbeat.** The old counter counted reads of a document's text, several per document, and is silent during extraction now. The desktop explains that `all` reads every downloaded document, most of which carry no statements.
+
+### Catalogue (findings 37 to 40, 43, 45 to 49, 54 to 56)
+
+- **Splits before sorting.** A query over the limit is split first. Reading it newest-first and oldest-first is now only a last pass, because CNINFO's time order is unstable (finding 37). A sorted request that fails is recorded as a gap; it no longer turns sorting off for the run (finding 55). Whether the order is honoured is decided per kind of query.
+- **Finer splits (finding 45):**
+  - manufacturing by its 31 CSRC divisions, used only if CNINFO's industry field accepts them, which is checked as the run goes;
+  - batches of companies, sent with the companies' own exchange (`column`), one exchange per batch, without and then with a board code (finding 54);
+  - as a last resort, single companies seen in the query, within 1,500 queries a day; if the first three return nothing in both forms, company queries are not used again.
+- **Short queries under the limit (findings 39 and 56).** A period of quiet days that comes back short is read again day by day, and a short day board by board.
+- **Paging (finding 38).** Paging no longer stops at the first page that repeats earlier rows, but after five such pages, and never goes past page 100.
+- **No repeats (finding 46).** Within a day, a query already read, or a count already asked for, is reused.
+- **Strategy 3.** Days short under strategy 2 (9 to 12 January and 29 April) are fetched again by `recatalogue-busy-days`.
+- **The probe (finding 54).** `probe-cninfo-filters` tests company queries with companies that have announcements in the query, sent with their own exchange, with and without a board code, one, two, three and up to ten together. It also tests the manufacturing divisions. Verdicts: WORKS, SINGLES_ONLY, IGNORED, PARTIAL or FAILS.
+
+### Reporting (findings 40 and 43)
+
+- **Windows.** `catalogue-days` shows a window of quiet days as one row with its total, its stored rows and its gap once, and counts it once in the status line. `--by-day` (desktop: "One row per day") lists the days.
+- **Today.** The catalogue summary counts today as "kept open", not as finished.
+
+**Tests.** `tests/test_v206.py` (31 tests):
+- the quote list with a 1,000-row limit, a board over 2,000, retries, the error in the note, the snapshot and the diagnosis;
+- extraction progress, resume, `--again`, a changed download and the Stop wording;
+- the 29 April shape split by company batches, single companies or divisions, and recorded when none works;
+- a leaf read once, short windows split by day, paging rules, a failed sorted request, strategy 3 and the probe verdicts;
+- window rows and the current day.
+
+The v2.0.4 mock CNINFO gained switches for whole-exchange codes, company queries that need their own exchange, and manufacturing divisions. Tests whose expectations changed with the new order of splitting were updated, and each change was checked.
+
+**Found during the build.** The PostgreSQL run found two faults that SQLite does not show:
+- **Method too long.** The longer method names of v2.0.6 can exceed the 60 characters of `catalogue_days.method`. They are now shortened to whole parts ("...+..."), and the day is recorded.
+- **Lost FAILED marking.** A failure while recording a day (as that one was) left the day neither recorded nor FAILED, because it was counted as finished before the write. Days are now counted only once recorded.
+
+It also showed that the single-company fallback could run for a whole day, where it cannot place a gap. It is now used only for a leaf within one board and one category. Tests cover all three.
+
+**Verification.**
+- Linux Python 3.12: 224 tests passed (2 skipped).
+- Linux Python 3.13: 215 passed (9 skipped: optional parts not installed there).
+- PostgreSQL 16: 221 passed (5 skipped).
+- Windows CPython 3.12 under Wine: 222 passed (4 skipped).
+- The Windows installer was installed, its offline self-test passed 20 of 20, and it was uninstalled cleanly.
+- A database shaped like v2.0.5 was upgraded to migration 0005.
+
+**Still to confirm live.**
+- "Update the company list" adds listing dates for at least 5,000 companies.
+- `probe-cninfo-filters` shows which company queries and whether divisions work.
+- `recatalogue-busy-days` closes 9 to 12 January and 29 April.
+- A stopped extraction continues.
 
 ## v2.0.5 (22 October 2026)
 

@@ -1,6 +1,17 @@
-# China A-share Company Intelligence v2.0.5
+# China A-share Company Intelligence v2.0.6
 
-A provenance-preserving research data system for SSE Main Board, STAR Market, SZSE Main Board and ChiNext companies. The architecture is set out in `ashare_scraper_build_plan.md`. Changes by version, and the findings behind them, are in `CHANGELOG.md`; the live-run findings are in `docs/live_run_findings_v2.0.2.md`, `docs/live_run_findings_v2.0.3.md` and `docs/live_run_findings_v2.0.5.md`.
+A provenance-preserving research data system for SSE Main Board, STAR Market, SZSE Main Board and ChiNext companies. The architecture is set out in `ashare_scraper_build_plan.md`. Changes by version, and the findings behind them, are in `CHANGELOG.md`; the live-run findings are in `docs/live_run_findings_v2.0.2.md`, `docs/live_run_findings_v2.0.3.md` and `docs/live_run_findings_v2.0.5.md`; the current patch plan is `docs/plan_v2.0.6.md`.
+
+v2.0.6 is a patch from the first live runs of the v2.0.4 catalogue engine (findings 35 to 57, `docs/live_run_findings_v2.0.5.md`):
+
+- **Listing dates for the whole list.** The quote list stopped after 1,000 companies on every run. When it stops part-way it is now read board by board, in both code orders, with retries after a pause, and the reason is shown.
+- **Extraction you can follow and resume.** "Extract figures from reports" shows documents done, seconds per document and an estimated finish, and a stopped run continues with the next document (migration 0005). The Stop message says what running a command again does, only where that is true.
+- **The last catalogue gaps.**
+  - Busy queries are split before they are read in both time orders.
+  - A query still over the limit is split by manufacturing division, by companies sent with their own exchange, or, as a last resort, by single companies.
+  - Short quiet periods are read again day by day and board by board.
+  - A query is never read twice in a day.
+- **Reporting.** A window of quiet days is one row in "Which days are catalogued", and today is counted as kept open.
 
 v2.0.5 is a maintenance release for the public repository. It changes no collection or extraction logic:
 

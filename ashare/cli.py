@@ -278,12 +278,15 @@ def _report_catalogue(result: dict) -> None:
 
 @app.command("diagnose-quote-list")
 def diagnose_quote_list_cmd():
-    """Why the public quote list (listing dates, daily snapshot) refuses requests: tries each request variant once
-    (about six requests) and reports what each returned (finding 4)."""
+    """Why the public quote list (listing dates, daily snapshot) refuses requests: tries each request variant once,
+    then page 11 of the whole list and of one board (about eight requests), and reports what each returned
+    (findings 4 and 57)."""
     from .quotelist import diagnose
     r = diagnose()
     for e in r["results"]:
-        if e.get("ok"):
+        if e.get("ok") and e.get("deep"):
+            print(f"  [green]{e['variant']}: answered[/green], {e['rows']} rows; e.g. {e['sample']}")
+        elif e.get("ok"):
             print(f"  [green]{e['variant']}: answered[/green], {e['total']:,} securities; e.g. {e['sample']}")
         else:
             print(f"  [red]{e['variant']}: {e['error']}[/red]")
@@ -322,26 +325,33 @@ def recatalogue_busy_days_cmd(
 @app.command("catalogue-days")
 def catalogue_days_cmd(kind: str = typer.Option("all"), since: str = typer.Option(None),
                        until: str = typer.Option(None),
-                       problems: bool = typer.Option(False, "--problems", help="Only days not complete")):
-    """Which days the market-wide catalogue has finished, with stored and expected counts."""
+                       problems: bool = typer.Option(False, "--problems", help="Only days not complete"),
+                       by_day: bool = typer.Option(False, "--by-day", help="One row per day, also for windows "
+                                                                           "of quiet days")):
+    """Which days the market-wide catalogue has finished, with stored and expected counts. v2.0.6: the days of a
+    window of quiet days, read as one query, are shown as one row with the window's total and gap."""
     from collections import Counter
-    from .market_catalogue import day_status
+    from .market_catalogue import day_status, units
     init_db()
     rows = day_status(kind, since, until)
-    print("Status: " + (", ".join(f"{k} {v}" for k, v in sorted(Counter(r["status"] for r in rows).items()))
-                        or "no days recorded yet"))
+    shown = rows if by_day else units(rows)
+    counts = Counter(r["status"] for r in shown)
+    print("Status: " + (", ".join(f"{k} {v}" for k, v in sorted(counts.items())) or "no days recorded yet")
+          + ("" if by_day or len(shown) == len(rows) else
+             f" ({len(rows):,} days; a window of quiet days counts once)"))
     if problems:
-        rows = [r for r in rows if r["status"] not in ("DONE",)]
-    _table(rows, ["day", "status", "expected", "stored", "gap_in_scope", "gap_out_scope", "rows_multi", "method",
-                  "partition", "error"])
+        shown = [r for r in shown if r["status"] not in ("DONE",)]
+    _table(shown, ["day", "status", "expected", "stored", "gap_in_scope", "gap_out_scope", "rows_multi", "method",
+                   "partition", "error"])
 
 
 @app.command("probe-cninfo-filters")
 def probe_cninfo_filters_cmd(day: str = typer.Option("2026-04-29", help="A very busy day"),
                              quiet_window: str = typer.Option("2026-01-09~2026-01-12",
                                                               help="A quiet window with repeated rows")):
-    """Check which CNINFO search filters work for whole-market queries: board codes, industry, company batches
-    and sort orders, and why rows repeat (about 70 to 120 requests; v2.0.4)."""
+    """Check which CNINFO search filters work for whole-market queries: board codes, industry, manufacturing
+    divisions, company queries and sort orders, and why rows repeat (about 150 to 220 requests; v2.0.4, company
+    test and divisions v2.0.6)."""
     from .market_catalogue import probe_filters
     r = probe_filters(day, quiet_window=quiet_window)
     print(f"{r['day']}: CNINFO reports {r.get('total', 0):,} announcements. Requests: {r.get('requests', 0)}.")
@@ -394,11 +404,15 @@ def extract_financials_cmd(
     security_code: str = typer.Option(None, help="Optional six-digit code; omit for the whole universe"),
     kind: str = typer.Option("reports", help="reports, annual, interim, quarterly, or all"),
     limit: int = typer.Option(None, help="Optional maximum documents per company"),
+    again: bool = typer.Option(False, "--again", help="Read every document again, including those already read "
+                                                      "by this extractor version"),
 ):
-    """Read headline figures and statements from downloaded periodic reports."""
+    """Read headline figures and statements from downloaded periodic reports. v2.0.6: shows progress, and a
+    stopped run continues with the next document when run again."""
     init_db()
     print(f"[cyan]Extracting financial facts: security={security_code or 'ALL'}, kind={kind}...[/cyan]")
-    result = extract_financials(security_code=security_code, kind=kind, limit=limit)
+    result = extract_financials(security_code=security_code, kind=kind, limit=limit, again=again,
+                                progress=lambda m: print(m))
     print(result)
     if result["errors"]:
         print(f"[yellow]Errors: {len(result['errors'])}[/yellow]")
