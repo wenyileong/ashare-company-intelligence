@@ -6,6 +6,8 @@
 2. `probe-cninfo-filters --day 2026-04-29`, run twice (199 requests each);
 3. "Re-catalogue busy days" (9 to 12 January and 29 April), still running when the log was copied.
 
+**Second log (findings 65 to 67).** A later copy of the same log adds three things: the re-catalogue, stopped by the author after 41 min 40 s during 29 April; "Which days are catalogued"; and "Diagnose the quote list".
+
 **Status:** findings only; no code has been changed. Numbering continues from the v2.0.5 findings (`docs/live_run_findings_v2.0.5.md`, findings 35 to 57).
 
 ## Summary
@@ -19,6 +21,9 @@
 | 62 | A split whose part exceeds its parent is treated as complete coverage | High (the cause of finding 61's waste) | Confirmed from the code |
 | 63 | 9 to 12 January was read again day by day | Information | Probably closed; to confirm |
 | 64 | The default order is unstable on every reading of the January window | Information (finding 56 confirmed) | Confirmed |
+| 65 | 9 to 12 January is complete; only 29 April remains short (20 rows) | Information (findings 39 and 63 closed) | Confirmed |
+| 66 | Eastmoney refuses every request from this network, page 1 included | High (finding 58: the cause is a refusal, not a row limit) | Confirmed |
+| 67 | The Stop message and the window rows work as designed | Information (findings 40, 43 and 51 closed) | Confirmed |
 
 ## 58. The quote list refused everything after page 10
 
@@ -72,6 +77,28 @@
 **Evidence.** The probe's single reading of the January window brought 2,914 of 2,952 in the first run and 2,926 of 2,954 in the second. The re-catalogue's reading brought 2,378 rows after 80 pages, 22 short of 2,400.
 
 **Assessment.** This confirms finding 56: one reading of a quiet window loses 1% or so of its rows, by a different amount each time. Splitting by day is the right remedy.
+
+## 65. 9 to 12 January is complete
+
+**Evidence.** "Which days are catalogued", problems only: "Status: DONE 288, OPEN 1, SHORTFALL 1 (296 days; a window of quiet days counts once)". The only short day is 29 April (26,046 of 26,066, 20 within the enabled boards). Its record is still the one written by v2.0.5, since the v2.0.6 re-catalogue was stopped during that day before recording it. The partition note shows this: "stock: filter ignored by CNINFO", from the earlier run.
+
+**Assessment.** The split of short windows by day (finding 39) closed the January window: 13 rows that two earlier versions could not reach. The whole 2026 catalogue now lacks 20 rows on one day, in one query (finding 61).
+
+## 66. Eastmoney refuses every request from this network
+
+**Evidence.** "Diagnose the quote list": every variant failed on page 1, five with HTTP 502 and one disconnected ("No variant answered").
+
+**Assessment.** This settles finding 58. The quote list now refuses even its first page, so the failure at page 11 was the start of a refusal, not a limit of 1,000 rows per query. Reading board by board cannot help while the refusal lasts. The same refusals were seen in the v2.0.2 runs (finding 4), and the quote list answered again by the v2.0.3 self-test (finding 33). The refusal therefore seems to come and go, perhaps after a burst of requests. Two consequences:
+- **Stop on refusal.** When page 1 of a part fails as well, the program should stop at once and say that the source is refusing requests (finding 58).
+- **Another source.** Listing dates should not depend on this feed alone. A second source (the exchanges' stock lists or CNINFO's company profiles) should be added after a live check. Until then, the import route in finding 58 is available.
+
+The 1,000-row reading added in v2.0.6 does no harm and stays useful if such a limit exists, but it is not shown to be needed.
+
+## 67. The Stop message and the window rows work
+
+**Evidence.** "Stopped: stopped by the user; everything saved so far is kept; running it again resumes with the first unfinished day", and the status line counting a window once.
+
+**Assessment.** Findings 40, 43 and 51 are closed as far as this log shows. Extraction's progress and resume have not yet been seen live.
 
 ## What to do now
 
