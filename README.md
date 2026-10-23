@@ -1,6 +1,6 @@
 # China A-share Company Intelligence v2.0.5
 
-A provenance-preserving research data system for SSE Main Board, STAR Market, SZSE Main Board and ChiNext companies. The architecture is set out in `ashare_scraper_build_plan.md`. Changes by version, and the findings behind them, are in `CHANGELOG.md`; the live-run findings are in `docs/live_run_findings_v2.0.2.md` and `docs/live_run_findings_v2.0.3.md`.
+A provenance-preserving research data system for SSE Main Board, STAR Market, SZSE Main Board and ChiNext companies. The architecture is set out in `ashare_scraper_build_plan.md`. Changes by version, and the findings behind them, are in `CHANGELOG.md`; the live-run findings are in `docs/live_run_findings_v2.0.2.md`, `docs/live_run_findings_v2.0.3.md` and `docs/live_run_findings_v2.0.5.md`.
 
 v2.0.5 is a maintenance release for the public repository. It changes no collection or extraction logic:
 
