@@ -14,6 +14,8 @@
 
 **Second log (findings 44 to 51).** A later copy of the same log adds three actions: extraction stopped after 5 min 37 s; "Re-catalogue busy days" run again, which finished 23 to 30 April in 2 h 15 min; and "Update the company list". It corrects finding 42.
 
+**Third log (findings 52 to 57).** The probe of CNINFO's filters (`probe-cninfo-filters --day 2026-04-29`, 157 requests, 4 min) and "Update the company list" run again. They settle findings 47, 48 and 50 as far as the evidence allows, and the next patch is planned in `docs/plan_v2.0.6.md`.
+
 **Status:** findings only; no code has been changed. Numbering continues from the v2.0.3 findings (`docs/live_run_findings_v2.0.3.md`, findings 20 to 34).
 
 ## Summary
@@ -37,6 +39,12 @@
 | 49 | 9 to 12 January was not fetched again, as designed | Information | Confirmed |
 | 50 | The quote list stops after 10 of 56 pages, and the reason is not shown; listing dates are filled for the companies fetched | High (finding 41) | Confirmed; cause inferred |
 | 51 | Extraction prints no progress and does not resume, although its Stop message says it does | Medium (wording; and every rerun starts again) | Confirmed from the code |
+| 52 | Both board schemes partition 29 April exactly | Information | Confirmed |
+| 53 | The industry filter partitions exactly; manufacturing holds 6,008 of the 8,772 日常经营 announcements on Shenzhen | Information | Confirmed |
+| 54 | The company test returned nothing, but it does not show whether the filter works | Medium (finding 48 unresolved) | Probe inconclusive |
+| 55 | CNINFO honours the time order, so the run turned sorting off for another reason | Medium | Confirmed; cause inferred |
+| 56 | The default order is also unstable on the quiet January window; no announcement is listed for several securities | Information (finding 25 resolved) | Confirmed |
+| 57 | The quote list stops at page 10 every time, so rerunning does not help | High (finding 50: listing dates for about 1,000 companies only) | Confirmed; cause inferred |
 
 **The overall state.** After the first log, 284 of 296 days were DONE, 1 OPEN (the current day) and 11 SHORTFALL. After the second, only five days remain short: 29 April by 20 rows (finding 45), and the 9 to 12 January window by 13 rows in all (findings 39 and 40). That is 33 rows in all, against 29,020 announcements on those five days.
 
@@ -174,16 +182,46 @@ The reported total also varied between requests for the same window: 2,954 in th
 
 Speed itself remains v2.1, workstream B. With `--kind all` the command reads every downloaded document, not only periodic reports; `--kind reports` (the default) is the usual choice.
 
+## 52. Both board schemes partition 29 April exactly
+
+**Evidence.** On 29 April the disjoint boards hold 9,088 (Shenzhen main), 8,511 (ChiNext), 5,035 (Shanghai main), 2,560 (STAR) and 872 (Beijing): 26,066, the day's total. The exchange codes hold 17,599, 7,595 and 872, also 26,066. Shenzhen (17,599) is the main board and ChiNext together, and Shanghai (7,595) the main board and STAR together.
+
+**Assessment.** This confirms finding 35, and what finding 22 inferred: the exchange codes cover whole exchanges, and the disjoint codes split them exactly.
+
+## 53. The industry filter partitions exactly
+
+**Evidence.** The largest category and exchange is 日常经营 on Shenzhen (8,772). Its 19 industry sections add up to 8,772, with manufacturing (制造业) at 6,008. Two sections are empty that day (居民服务、修理和其他服务业 and 综合).
+
+**Assessment.** The industry filter is reliable, but manufacturing is too large a section on the busiest day. Within the Shenzhen main board, 日常经营 in manufacturing is 3,024 (finding 45), just over the limit. Only a finer division of manufacturing, or a company filter, can split it.
+
+## 54. The company test is inconclusive
+
+**Evidence.** "company_batches: NO_DATA; three companies together: 0; one by one: 0".
+
+**Assessment.** The probe tests the first three companies of the Shenzhen main board by code, without checking that they published anything that day. Each returned nothing on its own, so the result cannot tell a filter that fails from companies with no announcements on 29 April. There is a second difference: the per-company mode, which is known to work, sends the company's own exchange (`column`) and board with the company, while the market query always sends `szse`, which matters for Shanghai companies at least. The probe should take companies that are known to have announcements that day (from the rows stored) and send their own exchange and board. It should then test one company, two, three and a batch, so that a failure shows where it starts. Until then, finding 48 stays unresolved.
+
+## 55. The time order is honoured; sorting was turned off for another reason
+
+**Evidence.** "sort_orders: HONOURED; first page newest-first and oldest-first share 0 of 30 rows".
+
+**Assessment (inferred).** For the day as a whole, CNINFO honours the order, yet the re-catalogue turned sorting off (finding 47). The engine does so in two cases: when the first pages match (possible under a board filter, or with the ties of finding 37), or when a sorted request raises any error. In the second case a single network error turns sorting off for the rest of the run. Only a definite sign should turn a filter off, and errors should be retried as for other requests. With finding 37, sorting remains a supplement only.
+
+## 56. The default order is unstable too, on quiet days
+
+**Evidence.** "repeated_rows: UNSTABLE_ORDER; 2026-01-09~2026-01-12: 2,934 rows of 2,952; 0 announcement(s) listed for several securities".
+
+**Assessment.** One reading of the January window in CNINFO's default order brings 18 fewer rows than its total, and no announcement is listed for several securities. Finding 25 is resolved: the small shortfalls on quiet days come from rows moving between pages, not from shared announcements. Smaller queries move fewer rows, which supports splitting short windows by day and board (finding 39).
+
+## 57. The quote list stops at page 10 every time
+
+**Evidence.** "Update the company list" run again: "0 listing dates added. Note: quote list incomplete: 10 of 56 pages fetched (1000 companies)". The ten pages of the first run were kept, and page 11 failed again.
+
+**Assessment (inferred).** The failure is not a burst limit (finding 50), since a later run fails at the same page at once. The probable cause is that Eastmoney now serves at most the first 1,000 rows (ten pages of 100) of one query. CNINFO's 3,000-result limit is a precedent. If so, the list can be read in parts:
+- each of the four boards on its own (the `fs` field takes one board at a time);
+- each board in both code orders (ascending and descending), so that a board of up to 2,000 companies is covered.
+
+Each board has fewer than 2,000 A-share companies (the company list gives the exact counts). The error message for page 11, which the program keeps but does not print, should confirm or refute the cause. The diagnosis command should also try page 11, and the program should print the error.
+
 ## Proposed next steps
 
-**For the author, before any build:**
-1. Run `ashare-cli probe-cninfo-filters --day 2026-04-29` (about 70 to 120 requests) and keep the output. It shows why the company-batch filter fails and whether the time order is honoured (findings 45, 47 and 48).
-2. Run "Update the company list" again, perhaps a few minutes apart, until the note about an incomplete quote list disappears (finding 50). Then rebuild the panel.
-
-**Probable contents of a v2.0.6 patch:**
-1. **The quote list:** print the error, wait and retry, and pace it more slowly (finding 50).
-2. **Extraction:** progress, resume and a true Stop message (finding 51).
-3. **A finer split for queries just over the limit:** sub-industries if CNINFO accepts them, otherwise single companies as a last resort, settled by the probe (finding 45).
-4. **Short windows under the limit:** split into single days, then by board (finding 39). The sorted passes stop only after several pages with nothing new, or are dropped (findings 38 and 47).
-5. **No repeated leaves:** a query read once in a day is not read again (finding 46).
-6. **Reporting:** a window's gap shown once (finding 40), and the current day distinguished (finding 43).
+The next patch, v2.0.6, is planned in `docs/plan_v2.0.6.md` from findings 35 to 57.
