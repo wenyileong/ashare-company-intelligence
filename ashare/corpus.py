@@ -282,7 +282,13 @@ def _annual_report(rng: random.Random, idx: int) -> tuple[str, list[list[str]], 
         else:
             holders.append((_name(rng), "境内自然人", rng.uniform(0.3, 1.5)))
     holders.sort(key=lambda h: -h[2])
+    # v2.0.7 (finding 68): odd-numbered reports use the layout with the nature after the name (as in the
+    # Shenzhen templates); every fourth has the nature glued to the name, as PDF text often gives it. Chosen by
+    # the report number, so the random sequence (and every other document) is unchanged.
+    layout_b, glued = idx % 2 == 1, idx % 4 == 1
     p10 = ["第七节 股份变动及股东情况", "（二）截至报告期末前十名股东持股情况", "单位：股",
+           "股东名称 股东性质 持股比例(%) 报告期末持股数量 报告期内增减变动情况 持有有限售条件的股份数量 "
+           "持有无限售条件的股份数量 质押、标记或冻结情况" if layout_b else
            "股东名称（全称） 报告期内增减 期末持股数量 比例(%) 持有有限售条件股份数量 质押、标记或冻结情况 股东性质"]
     top10, trad = [], []
     for name, nature, pct in holders:
@@ -291,7 +297,15 @@ def _annual_report(rng: random.Random, idx: int) -> tuple[str, list[list[str]], 
         change = rng.choice((0, rng.randint(-5, 5) * 100000))
         pledged = rng.choice((None, None, round(shares * 0.2)))
         state = ("质押", f"{pledged:,}") if pledged else ("无", "0")
-        p10.append(row(wrap(name, 12), f"{change:,}", f"{shares:,}", f"{pct:.2f}", "0", state[0], state[1], nature))
+        if layout_b and glued:
+            p10.append(row(wrap(name + nature, 12), f"{pct:.2f}", f"{shares:,}", f"{change:,}", "0", f"{shares:,}",
+                           state[0], state[1]))
+        elif layout_b:
+            p10.append(row(wrap(name, 12), nature, f"{pct:.2f}", f"{shares:,}", f"{change:,}", "0", f"{shares:,}",
+                           state[0], state[1]))
+        else:
+            p10.append(row(wrap(name, 12), f"{change:,}", f"{shares:,}", f"{pct:.2f}", "0", state[0], state[1],
+                           nature))
         top10.append({"shareholder_name": name, "shares": float(shares), "ownership_pct": pct,
                       "change_shares": float(change), "pledged_shares": float(pledged) if pledged else None,
                       "shareholder_nature": nature})

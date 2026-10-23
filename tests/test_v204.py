@@ -81,7 +81,8 @@ class LiveCNInfo:
     unless it is sent with the company's own exchange; ``division`` ("yes"/"no") whether manufacturing
     divisions are accepted as an industry."""
     def __init__(self, items, disjoint="yes", trade="yes", stock="yes", sort="yes", unstable=False, bj="yes",
-                 exchange="yes", column_strict=False, division="no"):
+                 exchange="yes", column_strict=False, division="no", stock_max=None):
+        self.stock_max = stock_max      # v2.0.7: more companies than this at once are ignored (finding 61)
         self.items, self.bj = items, bj
         self.disjoint, self.trade, self.stock, self.sort, self.unstable = disjoint, trade, stock, sort, unstable
         self.exchange, self.column_strict, self.division = exchange, column_strict, division
@@ -119,6 +120,8 @@ class LiveCNInfo:
                 sel = []
             elif self.column_strict and any(("sse" if c.startswith("6") else "szse") != column for c in codes):
                 sel = []
+            elif self.stock_max is not None and len(codes) > self.stock_max:
+                pass                                    # the company field is ignored for a long list
             elif not (len(codes) > 1 and self.stock == "ignore"):
                 sel = [it for it in sel if it["secCode"] in codes]
         order = body.get("sortType", "")

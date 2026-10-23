@@ -83,9 +83,11 @@ QUERY_LIMIT = 3000               # results one CNINFO query returns (100 pages o
 MARKET_COLUMN = "szse"           # ignored by CNINFO when the stock field is empty; any value works
 PROGRESS_EVERY = 20              # pages
 EARLY_STOP_PAGES = 5             # a capped query stops after this many pages with nothing new
-BATCH_SIZE = 150                 # companies per query when splitting by company
+BATCH_SIZE = 10                  # companies per query when splitting by company (v2.0.7: the size confirmed live;
+                                 # CNINFO did not apply a batch of 150, finding 61)
 RECHECK_DAYS = 30                # finished days whose totals are rechecked at the start of a run
 STRATEGY = 3                     # v2.0.6 (2 = v2.0.4; v2.0.3 days have no strategy recorded)
+STOCK_MAX_MEMBERS = 2500         # companies a company split may cover (one board)
 SINGLE_MAX = 1500                # single-company queries allowed for one leaf over the limit (v2.0.6)
 MAX_PAGES = QUERY_LIMIT // PAGE_SIZE     # pages beyond 100 repeat earlier results
 
@@ -533,8 +535,8 @@ class _Collector:
                 mid = len(parts) // 2
                 return [replace(spec, stock=";".join(parts[:mid])), replace(spec, stock=";".join(parts[mid:]))]
             members = self._members(spec)
-            if not members:
-                return []
+            if not members or len(members) > STOCK_MAX_MEMBERS:
+                return []                     # v2.0.7: within one board only (a few hundred queries at most)
             return self._company_specs(spec, members, style, BATCH_SIZE)
         return []
 
@@ -549,6 +551,12 @@ class _Collector:
                 return None
             totals = [(k,) + tuple(self.first(k)) for k in kids]
             tsum = sum(t for _, t, _ in totals)
+            big = max((t for _, t, _ in totals), default=0)
+            if big > total + max(5, total // 100):
+                # v2.0.7 (finding 62): a part larger than the whole means the filter was not applied
+                self.caps[dim] = False
+                self.notes.append(f"{dim}: filter not applied by CNINFO (a part of {big:,} for a query of {total:,})")
+                return None
             if len(kids) > 1 and all(t == total for _, t, _ in totals):
                 self.caps[dim] = False                    # the filter is ignored
                 self.notes.append(f"{dim}: filter ignored by CNINFO")
@@ -589,7 +597,10 @@ class _Collector:
             return got
         got: set = set()
         evaluated = []
-        for dim in dims:
+        # v2.0.7: the costly splits (company batches, manufacturing divisions) are counted only if the others
+        # leave rows missing; the rest are counted first and used in order of coverage, as before.
+        lazy = ("trade_division", "stock")
+        for dim in [d for d in dims if d not in lazy]:
             r = self._evaluate(dim, spec, total)
             if r is None:
                 continue
@@ -602,28 +613,20 @@ class _Collector:
             evaluated.append((dim, totals, tsum))
             if tsum >= total and not dim == "category":   # categories overlap: their sum proves nothing
                 break
-        # Use the dimensions in order of coverage until the rows reach the total.
         evaluated.sort(key=lambda e: (-(min(e[2], total)), DIMENSIONS.index(e[0])))
-        for dim, totals, tsum in evaluated:
-            if len(got) >= total:
+        used = 0
+        for dim in [d for d in dims if d in lazy] + [None]:
+            # Use the dimensions counted so far, in order of coverage, until the rows reach the total.
+            for dim_, totals, tsum in evaluated[used:]:
+                used += 1
+                if len(got) >= total:
+                    break
+                got |= self._use(spec, total, dim_, totals, tsum, dims)
+            if dim is None or len(got) >= total:
                 break
-            if tsum < total:
-                self.notes.append(f"{spec.label()}: {dim} parts reach {tsum:,} of {total:,}")
-            self.methods.append(dim.upper())
-            rest = tuple(d for d in dims if d != dim and not (d.startswith("board_") and dim.startswith("board_")))
-            if dim == "stock":
-                rest = rest + ("stock",)                  # a company batch over the limit is halved again
-            if dim == "trade_division":
-                rest = tuple(d for d in rest if d != "trade")
-            names = {"category": "category", "trade": "industry", "trade_division": "manufacturing division",
-                     "stock": "company batch"}
-            unit = names.get(dim, "board")
-            for i, (kid, t, kdata) in enumerate(totals, 1):
-                if t:
-                    got |= self.collect(kid, t, kdata, rest)
-                if len(totals) >= 5 and i % 5 == 0 and i < len(totals):
-                    _say(self.progress, f"    {spec.label()}: {unit} {i} of {len(totals)} done "
-                                        f"({len(got):,} of {total:,} so far)")
+            r = self._evaluate(dim, spec, total)
+            if r is not None:
+                evaluated.append((dim, r[0], r[1]))
         if len(got) < total:
             # The parts did not reach everything: read what the query itself holds. After a split the first
             # pages mostly repeat rows already found, so this pass stops when idle; with no split it reads all.
@@ -635,6 +638,28 @@ class _Collector:
                 got |= self._singles(spec, total, got)
             if len(got) < total:
                 self.notes.append(f"{spec.label()}: {total - len(got):,} of {total:,} unreachable")
+        return got
+
+    def _use(self, spec: Spec, total: int, dim: str, totals, tsum: int, dims: tuple) -> set:
+        """Collect the parts of a split of ``spec`` along ``dim``."""
+        got: set = set()
+        if tsum < total:
+            self.notes.append(f"{spec.label()}: {dim} parts reach {tsum:,} of {total:,}")
+        self.methods.append(dim.upper())
+        rest = tuple(d for d in dims if d != dim and not (d.startswith("board_") and dim.startswith("board_")))
+        if dim == "stock":
+            rest = rest + ("stock",)                  # a company batch over the limit is halved again
+        if dim == "trade_division":
+            rest = tuple(d for d in rest if d != "trade")
+        names = {"category": "category", "trade": "industry", "trade_division": "manufacturing division",
+                 "stock": "company batch"}
+        unit = names.get(dim, "board")
+        for i, (kid, t, kdata) in enumerate(totals, 1):
+            if t:
+                got |= self.collect(kid, t, kdata, rest)
+            if len(totals) >= 5 and i % 5 == 0 and i < len(totals):
+                _say(self.progress, f"    {spec.label()}: {unit} {i} of {len(totals)} done "
+                                    f"({len(got):,} of {total:,} so far)")
         return got
 
     def _split_small(self, spec: Spec, total: int) -> set:
@@ -1138,7 +1163,9 @@ def probe_filters(day: str = "2026-04-29", adapter=None, quiet_window: str = "20
             parts=dparts)
         # v2.0.6 (finding 54): company queries, with companies known to have announcements in this query, sent
         # with their own exchange; one, two and three companies, then a batch of up to ten.
-        page1 = q.page(base, 1).get("announcements") or []
+        page1 = []
+        for p in (1, 2, 3):                 # enough rows for 50 different companies
+            page1 += q.page(base, p).get("announcements") or []
         s = SessionLocal()
         try:
             known = {c.security_code: c for c in s.query(Company)}
@@ -1152,7 +1179,7 @@ def probe_filters(day: str = "2026-04-29", adapter=None, quiet_window: str = "20
             board = c.board if c else _board_of_code(code)
             if org and board and code not in {x[0] for x in comps}:
                 comps.append((code, None, org, board))
-            if len(comps) >= 10:
+            if len(comps) >= 50:
                 break
         if len(comps) >= 3:
             probe = _Collector(q, pcat, lambda items: None, None, {}, comps)
@@ -1162,10 +1189,19 @@ def probe_filters(day: str = "2026-04-29", adapter=None, quiet_window: str = "20
                 if any(singles):
                     two = sum(q.first(k)[0] for k in probe._company_specs(base, comps[:2], style, 2))
                     three = sum(q.first(k)[0] for k in probe._company_specs(base, comps[:3], style, 3))
-                    ten_singles = singles + [q.first(k)[0] for k in probe._company_specs(base, comps[3:], style, 1)]
-                    batch = sum(q.first(k)[0] for k in probe._company_specs(base, comps, style, len(comps)))
+                    one = singles + [q.first(k)[0] for k in probe._company_specs(base, comps[3:], style, 1)]
+                    ten = comps[:10]
+                    batch = sum(q.first(k)[0] for k in probe._company_specs(base, ten, style, len(ten)))
+                    # v2.0.7 (finding 61): larger batches, to find the largest CNINFO applies
+                    sizes = {}
+                    for n in (25, 50):
+                        if len(comps) >= n:
+                            got = q.first(probe._company_specs(base, comps[:n], style, n)[0])[0]
+                            sizes[n] = {"together": got, "one_by_one": sum(one[:n]),
+                                        "applied": got == sum(one[:n])}
                     result = {"style": style, "singles": singles, "two": two, "three": three,
-                              "batch": batch, "batch_singles": sum(ten_singles), "companies": len(comps)}
+                              "batch": batch, "batch_singles": sum(one[:10]), "companies": len(ten),
+                              "larger": sizes}
                     works = style
                     break
                 result.setdefault("tried", []).append({"style": style, "singles": singles})
@@ -1178,10 +1214,15 @@ def probe_filters(day: str = "2026-04-29", adapter=None, quiet_window: str = "20
                            and r["batch"] == r["batch_singles"] else
                            "IGNORED" if r["batch"] >= ptotal else "SINGLES_ONLY" if r["two"] == 0 else "PARTIAL")
                 style_text = "without a board code" if works == "A" else "with the board code"
+                larger = "; ".join(f"{n} together {v['together']:,} (one by one {v['one_by_one']:,}"
+                                   f"{', applied' if v['applied'] else ', NOT applied'})"
+                                   for n, v in r["larger"].items())
                 add("company_batches", verdict,
                     f"one by one {sum(r['singles']):,} ({', '.join(str(x) for x in r['singles'])}); two together "
                     f"{r['two']:,}; three together {r['three']:,}; {r['companies']} together {r['batch']:,} "
-                    f"(one by one {r['batch_singles']:,}); sent with the company's exchange, {style_text}", **r)
+                    f"(one by one {r['batch_singles']:,})" + (f"; {larger}" if larger else "")
+                    + f"; sent with the company's exchange, {style_text}; the catalogue sends {BATCH_SIZE} at a time",
+                    **r)
         else:
             add("company_batches", "NOT_TESTED", "fewer than three companies with an organisation ID in the query")
         d1 = q.page(replace(base, sort="desc"), 1).get("announcements") or []

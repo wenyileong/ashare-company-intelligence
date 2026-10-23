@@ -1,6 +1,58 @@
 # Change log
 
-This log records what changed in each version and the important findings behind the changes. The live-run findings are kept in full in `docs/live_run_findings_v2.0.2.md` (findings 1 to 19) `docs/live_run_findings_v2.0.3.md` (findings 20 to 34) and `docs/live_run_findings_v2.0.5.md` (findings 35 to 57, the first live runs of the v2.0.4 catalogue engine) and `docs/live_run_findings_v2.0.6.md` (findings 58 to 64). Earlier versions are described in `README.md` and in section 18 of `ashare_scraper_build_plan.md`.
+This log records what changed in each version and the important findings behind the changes. The live-run findings are kept in full in `docs/live_run_findings_v2.0.2.md` (findings 1 to 19) `docs/live_run_findings_v2.0.3.md` (findings 20 to 34) and `docs/live_run_findings_v2.0.5.md` (findings 35 to 57, the first live runs of the v2.0.4 catalogue engine) and `docs/live_run_findings_v2.0.6.md` (findings 58 to 69). Earlier versions are described in `README.md` and in section 18 of `ashare_scraper_build_plan.md`.
+
+## v2.0.7 (24 October 2026)
+
+**Aim:** fix two faults found by a review of a live release, then close the last catalogue gap and give listing dates a second source. The findings are 58 to 69 in `docs/live_run_findings_v2.0.6.md`.
+
+### Shareholders and privacy (findings 68 and 69)
+
+**Do not share a pseudonymised release made before v2.0.7.** After upgrading:
+1. run `extract-top-holders`;
+2. run `resolve-entities`;
+3. make the release again.
+
+- **Top-10 shareholders.**
+  - **Both layouts.** `parse_top10_pages` now reads both column orders: nature at the end (older), or nature after the name (Shenzhen). Before, the second was read as the first: the nature was glued to the name, the percentage was read as the change, and stray figures (0, 46, −519) were read as percentages.
+  - **Checks.** A row with a percentage outside 0 to 100 is left out, and a table whose percentages add up to more than 100 is rejected. A number made of two cells run together is not read.
+  - **Wrapped names** are joined, in the top-10 and tradable tables.
+  - **Old rows removed.** Rows read by an earlier version and not by this one are removed when the document is read again, with their review items. `resolve-entities` removes entities left only by such rows, and recognises a natural person whose nature is glued to the name.
+- **Pseudonymisation fails safe.**
+  - **The rule.** A shareholder, pledgor or controller name is masked unless a legal-person nature or an organisation word shows it to be an organisation's. Before, only names that looked like short Chinese names were masked, so "张三境内自然人" or "JOHN SMITH" could be released as they stood.
+  - **Glued natures.** A nature glued to a name is taken off, and the bare name gets the same identifier, so it is replaced in free text too.
+  - **The manifest** records the rule (`pseudonymisation.rule`).
+- **The synthetic corpus** now uses the Shenzhen layout in half its reports, a quarter with the nature glued to the name, so the parser accuracy gate covers it. On this corpus the text reader's precision for the top-10 table is 100% (82.1% before, on the older corpus); the tradable table's text reader went from 83.8% to 90.2%.
+
+### The catalogue (findings 61 and 62)
+
+- **Company batches of 10** (`BATCH_SIZE`), the size the probe confirmed live. CNINFO did not apply a batch of 150: each batch reported 8,871 rows for a query of 3,024, and the engine read about 3,000 pages for nothing.
+- **A part larger than its parent** (by more than 1%) now means the filter was not applied. It is not used, and not used again in the run.
+- **Costly splits counted only when needed.** Company batches and manufacturing divisions are counted only if the boards, categories and industries leave rows missing; company splits are made within one board.
+- **The probe** also tests batches of 25 and 50 companies, and reports whether CNINFO applied each.
+
+### Listing dates (findings 58, 59 and 66)
+
+- **The exchanges' stock lists** are now the first source: Shanghai main board and STAR (JSON), and Shenzhen A shares (an Excel file, read with a small built-in reader, so no new dependency). That is three requests, each response kept in the raw archive. The quote list is asked only for companies they leave without a date, and the output reports each list and how many dates came from each source. The lists are read as the exchanges' own pages read them; this needs a live check.
+- **Three refused attempts stop the quote list.** Three in a row stop the whole reading: the request, again after 30 seconds and again after two minutes, and any success resets the count. Before, every board paused in turn (49 minutes in the live run). When the whole list stops part-way, the first board's page 1 is one of the three attempts, so the board-by-board reading still runs if the boards answer.
+- **The note** lists every board read, including one refused at its first page, and says when the source is refusing requests.
+
+**Tests.**
+- `tests/test_v207.py` (23 tests): both shareholder layouts, the checks, removal of old rows and entities, the fail-safe rule and a release with a glued name, the manifest, the three-refusal rule and its pauses, the exchange lists, batches of 10, the parent check and the lazy splits.
+- The v2.0.4 mock CNINFO gained a limit on the number of companies at once.
+
+**Verification.**
+- Linux Python 3.12: 247 tests passed (2 skipped).
+- Linux Python 3.13: 238 passed (9 skipped).
+- PostgreSQL 16: 244 passed (5 skipped).
+- Windows CPython 3.12 under Wine: 245 passed (4 skipped).
+- The parser accuracy gate passes on the extended corpus.
+- The Windows installer installs, passes its offline self-test (20 of 20) and uninstalls cleanly.
+
+**Still to confirm live.**
+- "Update the company list" reads the exchanges' lists and dates nearly every company.
+- `recatalogue-busy-days` closes 29 April with batches of 10.
+- After re-extraction, 陕国投A's top-10 rows have their real percentages.
 
 ## v2.0.6 (23 October 2026)
 

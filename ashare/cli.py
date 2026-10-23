@@ -120,9 +120,11 @@ def init_database():
 def update_universe_cmd(
     source: str = typer.Option("cninfo", help="Universe source"),
     listing_dates: bool = typer.Option(True, "--listing-dates/--no-listing-dates",
-                                       help="Also fetch listing dates from the public quote list (~60 requests)"),
+                                       help="Also fetch listing dates: the exchanges' stock lists (3 requests), "
+                                            "then the public quote list for any still missing (~60 requests)"),
 ):
-    """Download the list of listed companies from CNINFO, with listing dates and status."""
+    """Download the list of listed companies from CNINFO, with listing dates (the exchanges' stock lists first,
+    v2.0.7) and status."""
     init_db()
     print(f"[cyan]Updating A-share universe from {source}...[/cyan]")
     result = update_universe(source, listing_dates=listing_dates)
@@ -139,13 +141,20 @@ def update_universe_cmd(
         if odd:
             print(f"  unrecognised codes: {', '.join(odd[:20])}")
     st = result.get("status") or {}
+    if st.get("exchange_lists"):                      # v2.0.7: the exchanges' own stock lists
+        print("Exchange lists: " + st["exchange_lists"])
     if st and not st.get("LISTED") and not st.get("quote_list_complete", True):    # finding 12
-        print(f"Status: could not be determined from the quote list ({st.get('DELISTED', 0)} delisted, recognised "
-              "by name). " + (f"Note: {st['note']}" if st.get("note") else ""))
+        print(f"Status: could not be determined from the exchanges' lists or the quote list "
+              f"({st.get('DELISTED', 0)} delisted, recognised by name). " + (f"Note: {st['note']}" if st.get("note") else ""))
         return
+    by = st.get("listing_dates_by_source") or {}
+    src = (f" ({by.get('exchanges', 0):,} from the exchanges' lists, {by.get('quote_list', 0):,} from the quote list)"
+           if by else "")
     print(f"Status: {st.get('LISTED', 0)} listed, {st.get('DELISTED', 0)} delisted (by name), "
           f"{st.get('NOT_IN_QUOTE_LIST', 0)} not in the quote list; {st.get('listing_dates_added', 0)} listing dates "
-          "added." + (f" Note: {st['note']}" if st.get("note") else ""))
+          f"added{src}." + (" The quote list was not needed." if st.get("exchange_lists_complete")
+                             and not st.get("quote_list_used") else "")
+          + (f" Note: {st['note']}" if st.get("note") else ""))
 
 
 @app.command("validate-universe")
@@ -350,8 +359,8 @@ def probe_cninfo_filters_cmd(day: str = typer.Option("2026-04-29", help="A very 
                              quiet_window: str = typer.Option("2026-01-09~2026-01-12",
                                                               help="A quiet window with repeated rows")):
     """Check which CNINFO search filters work for whole-market queries: board codes, industry, manufacturing
-    divisions, company queries and sort orders, and why rows repeat (about 150 to 220 requests; v2.0.4, company
-    test and divisions v2.0.6)."""
+    divisions, company queries (up to 50 at once) and sort orders, and why rows repeat (about 200 to 270 requests;
+    v2.0.4, company test and divisions v2.0.6, larger batches v2.0.7)."""
     from .market_catalogue import probe_filters
     r = probe_filters(day, quiet_window=quiet_window)
     print(f"{r['day']}: CNINFO reports {r.get('total', 0):,} announcements. Requests: {r.get('requests', 0)}.")

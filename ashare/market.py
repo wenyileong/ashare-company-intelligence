@@ -247,7 +247,7 @@ def fetch_eastmoney_snapshot(trade_date: str, page_size: int = 100, max_pages: i
     r = fetch_pages("f2,f3,f4,f5,f6,f8,f12,f13,f14,f15,f16,f17,f18", "snapshot", max_pages=max_pages,
                     use_cache=False, min_rows=0)
     if not r["complete"]:
-        detail = r.get("error") or "; ".join(f"{b['name']}: {b.get('error')}" for b in r["parts"].values()
+        detail = r.get("refused") or r.get("error") or "; ".join(f"{b['name']}: {b.get('error')}" for b in r["parts"].values()
                                              if b.get("error"))
         raise RuntimeError(f"quote list incomplete ({len(r['rows']):,} securities): {detail or 'no answer'}")
     out = []

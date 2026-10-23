@@ -132,7 +132,12 @@ The program cannot tell where an imported CSV file came from, so imports are tre
 
 ### Pseudonymisation
 
-Tick "Pseudonymise personal names" to replace the names of natural persons (directors, supervisors and officers, natural-person shareholders, pledgors and controllers) with identifiers such as `P3F9A0C21B7DE`. The same name always receives the same identifier when the same key is used, so panels built from different releases still link. Organisations keep their names. Raw text columns and the full text of documents are left out, and known names are replaced in titles and other free text. Two further options give stronger protection: ages and birth years in five-year bands, and dropping free text altogether.
+Tick "Pseudonymise personal names" to replace the names of natural persons (directors, supervisors and officers, natural-person shareholders, pledgors and controllers) with identifiers such as `P3F9A0C21B7DE`. The same name always receives the same identifier when the same key is used, so panels built from different releases still link. Organisations keep their names.
+
+Since v2.0.7 the rule fails safe. A shareholder, pledgor or controller name is masked unless a legal-person nature, or a word only organisations use (公司, 基金, 银行, LIMITED, BANK and the like), shows it to be an organisation's. Before v2.0.7, a person's name was masked only if it looked like a short Chinese name. A name with its shareholder nature glued on by the PDF text ("张三境内自然人"), or a name in Latin letters, could therefore be released unmasked. Each release records the rule in `manifest.json` (`pseudonymisation.rule`). **Do not share a pseudonymised release made before v2.0.7.** Make it again after these three steps:
+1. "Extract top shareholders" (`extract-top-holders`);
+2. "Resolve entities" (`resolve-entities`);
+3. the release itself. Raw text columns and the full text of documents are left out, and known names are replaced in titles and other free text. Two further options give stronger protection: ages and birth years in five-year bands, and dropping free text altogether.
 
 Pseudonymised data are still personal information in law. Read the [compliance note](compliance.md) before sharing a release.
 
@@ -195,7 +200,7 @@ Without a security code, "Catalogue announcements" works on the whole market:
   - days that versions before v2.0.3 cut short at 3,000.
 
   A day whose gap recurred under the current method is not repeated, because the same queries cannot close it; `--include-current` overrides this. `--list` shows the days first.
-- **Checking CNINFO's filters.** "Check CNINFO's search filters" (`probe-cninfo-filters`, about 150 to 220 requests) reports which board codes, industry filters (with manufacturing divisions), company queries and sort orders work, and why some rows repeat. The company test uses companies that have announcements in the query, and tests one, two, three and up to ten together, so that a failure shows where it starts.
+- **Checking CNINFO's filters.** "Check CNINFO's search filters" (`probe-cninfo-filters`, about 200 to 270 requests) reports which board codes, industry filters (with manufacturing divisions), company queries and sort orders work, and why some rows repeat. The company test uses companies that have announcements in the query, and tests one, two, three, ten, 25 and 50 together, so that a failure shows where it starts. The catalogue sends companies ten at a time, the size confirmed live; CNINFO did not apply a list of 150.
 
 `catalogue-days` shows each day's status (DONE, SHORTFALL, FAILED, or OPEN for today) with:
 - CNINFO's total and the rows stored;
@@ -206,9 +211,11 @@ Without a security code, "Catalogue announcements" works on the whole market:
 
 Several consecutive quiet days fetched together share one total and one gap, so they are shown as one row, for example "2026-01-09~2026-01-12 (window)", and counted once in the status line. "One row per day" (`--by-day`) lists the days separately, with the per-day total left blank. The summary at the end of a run counts today as "kept open", not as finished.
 
-### Listing dates and panels (v2.0.3, extended in v2.0.6)
+### Listing dates and panels (v2.0.3, extended in v2.0.6 and v2.0.7)
 
+- **The exchanges' stock lists (v2.0.7).** "Update the company list" first reads the Shanghai Stock Exchange's lists (main board and STAR) and the Shenzhen Stock Exchange's A-share list (main board and ChiNext). These are three requests, and every response is kept in the raw archive. These are the exchanges' own records of each company's listing date. The output reports what each list returned, for example "Exchange lists: Shanghai main board 1,690 of 1,690 dated; ...". Eastmoney's quote list is asked only if the exchanges' lists leave companies without a listing date; when it is not needed, the output says so. The exchanges' lists are read as their own web pages read them. If an exchange changes its page, its list is reported as failed, and the quote list fills the gap.
 - **Listing dates.** These come from Eastmoney's public quote list, read during "Update the company list". If the list refuses requests, "Diagnose the quote list" (`diagnose-quote-list`) tries each way of asking (about six requests), then page 11 of the whole list and of one board, and reports what each returned. A way that works is remembered and used first from then on. The download keeps every page fetched that day, so a run that stops part-way carries on where it stopped, and the listing dates already fetched are applied. A company is set to "not in the quote list" only from a complete list.
+- **Refusals (v2.0.7).** Three refused attempts in a row stop the quote list: the request, again after 30 seconds and again after two minutes, and any success resets the count. The note then says that Eastmoney may be refusing requests from this network for a while. In October 2026 it refused every request, page 1 included, for hours.
 - **A list longer than one query returns (v2.0.6).** In October 2026 the list stopped after 1,000 companies on every run, probably because one query returns at most 1,000 rows. When the whole list stops part-way, it is read one board at a time, each board in both code orders, which covers up to 2,000 companies a board. A page that fails is retried after 30 seconds and again after two minutes; the quote list is asked no more than once every two seconds. When the list is still incomplete, the note says which board fell short and why. The daily price snapshot is read the same way.
 - **Companies in each row.** "Build a panel" now has a setting for this (`--universe-basis`):
   - `listing`: a company is in a row when its listing record covers the row date.
@@ -221,6 +228,10 @@ Several consecutive quiet days fetched together share one total and one gap, so 
 ### Extracting figures (v2.0.6)
 
 "Extract figures from reports" (`extract-financials`) first counts the documents to read, then reports progress every 25 documents and at least once a minute, for example "250 of 9,800 documents; 8.7 s each; about 23 h 05 min left". Each document read is marked with the extractor's version, so a stopped run continues with the next document when run again; "Read documents again" (`--again`) reads them all. A document downloaded again with new content is read again. The default, `--kind reports`, reads the periodic reports; `all` reads every downloaded document, most of which carry no financial statements. Extraction reads only documents already downloaded: catalogue with downloads, or use "Download documents", first.
+
+### Top shareholders (v2.0.7)
+
+"Extract top shareholders" (`extract-top-holders`) reads the top-10 shareholder tables in both column orders used in periodic reports: the older one with the nature at the end, and the one with the nature after the name, as in the Shenzhen templates. A row whose figures fail the checks is left out rather than misread. Rows read from a document by an earlier version, and not by this one, are removed when the document is read again. Before v2.0.7, reports in the second layout gave shareholder names with the nature glued on, and figures one column out of place. After upgrading, run "Extract top shareholders" and then "Resolve entities".
 
 ### PDF reader messages (v2.0.3)
 

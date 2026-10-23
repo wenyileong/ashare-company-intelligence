@@ -1,6 +1,16 @@
-# China A-share Company Intelligence v2.0.6
+# China A-share Company Intelligence v2.0.7
 
-A provenance-preserving research data system for SSE Main Board, STAR Market, SZSE Main Board and ChiNext companies. The architecture is set out in `ashare_scraper_build_plan.md`. Changes by version, and the findings behind them, are in `CHANGELOG.md`; the live-run findings are in `docs/live_run_findings_v2.0.2.md`, `docs/live_run_findings_v2.0.3.md` and `docs/live_run_findings_v2.0.5.md`; the current patch plan is `docs/plan_v2.0.6.md`.
+A provenance-preserving research data system for SSE Main Board, STAR Market, SZSE Main Board and ChiNext companies. The architecture is set out in `ashare_scraper_build_plan.md`. Changes by version, and the findings behind them, are in `CHANGELOG.md`; the live-run findings are in `docs/live_run_findings_v2.0.2.md`, `docs/live_run_findings_v2.0.3.md` and `docs/live_run_findings_v2.0.5.md` and `docs/live_run_findings_v2.0.6.md`.
+
+v2.0.7 fixes two faults found by a review of a live release (findings 68 and 69, `docs/live_run_findings_v2.0.6.md`):
+
+- **Top-10 shareholders.** Reports with the shareholder nature after the name (the Shenzhen templates) were misread: the nature was glued to the name and every figure shifted one column. Both layouts are now read and checked, and misread rows are removed when the reports are read again.
+- **Pseudonymisation.** A natural person's name with the nature glued on was not masked. Masking now fails safe: a name is masked unless it is shown to be an organisation's. **Do not share a pseudonymised release made before v2.0.7.** After upgrading:
+  1. run "Extract top shareholders";
+  2. run "Resolve entities";
+  3. make the release again.
+
+It also sends companies to CNINFO ten at a time (the size confirmed live), rejects a split part larger than its parent, reads listing dates from the exchanges' own stock lists first, and stops the quote list after three refused attempts in a row.
 
 v2.0.6 is a patch from the first live runs of the v2.0.4 catalogue engine (findings 35 to 57, `docs/live_run_findings_v2.0.5.md`):
 

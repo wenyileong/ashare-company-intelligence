@@ -8,7 +8,9 @@
 
 **Second log (findings 65 to 67).** A later copy of the same log adds three things: the re-catalogue, stopped by the author after 41 min 40 s during 29 April; "Which days are catalogued"; and "Diagnose the quote list".
 
-**Status:** findings only; no code has been changed. Numbering continues from the v2.0.5 findings (`docs/live_run_findings_v2.0.5.md`, findings 35 to 57).
+**Release review (findings 68 and 69).** The author passed on a review of a live dataset release (made by the scraper's `release` command, pseudonymised), carried out in another project that reads the release. The review reported two faults, which were then confirmed against the scraper's code. Both are fixed in v2.0.7.
+
+**Status:** findings 58 to 67 are findings only; findings 68 and 69 are fixed in v2.0.7. Numbering continues from the v2.0.5 findings (`docs/live_run_findings_v2.0.5.md`, findings 35 to 57).
 
 ## Summary
 
@@ -24,6 +26,8 @@
 | 65 | 9 to 12 January is complete; only 29 April remains short (20 rows) | Information (findings 39 and 63 closed) | Confirmed |
 | 66 | Eastmoney refuses every request from this network, page 1 included | High (finding 58: the cause is a refusal, not a row limit) | Confirmed |
 | 67 | The Stop message and the window rows work as designed | Information (findings 40, 43 and 51 closed) | Confirmed |
+| 68 | Top-10 shareholder rows are misread when the shareholder nature follows the name: the nature is glued to the name and every figure shifts one column | **Critical** (wrong ownership figures in released data) | Confirmed in the code; fixed in v2.0.7 |
+| 69 | A natural person's name, glued to its nature, was not masked in a pseudonymised release | **Critical** (personal data in a release marked pseudonymised) | Confirmed in the code; fixed in v2.0.7 |
 
 ## 58. The quote list refused everything after page 10
 
@@ -99,6 +103,42 @@ The 1,000-row reading added in v2.0.6 does no harm and stays useful if such a li
 **Evidence.** "Stopped: stopped by the user; everything saved so far is kept; running it again resumes with the first unfinished day", and the status line counting a window once.
 
 **Assessment.** Findings 40, 43 and 51 are closed as far as this log shows. Extraction's progress and resume have not yet been seen live.
+
+## 68. Top-10 shareholder rows misread when the nature follows the name
+
+**Evidence (release review).** A live release held 16 top-10 shareholder rows, all for 陕国投A (000563).
+- The shareholder nature was glued to the end of the name, for example "…有限责任公司国有法人".
+- The real percentage stood in `change_shares` (26.8, 16.76 …).
+- `ownership_pct` held stray figures (0.0, 46.0, −519.0).
+
+**Cause (confirmed in the code).** `parse_top10_pages` read every row in the column order of the older template: name, change in the period, shares held, percentage, restricted shares, pledge state, and the nature at the end. The Shenzhen templates put the nature straight after the name, then the percentage, the shares held, the change, and restricted and unrestricted shares. In that layout:
+- the nature was read as part of the name;
+- the percentage was read as the change;
+- the change, or a share count, was read as the percentage.
+
+The only check was that the percentage did not exceed 100, which 0, 46 and −519 all pass. The synthetic test corpus generated only the older layout, so the parser accuracy gate could not catch it.
+
+**Fix (v2.0.7).**
+- **Both layouts read.** The layout is taken from the header, or from where the nature stands. The figures after the shares are placed by checking that restricted and unrestricted shares add up to the shares held.
+- **Checks.** A nature glued to a name is taken off. A row whose percentage is outside 0 to 100 is left out, and a table whose percentages add up to more than 100 is rejected. A number that is really two cells run together ("833,820,000200,000") is not read.
+- **Wrapped names.** A name wrapped onto two lines is joined, in both tables.
+- **Old rows removed.** Rows an earlier parser read from a document, and the current one does not, are removed when the document is read again, with their review items. `resolve-entities` removes entities left only by such rows.
+- **Corpus.** Half the reports in the synthetic corpus now use the other layout, a quarter with the nature glued to the name. On that corpus the text reader's precision for the top-10 table is 100% (82.1% before, on the older corpus), and the layout reader's stays at 100%.
+
+## 69. A natural person's name unmasked in a pseudonymised release
+
+**Evidence (release review).** Because the nature was glued to the name (finding 68), one natural-person shareholder was not recognised, and that person's real name appeared unmasked in a release marked "pseudonymised".
+
+**Cause (confirmed in the code).** `is_natural_person` treated a name as a person's only if it looked like a two-to-five-character Chinese name, or if its nature said so. "张三境内自然人" (seven characters) failed the first test, and its nature, misread, did not pass the second. A person's name written in Latin letters ("JOHN SMITH") without a nature would also have been released unmasked. Masking failed open: anything unrecognised was released as it stood.
+
+**Fix (v2.0.7).**
+- **Fail-safe rule.** A name is now masked unless a legal-person nature, or a word only organisations use (公司, 基金, 银行, LIMITED, BANK, AUTHORITY ...), shows it to be an organisation's. A nature glued to a name is taken off first, and the bare name receives the same identifier, so it is also replaced where it occurs in free text.
+- **Cost.** Masking an organisation by mistake loses a little information. Leaving a person unmasked is a privacy failure.
+- **The manifest.** Each release now records the rule in `manifest.json` (`pseudonymisation.rule`), so a release made under the earlier rule can be recognised.
+- **Existing releases.** Releases made before v2.0.7 should not be shared. After upgrading:
+  1. run `extract-top-holders` (which also removes the misread rows);
+  2. run `resolve-entities`;
+  3. make the release again.
 
 ## What to do now
 

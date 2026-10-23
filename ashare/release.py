@@ -104,21 +104,51 @@ def pseudonym(name: str, key: bytes) -> str:
 
 
 _ORG = re.compile(r"公司|集团|银行|基金|计划|信托|证券|保险|资产|合伙|中心|委员会|政府|国资|财政|大学|学院|研究|协会|"
-                  r"商会|工会|事务所|产品|账户|专户|组合|企业|厂$|局$|部$|社$|LIMITED|LTD|INC|CORP|LLC|GMBH|PLC|AG\b|SA\b|FUND|"
-                  r"TRUST|BANK|HOLDING|CAPITAL|PARTNERS|株式会社", re.I)
+                  r"商会|工会|事务所|产品|账户|专户|组合|企业|厂$|局$|部$|社$|LIMITED|LTD|INC|CORP|LLC|GMBH|PLC|"
+                  r"AG\b|SA\b|N\.?V\.?\b|B\.?V\.?\b|FUND|TRUST|BANK|HOLDING|CAPITAL|PARTNERS|AUTHORITY|INVESTMENT|ASSET|"
+                  r"MANAGEMENT|SECURITIES|GROUP|COMPANY|\bCO\.|NOMINEES|株式会社", re.I)
+# A shareholder nature glued to a name by the PDF text ("张三境内自然人"; finding 69).
+_NATURE_SUFFIX = re.compile(r"(境内自然人|境外自然人|自然人|国有法人|国有股|境内非国有法人|境内一般法人|境外法人|国有独资|"
+                            r"基金、理财产品等|其他)$")
+
+
+def strip_nature(name: str) -> tuple[str, str | None]:
+    """(name, nature) with a shareholder nature glued to the end of the name taken off."""
+    n = (name or "").strip()
+    m = _NATURE_SUFFIX.search(n)
+    if m and m.start() > 0:
+        return n[:m.start()].strip(), m.group(1)
+    return n, None
+
+
+# v2.0.7: recorded in each release's manifest, so that a release made under the earlier rule can be recognised.
+PERSON_RULE = ("fail-safe v2.0.7: a name is masked unless a legal-person nature or an organisation word shows "
+               "it to be an organisation's; a nature glued to the name is taken off first")
 
 
 def is_natural_person(name: str | None, nature: str | None = None) -> bool:
-    if not name:
+    """Whether a name is to be treated as a natural person's in a pseudonymised release.
+
+    v2.0.7 (finding 69): fail-safe. A name is a person's unless it is shown to be an organisation's: by a
+    legal-person nature, or by a word that only organisations use (公司, 基金, LIMITED ...). Before, a name had
+    to look like a two-to-five-character Chinese name to be masked, so a name with its nature glued on
+    ("张三境内自然人") or written in Latin letters ("JOHN SMITH") was released as it stood. Masking an
+    organisation by mistake loses a little information; leaving a person unmasked is a privacy failure."""
+    if not name or not str(name).strip():
         return False
-    nat = nature or ""
+    base, glued = strip_nature(str(name))
+    nat = (nature or "") + (glued or "")
     if "自然人" in nat or nat.upper() in ("PERSON", "DOMESTIC_NATURAL_PERSON", "FOREIGN_NATURAL_PERSON"):
         return True
-    if nat and ("法人" in nat or nat.upper() in ("COMPANY", "FUND", "GOVERNMENT", "PARTNERSHIP")):
+    if _ORG.search(base):
         return False
-    if _ORG.search(name):
+    if nat and ("法人" in nat or "国有" in nat or "基金" in nat or nat.upper() in (
+            "COMPANY", "FUND", "GOVERNMENT", "PARTNERSHIP", "STATE", "STATE_LEGAL_PERSON",
+            "DOMESTIC_NON_STATE_LEGAL_PERSON", "FOREIGN_LEGAL_PERSON", "FUND_OR_PRODUCT")):
         return False
-    return bool(re.fullmatch(r"[一-鿿·]{2,5}", name.strip()))
+    if re.fullmatch(r"[\d\s.,%()（）\-]+", base):
+        return False                      # a stray figure, not a name
+    return True
 
 
 _SPLIT = re.compile(r"[、,，;；/]")   # not 和/与/及: they occur inside names (张和平)
@@ -128,6 +158,11 @@ _SPLIT_KEEP = re.compile(r"([、,，;；/])")
 def _person_parts(value: str, nature: str | None, always: bool) -> list[str]:
     parts = [p.strip() for p in _SPLIT.split(value)] if not always else [value.strip()]
     return [p for p in parts if p and (always or is_natural_person(p, nature))]
+
+
+def _bare(name: str) -> str:
+    """The name without a glued nature, for the pseudonym and for finding it in free text."""
+    return strip_nature(name)[0] or name
 
 
 class Pseudonymiser:
@@ -146,7 +181,9 @@ class Pseudonymiser:
             nature = next((row.get(n) for n in NATURE_COLUMN.get((table, col), ()) if row.get(n)), None)
             for part in _person_parts(str(v), nature, always):
                 if len(part) >= 2:
-                    self.names.setdefault(part, pseudonym(part, self.key))
+                    bare = _bare(part)
+                    p = self.names.setdefault(bare, pseudonym(bare, self.key))
+                    self.names.setdefault(part, p)          # the glued form maps to the same identifier
 
     def _replace_text(self, text: str) -> str:
         if self._pattern is None:
@@ -377,6 +414,7 @@ def build_release(out_dir: str = "releases", name: str | None = None, security_c
                     "excluded_rows": dropped,
                     "note": "Rows are classed by source; tag an import with set-licence to change its class."},
         "pseudonymisation": ({"applied": True, "method": "HMAC-SHA256 of the normalised name, 12 hex digits",
+                              "rule": PERSON_RULE,
                               "key_fingerprint": hashlib.sha256(key).hexdigest()[:16],
                               "names_replaced": len(ps.names), "fields": sorted(ps.fields),
                               "coarsened": coarsen, "free_text_dropped": drop_free_text,

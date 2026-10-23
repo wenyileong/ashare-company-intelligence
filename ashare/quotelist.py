@@ -28,6 +28,12 @@ retried after a pause; the error is reported; once a query has stopped at the
 same page after its retries, that row limit is remembered for the day, so the
 parts do not wait for it again. The quote list is paced at no more than one
 request every two seconds.
+
+v2.0.7 (findings 58, 59 and 66): the live list then refused even page 1, so the
+cause is a refusal rather than a row limit. Three refused attempts in a row
+(the request, again after 30 seconds and again after two minutes; any success
+resets the count) now stop the whole reading, instead of every board pausing
+in turn (49 minutes). The note lists every board read, with its error.
 """
 from __future__ import annotations
 
@@ -233,27 +239,55 @@ def _wait(seconds: float) -> None:
         time.sleep(min(1.0, left))
 
 
-def _page_with_retry(pager: _Pager, pn: int, pz, fs: str, po: int):
-    """One page, retried after RETRY_WAITS when every variant fails (no waiting offline)."""
+MAX_REFUSALS = 3                # v2.0.7: refused attempts in a row that stop the reading
+
+
+class Refused(QuoteListError):
+    """The quote list refused MAX_REFUSALS attempts in a row."""
+
+
+class _Refusals:
+    """Counts refused attempts in a row across the whole reading (any success resets it), and pauses before a
+    second and third attempt (RETRY_WAITS). v2.0.7: the reading stops after three refused attempts in a row,
+    instead of pausing again for every board (finding 58)."""
+
+    def __init__(self, offline: bool):
+        self.offline, self.n, self.errors = offline, 0, []
+
+    def before(self) -> None:
+        if self.n and not self.offline:
+            _wait(RETRY_WAITS[min(self.n, len(RETRY_WAITS)) - 1])
+
+    def ok(self) -> None:
+        self.n = 0
+
+    def failed(self, what: str) -> None:
+        self.n += 1
+        self.errors.append(what)
+        if self.n >= MAX_REFUSALS:
+            raise Refused("; ".join(self.errors[-MAX_REFUSALS:]))
+
+
+def _attempt(pager: _Pager, ref: _Refusals, pn: int, pz, fs: str, po: int, label: str):
+    ref.before()
     try:
-        return pager.page(pn, pz, fs, po)
+        out = pager.page(pn, pz, fs, po)
+    except Refused:
+        raise
     except QuoteListError as exc:
-        last = exc
-    for w in RETRY_WAITS:
-        if not pager.client.offline:
-            _wait(w)
-        try:
-            return pager.page(pn, pz, fs, po)
-        except QuoteListError as exc:
-            last = exc
-    raise last
+        ref.failed(f"{label.strip(' ()') or 'whole list'} page {pn}: {exc}")
+        raise
+    ref.ok()
+    return out
 
 
-def _read_query(pager: _Pager, part: dict, fs: str, po: int, save, progress=None, label: str = "",
-                max_pages: int = 400, row_cap: int | None = None, retry: bool = True) -> str | None:
+def _read_query(pager: _Pager, part: dict, fs: str, po: int, save, ref: _Refusals, progress=None,
+                label: str = "", max_pages: int = 400, row_cap: int | None = None, late_tries: int = 2) -> str | None:
     """Read one query into ``part`` ({"pages", "total", "page_size", "error"}), resuming from its cached pages.
-    Returns the error that stopped it, or None. With ``row_cap``, pages beyond the cap are not requested."""
+    Returns the error that stopped it, or None. A first page is tried until the reading is refused (Refused is
+    raised); a later page at most ``late_tries`` times. With ``row_cap``, pages beyond the cap are not requested."""
     pn = 1
+    tries = 0
     while pn <= max_pages:
         size = part.get("page_size")
         if str(pn) in part["pages"]:
@@ -266,16 +300,25 @@ def _read_query(pager: _Pager, part: dict, fs: str, po: int, save, progress=None
             save()
             return part["error"]
         try:
-            fn = _page_with_retry if retry else (lambda p, n, z, f, o: p.page(n, z, f, o))
-            total, rows, size = fn(pager, pn, size, fs, po)
+            total, rows, size = _attempt(pager, ref, pn, size, fs, po, label)
+        except Refused as exc:
+            part["error"] = f"page {pn}: {str(exc).split('; ')[-1].split(': ', 1)[-1]}"
+            part["failed_page"] = pn
+            save()
+            raise
         except QuoteListError as exc:
+            tries += 1
+            if pn == 1 or tries < late_tries:
+                continue                      # try the same page again (after a pause)
             part["error"] = f"page {pn}: {exc}"
             part["failed_page"] = pn
             save()
             return part["error"]
+        tries = 0
         part["total"], part["page_size"] = total, size
         part["pages"][str(pn)] = rows
         part["error"] = None
+        part.pop("failed_page", None)
         save()
         if progress and pn % 10 == 0:
             progress(f"  quote list{label}: page {pn} of {math.ceil(total / size) if size else '?'}")
@@ -353,13 +396,14 @@ def fetch_pages(fields: str, kind: str, progress=None, max_pages: int = 400, use
             pass
 
     pager = _Pager(fields)
-    error = None
+    ref = _Refusals(pager.client.offline)
+    error, refused = None, None
     parts_used = False
     try:
         cap = cache.get("row_cap")
-        # A limit confirmed earlier today is tried once more without pauses: if the page beyond it now answers,
-        # the limit is dropped.
-        error = _read_query(pager, cache, FS, 1, save, progress, "", max_pages, retry=cap is None)
+        # A limit confirmed earlier today is tried once more: if the page beyond it now answers, it is dropped.
+        error = _read_query(pager, cache, FS, 1, save, ref, progress, "", max_pages,
+                            late_tries=1 if cap is not None else 2)
         size = cache.get("page_size")
         if cap is not None and size and _contiguous(cache) * size > cap:
             cache["row_cap"] = None
@@ -369,9 +413,10 @@ def fetch_pages(fields: str, kind: str, progress=None, max_pages: int = 400, use
                 pass
             save()
         if not _part_complete(cache) and cache["pages"]:
-            # The whole list stopped part-way. A stop at a page after earlier pages answered (and after the
-            # retries) may be the number of rows one query returns; it is confirmed when a board stops at the
-            # same number of rows, and is then remembered for today.
+            # The whole list stopped part-way. A stop at a page after earlier pages answered may be the number of
+            # rows one query returns; it is confirmed when a board stops at the same number of rows, and is then
+            # remembered for today. If the boards are refused too, the reading stops after three refused
+            # attempts in a row.
             size = cache.get("page_size")
             candidate = _contiguous(cache) * size if size else None
             parts_used = True
@@ -384,19 +429,23 @@ def fetch_pages(fields: str, kind: str, progress=None, max_pages: int = 400, use
                     part = cache["parts"].setdefault(f"{code}:{po}", {"pages": {}, "total": None,
                                                                        "page_size": None, "error": None})
                     label = f" ({name}, {'descending' if po else 'ascending'})"
-                    err = _read_query(pager, part, fs, po, save, progress, label, max_pages,
-                                      row_cap=cache.get("row_cap"), retry=False)
+                    err = _read_query(pager, part, fs, po, save, ref, progress, label, max_pages,
+                                      row_cap=cache.get("row_cap"), late_tries=1)
                     if err and part.get("failed_page"):
                         before = (part["failed_page"] - 1) * (part.get("page_size") or 0)
                         if candidate and before == candidate:
                             cache["row_cap"] = candidate            # the same limit: confirmed, no waiting
                             _remember_cap(candidate)
+                            ref.ok()                                # explained by the limit, not a refusal
                             save()
-                        else:                                       # a different stop: retry after pauses
-                            _read_query(pager, part, fs, po, save, progress, label, max_pages,
-                                        row_cap=cache.get("row_cap"), retry=True)
+                        else:                                       # a different stop: try that page again
+                            _read_query(pager, part, fs, po, save, ref, progress, label, max_pages,
+                                        row_cap=cache.get("row_cap"), late_tries=MAX_REFUSALS)
                     btotal = part.get("total") if part.get("total") is not None else btotal
                     codes |= {str(r.get("f12")) for r in _rows(part)}
+    except Refused as exc:
+        refused = str(exc)
+        save()
     finally:
         pager.close()
     merged: dict = {}
@@ -414,7 +463,8 @@ def fetch_pages(fields: str, kind: str, progress=None, max_pages: int = 400, use
                 codes.add(str(r.get("f12")))
             btotal = part.get("total") if part.get("total") is not None else btotal
             berr = berr or part.get("error")
-        if btotal is not None or codes:
+        attempted = any(f"{code}:{po}" in cache["parts"] for po in ORDERS)
+        if btotal is not None or codes or attempted:      # v2.0.7: also a board refused at its first page
             board_info[code] = {"name": name, "total": btotal, "rows": len(codes),
                                 "complete": btotal is not None and len(codes) >= btotal,
                                 "error": None if btotal is not None and len(codes) >= btotal else berr}
@@ -428,7 +478,7 @@ def fetch_pages(fields: str, kind: str, progress=None, max_pages: int = 400, use
     return {"rows": rows, "total": total, "complete": complete, "pages": len(cache["pages"]),
             "expected_pages": expected_pages, "variant": pager.variant[0] if pager.variant else None,
             "error": error, "errors": pager.errors, "parts": board_info, "parts_used": parts_used,
-            "row_cap": cache.get("row_cap")}
+            "row_cap": cache.get("row_cap"), "refused": refused}
 
 
 class ListingInfo(dict):
@@ -436,6 +486,9 @@ class ListingInfo(dict):
     complete = False
     total = 0
     note = None
+    parts: dict = {}
+    row_cap = None
+    refused = None
 
 
 def listing_info(progress=None) -> ListingInfo:
@@ -453,7 +506,13 @@ def listing_info(progress=None) -> ListingInfo:
         out.note = (f"quote list read board by board ({len(out):,} companies), because one query returns at most "
                     f"{r['row_cap']:,} rows" if r.get("row_cap") else
                     f"quote list read board by board ({len(out):,} companies)")
-    if not r["complete"]:
+    out.refused = r.get("refused")
+    if r.get("refused") and not r["complete"]:
+        out.note = (f"the quote list refused {MAX_REFUSALS} attempts in a row, so it was not read further "
+                    f"({len(out):,} companies fetched; {r['refused']}). Eastmoney may be refusing requests from "
+                    "this network for a while: run 'Update the company list' again later, or import listing dates "
+                    "(see the user guide)")
+    elif not r["complete"]:
         if not r["rows"]:
             out.note = ("the quote list refused every request (" + (r["error"] or "no answer") + "); run "
                         "'Diagnose the quote list' (ashare-cli diagnose-quote-list) to see why")

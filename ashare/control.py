@@ -23,7 +23,7 @@ from pathlib import Path
 from .timeutil import utcnow
 from .models import (SessionLocal, init_db, Company, Disclosure, OwnershipObservation, PledgeEvent,
                      ControlObservation, ControlEdge, Entity, EntityAlias, Person, PersonRole,
-                     ManagementObservation, SubsidiaryObservation)
+                     ManagementObservation, SubsidiaryObservation, ReviewItem)
 from .corporate_actions import parse_cn_date, _DATE, _clean, _document_pages
 from .ownership import normalise_date
 
@@ -48,16 +48,55 @@ def _f(tok: str | None) -> float | None:
 
 # --- top-10 tables ---------------------------------------------------------------------
 
+_NUM_PCT = _NUM + r"%?"
+# A well-formed figure: thousands grouped in threes, or no grouping. PDF text sometimes runs two cells together
+# ("833,820,000200,000"); such a token is not a figure, and the row is not read rather than misread.
+_WELL_FORMED = re.compile(r"-?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?%?")
+
+
+def _is_num(tok: str) -> bool:
+    return bool(re.fullmatch(_NUM_PCT, tok))
+# Natures, longest first, for finding one glued to the end of a name (v2.0.7).
+_NATURES_LONGEST = tuple(sorted(NATURES, key=len, reverse=True))
+
+
+def split_nature(name: str) -> tuple[str, str | None]:
+    """(name, nature) for a name with a shareholder nature glued to its end, as PDF text often gives it
+    ("西安投资控股有限公司国有法人"); otherwise (name, None). v2.0.7 (finding 68)."""
+    n = (name or "").strip()
+    for nat in _NATURES_LONGEST:
+        if n.endswith(nat) and len(n) > len(nat):
+            return n[: -len(nat)].strip(), nat
+    return n, None
+
+
+def _close(a: float | None, b: float | None) -> bool:
+    return a is not None and b is not None and abs(a - b) <= max(1.0, abs(b) * 1e-6)
+
+
 def parse_top10_pages(pages: list[str]) -> list[dict]:
-    """Rows of 前十名股东持股情况 (rank order)."""
+    """Rows of 前十名股东持股情况 (rank order).
+
+    v2.0.7 (finding 68): two column orders are read.
+    * Layout A (the older order, still used in many reports): name, change in the period, shares held,
+      percentage, restricted shares, pledge state and number, nature at the end.
+    * Layout B (the order with the nature after the name, as in the Shenzhen templates): name, nature,
+      percentage, shares held, then [change in the period,] restricted [and unrestricted] shares, pledge state.
+    The layout is taken from the header when it names the columns, otherwise from where the nature stands. The
+    columns after the shares in layout B are placed by checking that restricted and unrestricted shares add up
+    to the shares held. A row whose figures fail the checks (percentage outside 0 to 100, no shares) is left out.
+    """
     from .units import first_declared  # noqa: F401 (share counts carry no currency unit)
     out, seen = [], set()
     mode = None
+    header_layout, header_change = None, None
+    pending = ""                     # the first line of a name wrapped onto two lines
     for pno, page in enumerate(pages, start=1):
         for raw in page.splitlines():
             line = raw.replace("　", " ").strip()
             if re.search(r"前十名股东持股情况|前10名股东持股情况", line) and "无限售" not in line:
                 mode = "top10"
+                header_layout, header_change, pending = None, None, ""
                 continue
             if re.search(r"前十名无限售条件股东持股情况|前10名无限售条件股东持股情况|前十名流通股东", line):
                 mode = None
@@ -67,30 +106,74 @@ def parse_top10_pages(pages: list[str]) -> list[dict]:
                 continue
             if mode != "top10":
                 continue
+            if "股东名称" in line or ("股东性质" in line and not re.search(_NUM, line)):
+                # A header: which column comes first, the nature or the figures?
+                pos_nat = line.find("股东性质")
+                pos_pct = min([p for p in (line.find("持股比例"), line.find("比例")) if p >= 0], default=-1)
+                if pos_nat >= 0 and pos_pct >= 0:
+                    header_layout = "B" if pos_nat < pos_pct else "A"
+                if "增减" in line:
+                    header_change = True
+                elif header_layout == "B" and pos_pct >= 0:
+                    header_change = False
+                continue
             toks = line.split()
             k = 0
-            while k < len(toks) and not re.fullmatch(_NUM, toks[k]):
+            while k < len(toks) and not _is_num(toks[k]):
                 k += 1
-            if k == 0 or k >= len(toks):
+            if k >= len(toks):
+                # no figure: the first part of a wrapped name (kept for the next line), unless it is a note
+                pending = "" if re.search(r"单位|说明|注|股东名称", line) else (pending + line)[-60:]
                 continue
-            name = " ".join(toks[:k]) if re.search(r"[A-Za-z]", "".join(toks[:k])) else "".join(toks[:k])
-            if re.search(r"股东名称|报告期|期末持股|比例|数量|单位", name):
+            if k == 0:
+                pending = ""
                 continue
+            head = " ".join(toks[:k]) if re.search(r"[A-Za-z]", "".join(toks[:k])) else "".join(toks[:k])
+            if pending:
+                head = pending + ("" if not re.search(r"[A-Za-z]$", pending) else " ") + head
+                pending = ""
+            if re.search(r"股东名称|报告期|期末持股|比例|数量|单位", head):
+                continue
+            name, lead_nature = split_nature(head)
             rest = toks[k:]
             nums = []
             i = 0
-            while i < len(rest) and re.fullmatch(_NUM, rest[i]):
+            while i < len(rest) and _is_num(rest[i]):
                 nums.append(rest[i])
                 i += 1
             tail = rest[i:]
-            if len(nums) < 3:
+            if any(not _WELL_FORMED.fullmatch(x) for x in nums[:5]):
+                continue                     # two cells run together: not read rather than misread
+            if len(nums) < 3 and not (lead_nature and len(nums) >= 2):
                 continue
-            # change, shares held, percentage, restricted shares
-            change, shares, pct = _f(nums[0]), _f(nums[1]), _f(nums[2])
-            restricted = _f(nums[3]) if len(nums) > 3 else None
-            if pct is None or pct > 100 or shares is None:
+            layout = header_layout or ("B" if lead_nature else "A")
+            vals = [_f(x) for x in nums]
+            change = restricted = None
+            if layout == "B":
+                pct, shares = vals[0], vals[1]
+                r = vals[2:]
+                if len(r) >= 3 and _close((r[1] or 0) + (r[2] or 0), shares):
+                    change, restricted = r[0], r[1]
+                elif len(r) >= 2 and _close((r[0] or 0) + (r[1] or 0), shares):
+                    restricted = r[0]
+                elif len(r) >= 2:
+                    if header_change is False:
+                        restricted = r[0]
+                    else:
+                        change, restricted = r[0], r[1]
+                elif len(r) == 1:
+                    if header_change:
+                        change = r[0]
+                    else:
+                        restricted = r[0]
+            else:
+                change, shares, pct = vals[0], vals[1], vals[2]
+                restricted = vals[3] if len(vals) > 3 else None
+            if pct is None or not (0 <= pct <= 100) or shares is None or shares <= 0:
                 continue
-            state, pledged, nature = None, None, None
+            if restricted is not None and (restricted < 0 or restricted > shares + 1):
+                restricted = None
+            state, pledged, nature = None, None, lead_nature
             j = 0
             if j < len(tail) and any(tail[j].startswith(s) for s in _STATES):
                 state = tail[j]
@@ -99,7 +182,8 @@ def parse_top10_pages(pages: list[str]) -> list[dict]:
                     pledged = _f(tail[j])
                     j += 1
             rest_text = "".join(tail[j:])
-            nature = next((n for n in NATURES if n in rest_text), rest_text or None)
+            if nature is None:
+                nature = next((n for n in NATURES if n in rest_text), rest_text or None)
             if name in seen:
                 continue
             seen.add(name)
@@ -107,30 +191,40 @@ def parse_top10_pages(pages: list[str]) -> list[dict]:
                         "ownership_pct": pct, "restricted_shares": restricted, "pledge_state": state,
                         "pledged_shares": pledged if state and ("质押" in state or "冻结" in state or "标记" in state) else None,
                         "shareholder_nature": nature, "shareholder_type": NATURE_TYPES.get(nature or ""),
-                        "page": pno, "raw": line})
+                        "page": pno, "raw": line, "layout": layout})
             if len(out) >= 10:
                 mode = None
+    total = sum(r["ownership_pct"] for r in out)
+    if total > 100.5:          # the figures cannot all be percentages: do not keep a misread table
+        return []
     return out
 
 
 def parse_top10_tradable_pages(pages: list[str]) -> list[dict]:
     """Rows of 前十名无限售条件股东持股情况: name, tradable shares, share class."""
     out, seen, mode = [], set(), False
+    pending = ""                     # v2.0.7: the first line of a wrapped name
     for pno, page in enumerate(pages, start=1):
         for raw in page.splitlines():
             line = raw.replace("　", " ").strip()
             if re.search(r"前十名无限售条件股东持股情况|前10名无限售条件股东持股情况", line):
-                mode = True
+                mode, pending = True, ""
                 continue
             if mode and re.search(r"上述股东关联关系|一致行动|前十名股东参与融资融券|前十名有限售条件", line):
                 mode = False
                 continue
             if not mode:
                 continue
-            m = re.match(r"^(.+?)\s+(" + _NUM + r")\s+(人民币普通股|境内上市外资股|境外上市外资股)(?:\s+(" + _NUM + r"))?\s*$", line)
+            m = re.match(r"^(.+?)\s+(" + _NUM + r")\s*(人民币普通股|境内上市外资股|境外上市外资股)(?:\s+(" + _NUM + r"))?\s*$", line)
             if not m:
+                pending = "" if (re.search(r"\d", line) or re.search(r"股东名称|数量", line)) else (pending + line)[-60:]
                 continue
-            name = re.sub(r"\s+", "" if not re.search(r"[A-Za-z]", m.group(1)) else " ", m.group(1)).strip()
+            if not _WELL_FORMED.fullmatch(m.group(2)):
+                pending = ""
+                continue
+            head = (pending + m.group(1)) if pending else m.group(1)
+            pending = ""
+            name = re.sub(r"\s+", "" if not re.search(r"[A-Za-z]", head) else " ", head).strip()
             if name in seen or re.search(r"股东名称|数量", name):
                 continue
             seen.add(name)
@@ -163,6 +257,19 @@ def extract_top_holders(security_code: str | None = None) -> dict:
                 rows, info = dual_run("top10", path, {"title": d.title_cn})
                 tradable, _ = dual_run("top10_tradable", path, {"title": d.title_cn})
                 tally_dual(totals, info, d.id)
+                # v2.0.7 (finding 68): rows an earlier parser read from this document, and that the current one
+                # does not, are removed (with their review items), so a misread table does not linger.
+                keep = {r["shareholder_name"] for r in rows}
+                stale = [o for o in s.query(OwnershipObservation).filter_by(company_id=c.id, disclosure_id=d.id)
+                         if o.shareholder_name not in keep]
+                if stale:
+                    ids = [o.id for o in stale]
+                    s.query(ReviewItem).filter(ReviewItem.table_name == "ownership_observations",
+                                               ReviewItem.row_id.in_(ids)).delete(synchronize_session=False)
+                    for o in stale:
+                        s.delete(o)
+                    totals["removed"] = totals.get("removed", 0) + len(stale)
+                    s.commit()
                 if not rows:
                     continue
                 totals["reports"] += 1
@@ -569,6 +676,9 @@ def normalise_name(name: str) -> str:
 
 
 def _entity_type(name: str) -> str:
+    name, nature = split_nature(name)          # v2.0.7: a nature glued to the name (finding 68)
+    if nature and "自然人" in nature:
+        return "PERSON"
     if re.search(r"国有资产监督管理|国资委|人民政府|财政|管理委员会$", name):
         return "GOVERNMENT"
     if re.search(r"合伙企业|有限合伙", name):
@@ -635,6 +745,18 @@ def resolve_entities() -> dict:
         for co in s.query(ControlObservation).all():
             get(co.actual_controller, "controller")
             get(co.controlling_shareholder, "controller")
+        s.flush()
+        # v2.0.7 (finding 68): entities known only as shareholders, which no shareholder row names any more (rows
+        # misread by an earlier parser and since removed), are removed with their aliases.
+        linked = {eid for (eid,) in s.query(OwnershipObservation.entity_id).filter(
+            OwnershipObservation.entity_id.isnot(None)).distinct()}
+        pruned = 0
+        for e in s.query(Entity).all():
+            if (e.sources or "") == "shareholder" and not e.credit_code and e.id not in linked:
+                s.query(EntityAlias).filter_by(entity_id=e.id).delete(synchronize_session=False)
+                s.delete(e)
+                pruned += 1
+        totals["removed"] = pruned
         s.commit()
         totals["entities"] = s.query(Entity).count()
         return totals
