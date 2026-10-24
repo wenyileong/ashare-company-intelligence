@@ -15,6 +15,11 @@
 - the transactions, share-capital and regulatory extractions;
 - the start of "Extract segments from reports".
 
+**Third log (findings 82 to 91).** The latest copy adds:
+- "Extract segments from reports", finished (8 h 30 min);
+- "Run all checks" (`validate-all`) and "Show findings" (`show-flags`, 1,778 findings);
+- share-capital reconciliation and transactions again, and corporate actions from titles.
+
 **Status:** findings only; no code has been changed. Numbering continues from the v2.0.6 findings (`docs/live_run_findings_v2.0.6.md`, findings 58 to 69).
 
 ## Summary
@@ -33,6 +38,16 @@
 | 79 | The progress counter says "0.0 per second" and counts reads, not documents | Low (misleading) | Confirmed |
 | 80 | Transactions and regulatory events are read from titles only, with no counterparty or amount | Information (documents not downloaded) | Confirmed |
 | 81 | Share-capital reconciliation found no data to reconcile | Information | Confirmed |
+| 82 | Segment extraction finished: 600 reports in 8 h 30 min, about 51 seconds a report | Medium (slow, as in 76) | Confirmed |
+| 83 | Segment totals often disagree with the reported total: 248 findings, median difference 35% | **High** (segment figures unreliable without review) | Confirmed from the findings; cause to check |
+| 84 | 174 differences between two readings of the same period, 168 of them between two documents filed the same day; 100 differ by a power of ten | **High** (wrong financial figures in the database) | Confirmed; which documents, to check |
+| 85 | Digits glued to or cut from figures: for example 11,791,960,892.40 against 1,791,960,892.40 | High (wrong figures) | Confirmed from the findings |
+| 86 | Three differences marked "explained by a restatement" are between documents filed the same day | Low (a weak explanation shown as an explanation) | Confirmed from the code |
+| 87 | The balance-sheet identity fails in 37 of 351 groups checked (11%) | Medium | Confirmed |
+| 88 | The two parsers disagree on 1,345 figures (financials 486, statements 278, segments 581) | Medium (needs review, not a fault in itself) | Confirmed |
+| 89 | A table heading, 与本公司的关系, read as the actual controller's name | Medium (supports 78) | Confirmed |
+| 90 | Corporate actions (42,395, titles only) were read after the checks ran, so none were grouped; ownership checks covered one company | Information (order of actions) | Confirmed |
+| 91 | "Show findings" prints 1,778 findings as a 10,000-line table, without the company code | Low (hard to use) | Confirmed |
 
 ## 70. The exchanges' stock lists work
 
@@ -132,12 +147,90 @@ This should take each report from minutes to seconds.
 
 **Assessment.** The reconciliation compares share-capital observations, imported or read from reports, with corporate actions. None have been imported or extracted yet, so there is nothing to compare. This is not a fault.
 
+## 82. Segment extraction: 600 reports in eight and a half hours
+
+**Evidence.** "Extract segments from reports" counted 1,200 readings and finished after 30,588 seconds: `{'reports': 600, 'segments': 3859, ... 'dual_run': {'agree': 2979, 'disagree': 581, 'single': 299, 'secondary_only': 1799}, 'scanned_documents': [405]}`. The PDF reader noted damaged cross-references (repaired) and fonts without a standard encoding in two documents.
+
+**Assessment.** About 51 seconds a report, two readings each: faster than top-10 shareholders (finding 76), but still eight hours for 600 reports. The same remedy applies (targeted pages, one reading per report, progress and resume). One document (disclosure 405) is a scan without a text layer, so nothing was read from it. The 1,799 segments found only by the second (plain-text) parser are kept as that parser's reading, so they lack the cross-check the other 2,979 have.
+
+## 83. Segment totals often disagree with the reported total
+
+**Evidence.** 248 `SEGMENT_SUM_MISMATCH` findings: by product 102, by industry 88, by region 42, by sales model 11, reportable segments 5. Most compare the sum of the segments with the table's own total (217); the rest with the revenue figure (31). The absolute differences have a median of 35%; 69 are within 10%, and 65 are 90% or more. Four exceed a billion per cent, which can only be a unit or digit fault. 56 sums are larger than the total, 192 smaller.
+
+**Assessment (cause to check).** A difference of a few per cent can be genuine (rounding, an "other" line not read, inter-segment eliminations). Differences of a third or more, and sums under half the total, point to rows missed when a table runs over a page or wraps, or to a subtotal row read as a segment. Until this is checked against a few reports, segment figures should be used only where the sum agrees with the total. A `segments` call for a flagged company with the report open beside it would show the pattern.
+
+## 84. Two readings of the same period disagree
+
+**Evidence.** 174 `EXTRACTION_DISCREPANCY` findings (plus the 3 of finding 86), from 77 pairs of documents:
+- **Same day.** In 168 of the 174, the two documents were filed on the same day and have consecutive record numbers (for example disclosures 9 and 10, 57 and 58).
+- **Powers of ten.** In 100, the two values differ by exactly 1,000, 10,000, a million or a hundred million: one reading applied the wrong unit (元, 千元, 万元 or 亿元).
+- **Other.** Two differ only in sign (operating profit −12,513,029,670 against +12,513,029,670); the other 72 by no simple factor (inventory 373,738,098,100 against 2,664,000), which means a different figure was read.
+- **Metrics.** Revenue (64), parent net profit (34), operating cash flow (32) and net profit after non-recurring items (28): the headline figures.
+
+**Cause (from the code; the documents still to check).** Two things combine.
+- **Two documents.** Financial extraction reads documents classed as annual, interim or quarterly reports. A summary (摘要) or English version is classed apart, so these pairs are probably a report together with another document whose title also contains 年度报告 (a corrected version, or a notice about the report), or documents read under "All downloaded documents" before v2.0.6. This needs the two titles; the query below gives them.
+- **The unit.** The text reader takes the first figure after a label, and the unit from the nearest "单位：" line before it. Where no such line precedes the figure on that page or earlier, but one exists elsewhere in the document, it assumes 元. A key-figures table near the front of a report, or a summary document, often declares its unit only in the table heading or not at all, so the same figure is read once in 元 and once in 万元.
+
+In each pair at most one value is right, and the database does not yet say which. Panels should not use the periods of these 77 pairs until it is fixed.
+
+**Check.** `ashare-cli query "SELECT id, announcement_date, kind, title_cn FROM disclosures WHERE id IN (9,10,57,58,126,128,129,255,256)"` shows what the pairs are.
+
+## 85. Digits glued to or cut from figures
+
+**Evidence.** One company's documents of 31 March (disclosures 128 and 129) and a later document (126, 13 June):
+- equity 11,791,960,892.40 against 1,791,960,892.40;
+- other equity instrument investments 452,156,535.48 against 2,156,535.48;
+- taxes and surcharges 227,102,914.31 against 7,102,914.31;
+- non-current assets due within a year 22,103,629.82 against 22,103;
+- revenue 1,355.2 against 143,751,044,503.13.
+
+**Assessment.** The digits beyond the shared ending (1, 45, 22) look like a note reference (附注 number) glued to the figure in one reading, or digits lost in the other; "22,103" and "1,355.2" are figures cut at a separator or a line break. Either way, one reading of each is wrong. These come from both readers, the text heuristic and the statement-table reader. The number check (`_WELL_FORMED`) added for the top-10 parser in v2.0.7 rejects such numbers there, and the financial readers need the same check, with the note column kept apart.
+
+## 86. "Explained by a restatement" for documents filed the same day
+
+**Evidence.** Three `RESTATEMENT_EXPLAINED` findings compare disclosures 57 and 58, both of 29 April: revenue 9,835,474,916.50 against 2,544,411,519.38, parent net profit −12,582,399,856.80 against +94,810,677.19.
+
+**Assessment (from `crossvalidation.py`).** A difference is "explained" whenever a restatement announcement falls between the two documents' dates. When both are filed on the same day, any restatement filed that day explains it, so this says little. These are probably the same fault as finding 84. A difference between documents of the same day should be explained only by a restatement that names the document (a corrected report, 更正后).
+
+## 87. The balance-sheet identity
+
+**Evidence.** "Balance sheet identity: groups_checked: 351, passed: 314, failed: 37, insufficient: 228".
+
+**Assessment.** Total assets equal total liabilities and equity in 314 of 351 balance sheets read whole (89%). The 37 failures are probably the faults of findings 84 and 85; 228 balance sheets lacked one of the three totals.
+
+## 88. The two parsers disagree on 1,345 figures
+
+**Evidence.** 1,345 `PARSER_DISAGREEMENT` findings: segments 581, financials 486, statements 278. In each the layout reading was kept.
+
+**Assessment.** This is the dual run doing its job: it shows where a figure needs a look. It is not a fault in itself. But at this number it needs the review queue (`build-review-queue`) rather than reading the findings one by one, and the parsers' evaluation (`evaluate-parsers`) on a few hand-checked reports would show which reader is more often right.
+
+## 89. A table heading read as the actual controller
+
+**Evidence.** Among the eight `OWNERSHIP_TYPE_UNKNOWN` findings: `"controller": "与本公司的关系"` ("relationship with the company", a column heading); three with an empty name and the nature 境内其他机构; four with no controller found.
+
+**Assessment.** This supports finding 78: the controller parser reads the table's layout wrongly in some reports, as the top-10 parser did before v2.0.7. A heading should never be taken as a name.
+
+## 90. The order of the actions
+
+**Evidence.** "Run all checks" reported `corporate_actions_grouped: 0` and `ownership_checked: 1`. Corporate actions were read from titles afterwards: 42,395 actions, all "title_only".
+
+**Assessment.** Not a fault. The checks ran before the corporate actions existed, so none were grouped, and only one company has ownership data that the check can test (from an imported or extracted shareholding total). Running "Link events" and "Run all checks" again now groups the corporate actions.
+
+## 91. "Show findings" is hard to use at this size
+
+**Evidence.** 1,778 findings printed as a table of about 10,000 lines, with the JSON details wrapped in a narrow column and no company code.
+
+**Assessment.** The command can filter (`--security-code`, `--severity`, `--rule`), but the desktop action shows everything. A count by rule and company first, the company code in each row, and an export to CSV would make it usable.
+
 ## What to do now
 
 1. Let "Read top-10 shareholders from reports" finish, then check 陕国投A: `ashare-cli show-ownership 000563` should show its real percentages (26.80, 16.76 …) and names without the nature glued on.
 2. "Resolve entities", then `rebuild-security-history`, so that the listing and delisting events reach the point-in-time universe.
 3. Make the release again, then rebuild a panel. Most rows should now be included by listing record, not report evidence.
 4. Optionally, "Download daily prices" for one company, to see whether Eastmoney's price history still answers (finding 73).
+5. Run the query in finding 84 and send the output, so that the document pairs can be identified before the fix.
+6. "Link events", then "Run all checks" again, so that the corporate actions are grouped (finding 90).
+7. Until v2.0.8, do not use segment figures whose sum disagrees with the total, or financial figures for the company-periods flagged in findings 84 and 85.
 
 **For the next patch (v2.0.8, proposed):**
 1. Targeted reading for the document extractors: find the pages first, read the layout of those pages only, and read each report once for all its tables. Add progress, an estimate and resume (findings 76, 77 and 79).
@@ -145,3 +238,7 @@ This should take each report from minutes to seconds.
 3. The installer's check for a running copy (finding 74).
 4. The NOT_IN_EXCHANGE_LIST status, with delisting dates from the listing events (findings 71 and 75).
 5. A second price source, if finding 73 shows that price histories are refused too.
+6. Financial figures: the unit taken from the table that holds the figure, the number check of v2.0.7 for the financial readers, and the note column kept apart; documents that are not the report itself left out (findings 84, 85 and 87).
+7. Segments: rows over page breaks and subtotal rows, checked against the flagged reports (finding 83).
+8. Restatements: a same-day difference explained only by a corrected report (finding 86).
+9. "Show findings": a summary by rule and company, the company code and a CSV export (finding 91).
