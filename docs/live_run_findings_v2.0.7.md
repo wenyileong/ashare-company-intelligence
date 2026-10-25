@@ -20,6 +20,8 @@
 - "Run all checks" (`validate-all`) and "Show findings" (`show-flags`, 1,778 findings);
 - share-capital reconciliation and transactions again, and corporate actions from titles.
 
+**Fourth excerpt (findings 92 to 95).** The corporate-action run that ends the third log, then "Build a panel" (`build-panel --unit year --align fiscal --start 2026-01-01 --end 2026-10-24 --universe-basis auto`), 25 October 2026.
+
 **Status:** findings only; no code has been changed. Numbering continues from the v2.0.6 findings (`docs/live_run_findings_v2.0.6.md`, findings 58 to 69).
 
 ## Summary
@@ -48,6 +50,10 @@
 | 89 | A table heading, 与本公司的关系, read as the actual controller's name | Medium (supports 78) | Confirmed |
 | 90 | Corporate actions (42,395, titles only) were read after the checks ran, so none were grouped; ownership checks covered one company | Information (order of actions) | Confirmed |
 | 91 | "Show findings" prints 1,778 findings as a 10,000-line table, without the company code | Low (hard to use) | Confirmed |
+| 92 | The panel ignores the 5,200 listing dates: a listing history built before they arrived takes precedence | **High** (panels fall back on report evidence for every company) | Confirmed from the code |
+| 93 | A fiscal-year panel for 2026 has no annual figures, because the year has not ended | Medium (an empty panel, with no warning) | Confirmed from the code |
+| 94 | 352 companies are in neither the listing record nor the report evidence | Information (consistent with 71) | Confirmed from counts |
+| 95 | The corporate-action run is the one already in the third log | Information | Confirmed |
 
 ## 70. The exchanges' stock lists work
 
@@ -222,6 +228,34 @@ In each pair at most one value is right, and the database does not yet say which
 
 **Assessment.** The command can filter (`--security-code`, `--severity`, `--rule`), but the desktop action shows everything. A count by rule and company first, the company code in each row, and an export to CSV would make it usable.
 
+## 92. The panel ignores the new listing dates
+
+**Evidence.** `{'rows': 5225, ... 'dropped': {'included_by_report_evidence': 5223, 'excluded_no_listing_date': 5575}}`. Only 2 of 5,225 rows come from the listing record, although "Update the company list" had given about 5,230 companies a listing date (finding 70).
+
+**Cause (from `security_master.universe_at`).** The point-in-time universe reads the listing history (`security_history`) where a company has one, and the company record's listing date only where it has none. The history was built ("Build listing history") before the exchanges' lists filled in the listing dates, so its derived periods for nearly every company have no start date. Such a company is then counted as "no listing date", and the listing date now on its company record is never consulted. Step 2 of "What to do now", rebuilding the history, had not yet been run.
+
+**Assessment.** The remedy for the author is to run "Build listing history" (`rebuild-security-history`), then build the panel again; the history then starts from the IPO event or the listing date. In the code, two things are wrong and belong in v2.0.8:
+- a derived history without a start date should give way to the company record's listing date, not exclude the company;
+- "Update the company list" should rebuild the derived history for the companies whose listing dates it changed, or at least say that it needs rebuilding.
+
+## 93. A fiscal-year panel for a year that has not ended
+
+**Evidence.** `--unit year --align fiscal --start 2026-01-01 --end 2026-10-24` gave one row per company for the fiscal year ending 31 December 2026, and `max_published_date: None`: no value in the panel has a publication date.
+
+**Assessment (from `panel._rows_spec`).** A fiscal-year row takes figures for the year ending 31 December, so the 2026 row looks for 2026 annual reports, which will be published from January 2027. The financial variables are therefore empty in every row. The report evidence, by contrast, counts 2026 interim and quarterly reports, so the rows exist. The panel the author probably wants is fiscal year 2025 (`--start 2025-01-01 --end 2025-12-31`, using the annual reports published in 2026), or quarterly rows for 2026 (`--unit quarter`). The program should warn when a fiscal-year row's year has not ended, and say how many rows have no financial figures at all.
+
+## 94. Companies outside the panel
+
+**Evidence.** 5,225 rows from 5,577 companies.
+
+**Assessment.** The other 352 have neither a usable listing record nor a periodic report for 2026. This matches the roughly 350 companies in CNINFO's list but in neither exchange's list (finding 71), most probably delisted before 2026. Leaving them out of a 2026 panel is right; for earlier years they need delisting dates (finding 71).
+
+## 95. Corporate actions from titles
+
+**Evidence.** 42,395 actions from 472,613 announcements, all "title_only", after 131.7 seconds.
+
+**Assessment.** The figures and the time are identical to the last action of the third log, so this is the same run, not a second one (finding 90). The titles give the type and date of each action; ratios and record dates need the documents.
+
 ## What to do now
 
 1. Let "Read top-10 shareholders from reports" finish, then check 陕国投A: `ashare-cli show-ownership 000563` should show its real percentages (26.80, 16.76 …) and names without the nature glued on.
@@ -230,7 +264,8 @@ In each pair at most one value is right, and the database does not yet say which
 4. Optionally, "Download daily prices" for one company, to see whether Eastmoney's price history still answers (finding 73).
 5. Run the query in finding 84 and send the output, so that the document pairs can be identified before the fix.
 6. "Link events", then "Run all checks" again, so that the corporate actions are grouped (finding 90).
-7. Until v2.0.8, do not use segment figures whose sum disagrees with the total, or financial figures for the company-periods flagged in findings 84 and 85.
+7. "Build listing history", then build the panel again, for fiscal year 2025 (`--start 2025-01-01 --end 2025-12-31`). Expect most rows with `universe_basis = LISTING_RECORD` (findings 92 and 93).
+8. Until v2.0.8, do not use segment figures whose sum disagrees with the total, or financial figures for the company-periods flagged in findings 84 and 85.
 
 **For the next patch (v2.0.8, proposed):**
 1. Targeted reading for the document extractors: find the pages first, read the layout of those pages only, and read each report once for all its tables. Add progress, an estimate and resume (findings 76, 77 and 79).
@@ -242,3 +277,5 @@ In each pair at most one value is right, and the database does not yet say which
 7. Segments: rows over page breaks and subtotal rows, checked against the flagged reports (finding 83).
 8. Restatements: a same-day difference explained only by a corrected report (finding 86).
 9. "Show findings": a summary by rule and company, the company code and a CSV export (finding 91).
+10. The listing history: the company record's listing date used where the derived history has no start, and the history rebuilt when listing dates change (finding 92).
+11. Panels: a warning for fiscal years not yet ended, and a count of rows without financial figures (finding 93).
