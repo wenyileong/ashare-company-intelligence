@@ -1352,6 +1352,8 @@ Sizes are relative (S/M/L) and indicate build effort, not calendar time. v1.4 is
 | Group structure tree | Subsidiaries by jurisdiction and stake, offshore entities highlighted | Business & group | v1.8 |
 | Interlock network | Directors shared between companies | Board & industry | v1.8 |
 
+**Visualisation engine layer (proposed, 28 October 2026).** A view layer between the validated data and every display, for the Nested Valuation Framework: a schema-versioned graph snapshot with evidential status, point-in-time dates and provenance on every node and edge, drawn first as a native 2D layered chart and optionally in an offline interactive viewer. See `docs/plan_v2.0.8_and_visualisation.md`, section 7.
+
 **Interaction model**
 - Charts appear in a chart pane above the existing output text.
 - The output text remains available as a table view of the same data.
@@ -1398,7 +1400,9 @@ The end state (v2.0) is followed by maintenance releases driven by the author's 
 | v2.0.5 | Released, 22 October 2026 | Preparation for public release: user agent, rate ceiling, disclaimer, CONTRIBUTING and SECURITY | `CHANGELOG.md`; `docs/live_run_findings_v2.0.5.md` (findings 35 to 57) |
 | v2.0.7 | Built, 24 October 2026 | Release-review fixes (shareholder layouts, pseudonymisation), batches of ten, exchange stock lists | `CHANGELOG.md`; `docs/live_run_findings_v2.0.6.md` (findings 58 to 69) |
 | v2.0.6 | Built, 23 October 2026 | Listing dates in full, extraction with progress and resume, the last catalogue gaps | `docs/plan_v2.0.6.md`; `CHANGELOG.md` |
+| v2.0.8 | Planned, 28 October 2026 | Correct data first: listing history and panels, financial units and numbers, targeted reading with progress and resume, segments and control, installer check | `docs/plan_v2.0.8_and_visualisation.md` (sections 2 to 4); `docs/live_run_findings_v2.0.7.md` (findings 70 to 95) |
 | v2.1 | Planned | Chinese desktop interface, extraction speed, polish | `docs/plan_v2.1.md`; `docs/glossary_zh_CN.md` |
+| v2.2 to v2.3 | Proposed | Visualisation engine layer for the Nested Valuation Framework: graph snapshot, 2D layered view, optional offline interactive viewer, first episode, measures registry | `docs/plan_v2.0.8_and_visualisation.md` (sections 6 and 7) |
 
 **v2.0.4 (patch; released 18 October 2026).** The first live whole-market catalogue under v2.0.3 confirmed the limit and resumption, but left 12 days short. The causes:
 - overlapping board codes;
