@@ -89,7 +89,9 @@ This log records what changed in each version and the important findings behind 
 - **Results:**
   - 303 pass on Linux Python 3.12 (two skips);
   - 293 on Python 3.13 (ten skips, the desktop tests without tkinter);
-  - 300 against PostgreSQL 16 (five skips).
+  - 300 against PostgreSQL 16 (five skips);
+  - 301 on Windows CPython 3.12 under Wine (four skips);
+  - GitHub CI passes.
 - **The installer under Wine.** It installed; it stopped with exit code 5 over a running copy; it reinstalled once the copy was closed; and it uninstalled.
 
 ## v2.0.7 (24 October 2026)
