@@ -230,6 +230,11 @@ def parse_statement_items(pages: list[str], unit_mult: float | None = None) -> l
                 if v is None:
                     continue
                 per_share = code.startswith("eps_")
+                # v2.0.8 (finding 85): an amount cut at a separator or line break ("22,103" for 22,103,629.82 in
+                # yuan, "1,355.2") is not taken; statement amounts in yuan carry two decimals.
+                from .numbers import well_formed_amount
+                if not per_share and not well_formed_amount(m.group(2), mult):
+                    continue
                 found[code] = {"metric": code, "value": v if per_share else v * mult, "raw_value": m.group(2),
                                "label": m.group(1).strip(), "page": pno, "statement": st,
                                "prior_raw": m.group(3), "unit": "CNY_PER_SHARE" if per_share else "CNY"}

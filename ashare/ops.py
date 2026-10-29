@@ -156,10 +156,11 @@ def _handle_market(item_key: str, params: dict) -> dict:
     end = params.get("end") or date.today().isoformat()
     if start > end:
         return {"skipped": "up to date"}
-    r = acquire_market_data(item_key, start, end, "eastmoney", params.get("adjust", "none"))
-    if r["errors"]:
-        raise RuntimeError(str(r["errors"][0]))
-    set_mark("EASTMONEY_PUBLIC", item_key, "daily_bars", end)
+    from .market import price_source, PROVIDERS
+    provider = params.get("provider") or price_source()
+    # v2.0.8: errors keep their type, so that a refusal can be told from a fault (run_job's refusal rule)
+    r = acquire_market_data(item_key, start, end, provider, params.get("adjust", "none"), raise_errors=True)
+    set_mark(PROVIDERS[provider][0], item_key, "daily_bars", end)
     return {"inserted": r["bars_inserted"], "updated": r["bars_updated"]}
 
 
@@ -258,6 +259,14 @@ def request_cancel(job_id: int) -> None:
         s.close()
 
 
+def _refused(exc) -> bool:
+    """A refusal by the remote service (an HTTP error status, or the connection dropped without an answer)."""
+    return isinstance(exc, (httpx.HTTPStatusError, httpx.RemoteProtocolError, httpx.ReadError))
+
+
+MAX_REFUSED_ITEMS = 3
+
+
 def _transient(exc) -> bool:
     return isinstance(exc, (httpx.TransportError, httpx.HTTPStatusError, TimeoutError, ConnectionError))
 
@@ -278,6 +287,7 @@ def run_job(job_id: int, progress=None, sleep=time.sleep) -> dict:
         handler = HANDLERS[job.kind]
         items = [i for i in s.query(JobItem).filter(JobItem.job_id == job_id).order_by(JobItem.id)
                  if i.status == "PENDING" or (i.status == "FAILED" and i.attempts < MAX_ATTEMPTS)]
+        refused = 0
         for item in items:
             s.refresh(job)
             if job.cancel_requested:
@@ -292,14 +302,24 @@ def run_job(job_id: int, progress=None, sleep=time.sleep) -> dict:
             except Exception as exc:  # noqa: BLE001 - every failure is recorded on the item
                 item.status, item.last_error = "FAILED", f"{type(exc).__name__}: {exc}"[:1000]
                 job.last_error = item.last_error
-                if _transient(exc) and item.attempts < MAX_ATTEMPTS:
+                if params.get("stop_after_refusals") and _refused(exc):
+                    refused += 1
+                elif _transient(exc) and item.attempts < MAX_ATTEMPTS:
                     sleep(min(2 ** item.attempts, 30))
+            else:
+                refused = 0
             item.updated_at = utcnow()
             job.done = s.query(JobItem).filter_by(job_id=job_id, status="DONE").count()
             job.failed = s.query(JobItem).filter_by(job_id=job_id, status="FAILED").count()
             s.commit()
             if progress:
                 progress(job.done, job.total, item.item_key, item.status)
+            if refused >= MAX_REFUSED_ITEMS:
+                # v2.0.8 (finding 73): the source refuses every request; asking for each of 5,000 companies helps
+                # nobody. The job stops; its other items stay pending for the next run.
+                job.status, job.last_error = "STOPPED", f"{refused} refused in a row: {item.last_error}"[:1000]
+                s.commit()
+                break
         if job.status == "RUNNING":
             retryable = s.query(JobItem).filter(JobItem.job_id == job_id, JobItem.status == "FAILED",
                                                 JobItem.attempts < MAX_ATTEMPTS).count()
@@ -374,18 +394,26 @@ def daily_update(until: str | None = None, prices: bool = True, extract: bool = 
     return out
 
 
-def update_prices(until: str, progress=None) -> dict:
+def update_prices(until: str, progress=None, provider: str | None = None) -> dict:
     """Today's bars for the whole market in one pass over the quote list; companies whose last
-    bar is older than the previous weekday are backfilled one by one (a resumable job)."""
-    from .market import fetch_eastmoney_snapshot, persist_snapshot
-    out = {}
-    try:
-        snap = fetch_eastmoney_snapshot(until)
-        out["snapshot"] = persist_snapshot(snap)
-        if snap:
-            set_mark("EASTMONEY_PUBLIC", "*", "daily_snapshot", until)
-    except Exception as exc:  # the backfill below still runs
-        out["snapshot_error"] = f"{type(exc).__name__}: {exc}"
+    bar is older than the previous weekday are backfilled one by one (a resumable job).
+
+    v2.0.8 (finding 73): follows the chosen price source. 'none' asks nothing; 'tencent' has no market-wide list,
+    so the backfill brings the day; the backfill stops after three companies refused in a row."""
+    from . import market
+    provider = (provider or market.price_source()).lower()
+    out = {"provider": provider}
+    if provider == "none":
+        out["skipped"] = "price source is 'none' (Settings): import prices from CSV"
+        return out
+    if provider == "eastmoney":
+        try:
+            snap = market.fetch_eastmoney_snapshot(until)
+            out["snapshot"] = market.persist_snapshot(snap)
+            if snap:
+                set_mark("EASTMONEY_PUBLIC", "*", "daily_snapshot", until)
+        except Exception as exc:  # the backfill below still runs
+            out["snapshot_error"] = f"{type(exc).__name__}: {exc}"
     prev = date.fromisoformat(until) - timedelta(days=1)
     while prev.weekday() >= 5:
         prev -= timedelta(days=1)
@@ -398,8 +426,12 @@ def update_prices(until: str, progress=None) -> dict:
     finally:
         s.close()
     if stale:
-        j = create_job("market", {"incremental": True, "end": until}, stale)
+        j = create_job("market", {"incremental": True, "end": until, "provider": provider,
+                                  "stop_after_refusals": True}, stale)
         out["backfill"] = run_job(j, progress)
+        if out["backfill"].get("status") == "STOPPED":
+            out["backfill_stopped"] = (f"{provider} refused {MAX_REFUSED_ITEMS} companies in a row; the rest wait for "
+                                       "the next run. 'Test price sources' shows which source answers.")
     out["backfilled_companies"] = len(stale)
     return out
 

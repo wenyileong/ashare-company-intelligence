@@ -97,7 +97,7 @@ def test_extractors_store_variant_and_flag_disagreement(db, company, tmp_path, m
                 x["revenue"] *= 1.5
         return out
     monkeypatch.setattr(PARSERS["segments"], "run", skewed)
-    extract_segments("600519")
+    extract_segments("600519", again=True)       # v2.0.8: read again although already read
     flags = cross_validate("600519")["flags"]
     assert flags.get("PARSER_DISAGREEMENT", 0) >= 1
     f = show_flags("600519", rule="PARSER_DISAGREEMENT")[0]
@@ -130,7 +130,7 @@ def test_review_workflow_survives_reextraction(db, company, tmp_path):
     assert original != 123456.0                               # the observation itself is untouched
     view = segments("600519")["dimensions"][row.dimension]["segments"]
     assert next(x for x in view if x["name"] == row.segment_name)["revenue"] == 123456.0
-    extract_segments("600519")                                # re-extraction keeps the correction
+    extract_segments("600519", again=True)                    # re-extraction keeps the correction
     view = segments("600519")["dimensions"][row.dimension]["segments"]
     assert next(x for x in view if x["name"] == row.segment_name)["revenue"] == 123456.0
     q2 = build_review_queue("600519", low_confidence_below=0.99)

@@ -250,7 +250,7 @@ def _same(a, b) -> bool:
 
 
 def dual_run(family: str, path: Path, meta: dict | None = None, text_pages: list[str] | None = None,
-             cache: dict | None = None) -> tuple[list[dict], dict]:
+             cache: dict | None = None, reader=None, sections=None) -> tuple[list[dict], dict]:
     """Run the text and layout variants of a parser family and reconcile them.
 
     The variant with the higher (calibrated) confidence is primary and its
@@ -267,6 +267,8 @@ def dual_run(family: str, path: Path, meta: dict | None = None, text_pages: list
     for spec in variants(family):
         if spec.input == "text" and text_pages is not None:
             pages = text_pages
+        elif reader is not None:          # v2.0.8: only the pages of the sections sought (ashare.reportreader)
+            pages = reader.pages(spec.input, sections or [family])
         else:
             pages = pages_for(path, spec.input, cache)
         if not pages:
@@ -276,9 +278,11 @@ def dual_run(family: str, path: Path, meta: dict | None = None, text_pages: list
         except Exception as exc:  # one variant failing must not stop the other
             runs[spec.name] = (spec, [])
             meta.setdefault("_errors", []).append(f"{spec.name}: {exc!r}")
-    info = {"variants": sorted(runs), "agree": 0, "disagree": 0, "single": 0, "secondary_only": 0}
+    info = {"variants": sorted(runs), "agree": 0, "disagree": 0, "single": 0, "secondary_only": 0,
+            "glue_resolved": 0}
     import re as _re
-    texts = [text_pages] if text_pages is not None else [pages_for(path, "text", cache)]
+    texts = [text_pages] if text_pages is not None else \
+        [reader.pages("text", sections or [family])] if reader is not None else [pages_for(path, "text", cache)]
     info["scanned"] = path.suffix.lower() == ".pdf" and all(len(_re.sub(r"\s+", "", "".join(t or []))) < 20 for t in texts)
     if not runs:
         return [], info
@@ -303,6 +307,16 @@ def dual_run(family: str, path: Path, meta: dict | None = None, text_pages: list
             r["_agreement"] = "SINGLE"
             info["single"] += 1
             continue
+        # v2.0.8 (finding 85): a note reference glued to the amount in one reading ("1" + "1,791,960,892.40") gives
+        # a well-formed but wrong number; when the other reading is the same figure without those digits, it wins.
+        if r.get("raw_value") and alt.get("raw_value"):
+            from ..numbers import glue_split
+            if glue_split(r["raw_value"], alt["raw_value"]):
+                r["_glue"], r["raw_value"], r["value"] = r["raw_value"], alt["raw_value"], alt.get("value")
+                info["glue_resolved"] += 1
+            elif glue_split(alt["raw_value"], r["raw_value"]):
+                info["glue_resolved"] += 1
+                alt = {**alt, "value": r.get("value")}
         diff = {f: alt.get(f) for f in primary.fields
                 if _norm(r.get(f)) is not None and _norm(alt.get(f)) is not None and not _same(r.get(f), alt.get(f))}
         if diff:
@@ -333,6 +347,8 @@ def extraction_note(record: dict) -> str | None:
     if not record.get("_variant"):
         return None
     note = {"variant": record["_variant"], "agreement": record.get("_agreement")}
+    if record.get("_glue"):
+        note["glued_note_removed"] = record["_glue"]
     if record.get("_alternative"):
         note["alternative"] = record["_alternative"]
     return json.dumps(note, ensure_ascii=False, default=str)

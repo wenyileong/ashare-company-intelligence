@@ -69,7 +69,8 @@ app = typer.Typer(help="China A-share company research data collector", pretty_e
 
 # Commands that work on the company list and do nothing useful without it.
 _NEEDS_UNIVERSE = {
-    "catalogue-disclosures", "recatalogue-busy-days", "download-documents", "acquire-market", "daily-update", "job-create", "extract-financials",
+    "catalogue-disclosures", "recatalogue-busy-days", "download-documents", "acquire-market", "diagnose-prices",
+    "daily-update", "job-create", "extract-financials",
     "extract-corporate-actions", "extract-regulatory-events", "extract-management", "extract-segments",
     "extract-subsidiaries", "extract-human-capital", "extract-esg", "extract-top-holders", "extract-control",
     "extract-pledges", "extract-transactions", "extract-listing-events", "build-panel", "market-snapshots",
@@ -151,9 +152,13 @@ def update_universe_cmd(
     src = (f" ({by.get('exchanges', 0):,} from the exchanges' lists, {by.get('quote_list', 0):,} from the quote list)"
            if by else "")
     print(f"Status: {st.get('LISTED', 0)} listed, {st.get('DELISTED', 0)} delisted (by name), "
-          f"{st.get('NOT_IN_QUOTE_LIST', 0)} not in the quote list; {st.get('listing_dates_added', 0)} listing dates "
+          + (f"{st.get('NOT_IN_EXCHANGE_LIST', 0)} in neither exchange's list (probably delisted; dates from the "
+             "listing events where known), " if st.get("NOT_IN_EXCHANGE_LIST") else "")
+          + f"{st.get('NOT_IN_QUOTE_LIST', 0)} not in the quote list; {st.get('listing_dates_added', 0)} listing dates "
           f"added{src}." + (" The quote list was not needed." if st.get("exchange_lists_complete")
                              and not st.get("quote_list_used") else "")
+          + (f" Listing history rebuilt for {st['history_rebuilt']:,} companies whose dates or status changed."
+             if st.get("history_rebuilt") else "")
           + (f" Note: {st['note']}" if st.get("note") else ""))
 
 
@@ -484,14 +489,42 @@ def acquire_market_cmd(
     start: str = typer.Option(..., help="Start date YYYY-MM-DD"),
     end: str = typer.Option(..., help="End date YYYY-MM-DD"),
     security_code: str = typer.Option(None, help="Optional six-digit code; omit for the whole universe"),
-    provider: str = typer.Option("eastmoney", help="Market provider: eastmoney"),
+    provider: str = typer.Option(None, help="eastmoney or tencent (default: the price source in Settings, "
+                                             "ASHARE_PRICE_SOURCE)"),
     adjust: str = typer.Option("none", help="none, forward, or backward"),
 ):
-    """Download daily prices for one company (or all) from the public price feed."""
+    """Download daily prices for one company (or all) from a public price feed (v2.0.8: the source is chosen)."""
+    from .market import price_source
     init_db()
+    provider = provider or price_source()
     print(f"[cyan]Acquiring market data: {start} to {end}, provider={provider}, adjustment={adjust}...[/cyan]")
-    result = acquire_market_data(security_code, start, end, provider, adjust)
+    try:
+        result = acquire_market_data(security_code, start, end, provider, adjust)
+    except ValueError as exc:
+        print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=2)
     print(result)
+
+
+@app.command("diagnose-prices")
+def diagnose_prices_cmd(code: str = typer.Argument("600519", help="Any listed company; nothing is stored"),
+                        days: int = typer.Option(30, help="How many days back to ask for")):
+    """Test price sources (v2.0.8, finding 73): ask each public source for one company's recent prices."""
+    from .market import diagnose_prices
+    init_db()
+    r = diagnose_prices(code, days)
+    for x in r["providers"]:
+        print(f"  {x['provider']}: " + (f"{x['bars']} days, last {x['last']} close {x['last_close']}" if x["ok"]
+                                       else f"failed ({x['error']})"))
+    cur = r["current"]
+    if r["suggestion"] == "none":
+        print("No public source answered from this network. Import prices from CSV (licensed data), or try again "
+              "later; Settings > Price source = None stops the daily update asking.")
+    elif r["suggestion"] != cur and not any(x["provider"] == cur and x["ok"] for x in r["providers"]):
+        print(f"The current source ({cur}) did not answer; '{r['suggestion']}' did. Choose it under Settings > Price "
+              f"source (or set ASHARE_PRICE_SOURCE={r['suggestion']}).")
+    else:
+        print(f"The current source ({cur}) answers.")
 
 @app.command("import-market-csv")
 def import_market_csv_cmd(
@@ -695,11 +728,24 @@ def validate_all_cmd(security_code: str = typer.Option(None)):
 
 @app.command("show-flags")
 def show_flags_cmd(security_code: str = typer.Option(None), severity: str = typer.Option(None),
-                   rule: str = typer.Option(None)):
-    """Validation flags, optionally for one company."""
-    rows = [{"id": f.id, "severity": f.severity, "rule": f.rule, "layer": f.layer, "table": f.table_name,
-             "rows": f.row_ids, "details": f.details} for f in show_flags(security_code, severity, rule)]
-    _table(rows, title="Validation flags")
+                   rule: str = typer.Option(None),
+                   details: bool = typer.Option(False, "--details", help="List every finding (long)"),
+                   export: str = typer.Option(None, "--export", help="Write the findings to this CSV file")):
+    """Validation findings. v2.0.8 (finding 91): a summary by rule and company first; --details lists the rows
+    (with the company code), --export writes them all to CSV. Filters: --security-code, --severity, --rule."""
+    from .crossvalidation import flag_summary, flag_rows, export_flags
+    if export:
+        print(f"Written: {export_flags(export, security_code, severity, rule)}")
+    if details or security_code or rule:
+        _table(flag_rows(security_code, severity, rule), title="Validation flags")
+        return
+    summ = flag_summary(security_code)
+    if not summ["total"]:
+        print("No findings recorded. 'Run all checks' (validate-all) records them; they never change the data.")
+        return
+    _table(summ["by_rule"], ["rule", "severity", "count"], title=f"Findings by rule ({summ['total']:,} in all)")
+    _table(summ["by_company"], ["code", "count"], title="Companies with most findings")
+    print("For the rows: --details, or --rule NAME, or --security-code CODE; --export file.csv writes them all.")
 
 
 @app.command("profile")
@@ -929,10 +975,13 @@ def industry_summary_cmd(scheme: str = typer.Option("CSRC_2012"), level: int = t
 
 @app.command("extract-management")
 def extract_management_cmd(security_code: str = typer.Option(None),
-                           use_documents: bool = typer.Option(True, "--use-documents/--titles-only")):
+                           use_documents: bool = typer.Option(True, "--use-documents/--titles-only"),
+                           again: bool = typer.Option(False, "--again", help="Read every annual report's officer "
+                                                      "table again")):
     """Appointments and resignations from announcements, and officer tables from annual reports."""
     print({"events": extract_management_events(security_code, use_documents),
-           "annual_report_rosters": extract_rosters(security_code) if use_documents else "skipped"})
+           "annual_report_rosters": extract_rosters(security_code, again, _progress) if use_documents
+           else "skipped"})
 
 
 @app.command("import-management-csv")
@@ -979,9 +1028,11 @@ def governance_cmd(security_code: str, as_of: str = typer.Option(None)):
 # ---------------------------------------------------------------------------
 
 @app.command("extract-segments")
-def extract_segments_cmd(security_code: str = typer.Option(None)):
-    """Read revenue-composition and segment-margin tables from downloaded annual and interim reports."""
-    print(extract_segments(security_code))
+def extract_segments_cmd(security_code: str = typer.Option(None), again: bool = typer.Option(False, "--again", help="Read every document again, including those already read by "
+                                                                  "this extractor version")):
+    """Read revenue-composition and segment-margin tables from downloaded annual and interim reports. v2.0.8: only
+    the table pages are read; progress is shown, and a stopped run continues with the next report."""
+    print(extract_segments(security_code, again, _progress))
 
 
 @app.command("import-segments-csv")
@@ -1014,9 +1065,10 @@ def segment_history_cmd(security_code: str, dimension: str = typer.Option("PRODU
 
 
 @app.command("extract-subsidiaries")
-def extract_subsidiaries_cmd(security_code: str = typer.Option(None)):
-    """Read the group-composition and major-subsidiary tables from downloaded reports."""
-    print(extract_subsidiaries(security_code))
+def extract_subsidiaries_cmd(security_code: str = typer.Option(None), again: bool = typer.Option(False, "--again", help="Read every document again, including those already read by "
+                                                                  "this extractor version")):
+    """Read the group-composition and major-subsidiary tables from downloaded reports (resumable)."""
+    print(extract_subsidiaries(security_code, again, _progress))
 
 
 @app.command("import-subsidiaries-csv")
@@ -1058,9 +1110,10 @@ def scope_changes_cmd(security_code: str, date_from: str = typer.Option(None, "-
 # ---------------------------------------------------------------------------
 
 @app.command("extract-human-capital")
-def extract_human_capital_cmd(security_code: str = typer.Option(None)):
-    """Read the R&D table, workforce composition, education and patents from downloaded reports."""
-    print(extract_human_capital(security_code))
+def extract_human_capital_cmd(security_code: str = typer.Option(None), again: bool = typer.Option(False, "--again", help="Read every document again, including those already read by "
+                                                                  "this extractor version")):
+    """Read the R&D table, workforce composition, education and patents from downloaded reports (resumable)."""
+    print(extract_human_capital(security_code, again, _progress))
 
 
 @app.command("import-human-capital-csv")
@@ -1642,6 +1695,14 @@ def build_panel_cmd(variables: str = typer.Option(None, help="Comma-separated (d
         print({"dropped": r["dropped"]} if r["dropped"] else "")
         raise typer.Exit(code=1)
     print({k: v for k, v in w.items() if k != "files"})
+    if r.get("fiscal_years_not_ended"):                                   # v2.0.8, finding 93
+        yrs = ", ".join(str(y) for y in r["fiscal_years_not_ended"])
+        print(f"[yellow]Fiscal year {yrs} has not ended, so its annual figures do not exist yet. For the last "
+              f"complete year use --end {__import__('datetime').date.today().year - 1}-12-31; for this year's interim figures use "
+              "--unit quarter.[/yellow]")
+    if r.get("rows_without_financials"):
+        print(f"[yellow]{r['rows_without_financials']:,} of {len(r['rows']):,} rows have no financial figure at "
+              "all.[/yellow]")
     ev = sum(1 for row in r["rows"] if row.get("universe_basis") == "REPORT_EVIDENCE")
     if ev:
         print(f"[yellow]{ev:,} of {len(r['rows']):,} rows include a company by report evidence (it published a "
@@ -1701,10 +1762,12 @@ def price_chart_cmd(code: str, out: str = typer.Option("charts/price", help="Out
 # --- v1.8: ownership and control ------------------------------------------------------
 
 @app.command("extract-top-holders")
-def extract_top_holders_cmd(security_code: str = typer.Option(None, "--security-code", "--code")):
-    """Top-10 shareholders and top-10 tradable holders from downloaded periodic reports."""
+def extract_top_holders_cmd(security_code: str = typer.Option(None, "--security-code", "--code"), again: bool = typer.Option(False, "--again", help="Read every document again, including those already read by "
+                                                                  "this extractor version")):
+    """Top-10 shareholders and top-10 tradable holders from downloaded periodic reports. v2.0.8: only the two
+    tables' pages are read; progress is shown, and a stopped run continues with the next report."""
     from .control import extract_top_holders
-    print(extract_top_holders(security_code))
+    print(extract_top_holders(security_code, again, _progress))
 
 
 @app.command("extract-pledges")
@@ -1734,10 +1797,11 @@ def pledges_cmd(code: str):
 
 
 @app.command("extract-control")
-def extract_control_cmd(security_code: str = typer.Option(None, "--security-code", "--code")):
-    """Controlling shareholder, actual controller and ownership type from annual and interim reports."""
+def extract_control_cmd(security_code: str = typer.Option(None, "--security-code", "--code"), again: bool = typer.Option(False, "--again", help="Read every document again, including those already read by "
+                                                                  "this extractor version")):
+    """Controlling shareholder, actual controller and ownership type from annual and interim reports (resumable)."""
     from .control import extract_control
-    print(extract_control(security_code))
+    print(extract_control(security_code, again, _progress))
 
 
 @app.command("import-control-csv")

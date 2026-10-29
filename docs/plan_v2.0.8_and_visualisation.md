@@ -1,6 +1,6 @@
 # Findings register, fix plan (v2.0.8) and the visualisation engine layer
 
-**Status:** plan, 28 October 2026; decisions taken and build design added 29 October 2026 (sections 9 to 11). v2.0.8 is built from section 10.
+**Status:** plan, 28 October 2026; decisions taken and build design added 29 October 2026 (sections 9 to 11). v2.0.8 was built from section 10 on 29 October 2026 (`CHANGELOG.md`).
 
 **Basis:**
 - the live-run findings 1 to 95, in five files under `docs/` (section 1);

@@ -8,12 +8,12 @@ This guide covers the desktop application and the command line. The [methods doc
 
 ### Windows installer
 
-Run `AShareScraper-2.0.4-setup.exe`. It installs for the current user (no administrator rights are needed) into `%LOCALAPPDATA%\Programs\AShareScraper` and adds Start-menu entries for the application, the command line, this guide and the uninstaller. Two options are offered:
+Run `AShareScraper-2.0.8-setup.exe`. It installs for the current user (no administrator rights are needed) into `%LOCALAPPDATA%\Programs\AShareScraper` and adds Start-menu entries for the application, the command line, this guide and the uninstaller. Two options are offered:
 
 - a desktop shortcut;
 - adding the program folder to your PATH, so that `ashare-cli` runs from any command prompt.
 
-Installing a newer version over an older one replaces the program files only. Your data folder is never changed by installing, upgrading or uninstalling.
+Installing a newer version over an older one replaces the program files only. Your data folder is never changed by installing, upgrading or uninstalling. Close the program first: since v2.0.8 the installer checks, and if AShareScraper.exe or ashare-cli.exe is still running (sometimes in the background after its window has closed) it asks you to close it and choose Retry. Earlier installers showed "Error opening file for writing" instead; choose Retry there too, never Ignore.
 
 If the installer is not code-signed, Windows SmartScreen may show "Windows protected your PC". Choose **More info**, then **Run anyway**. Some antivirus programs are wary of unsigned programs built with PyInstaller; if yours quarantines a file, restore it and add an exception for the program folder.
 
@@ -225,9 +225,63 @@ Several consecutive quiet days fetched together share one total and one gap, so 
   The `universe_basis` column records which applies to each row: LISTING_RECORD or REPORT_EVIDENCE.
 - **Empty panels.** A panel with no rows is not written. The command says why, for example missing listing dates, filters that exclude every company, or dates that give no rows, and what to do. It then ends with an error, so the desktop shows "Last action failed".
 
+### Panels and fiscal years (v2.0.8)
+
+A fiscal-year row (`--align fiscal`) takes the figures of the year ending 31 December. For a year that has not ended, those figures do not exist yet. "Build a panel" then names the year, and says how many rows have no financial figure at all; the manifest records both. For the last complete year, end the panel on 31 December of the year before, which is the desktop form's default. For this year's interim figures, use `--unit quarter`. Since v2.0.8, a listing history built before the listing dates arrived no longer hides them, and "Update the company list" rebuilds the history of the companies whose dates changed. A company in neither exchange's list is marked NOT_IN_EXCHANGE_LIST and treated as delisted on an unknown date, until a delisting announcement gives the date.
+
 ### Extracting figures (v2.0.6)
 
 "Extract figures from reports" (`extract-financials`) first counts the documents to read, then reports progress every 25 documents and at least once a minute, for example "250 of 9,800 documents; 8.7 s each; about 23 h 05 min left". Each document read is marked with the extractor's version, so a stopped run continues with the next document when run again; "Read documents again" (`--again`) reads them all. A document downloaded again with new content is read again. The default, `--kind reports`, reads the periodic reports; `all` reads every downloaded document, most of which carry no financial statements. Extraction reads only documents already downloaded: catalogue with downloads, or use "Download documents", first.
+
+### What v2.0.8 changed in the figures
+
+- **Notices.** A notice about a report (年度报告披露提示性公告, 更正公告, 补充公告) is not read as the report; its figures are removed.
+- **Units.** A figure's unit is taken from its own page, or the end of the page before. With no unit declared there, the figure is marked `CNY_ASSUMED`.
+- **Two readers, one document.** When the headline reader and the statement reader of a document differ by an exact power of ten, the statement reading is kept and the note says so.
+- **Cut and glued amounts.** An amount in yuan needs two decimals, so a figure cut at a separator is not read. A note number glued to an amount is removed when the other reading shows the figure without it.
+- **Old readings.** Figures an earlier version read from a document, and this one does not, are removed when the document is read again.
+
+"Extract figures from reports" reads every report once more after the upgrade, because the extractor's version changed.
+
+### Table extraction: only the table pages, with progress and resume (v2.0.8)
+
+These actions read only the pages of the tables they need, found by a quick pass over the page text:
+- "Read top-10 shareholders" (`extract-top-holders`);
+- "Read controlling shareholder and actual controller" (`extract-control`);
+- "Extract segments from reports" (`extract-segments`);
+- "Extract R&D and workforce" (`extract-human-capital`);
+- "Extract subsidiaries" (`extract-subsidiaries`);
+- the officer roster in "Extract from announcements and annual reports" (`extract-management`).
+
+The pages found are remembered beside the documents (`disclosures/.section_index`), so the other actions skip the pass. Each action counts the reports first, then reports progress every 25 reports and at least once a minute ("250 of 9,800 documents; 8.7 s each; about …"). A stopped run continues with the next report; "Read reports again" (`--again`) reads them all. A report in which no table heading is found is read whole, as before.
+
+### Segments and controllers (v2.0.8)
+
+- **Segment tables.**
+  - **Over a page break.** A table continued on the next page is read in full.
+  - **Subtotals and breakdowns.** "小计" rows are subtotals, and "其中：" rows are breakdowns, not segments.
+  - **Table kind.** Each row records whether it came from the composition table, which lists every segment, or the margin table, which lists only segments above 10% of revenue. A dimension read only from the margin table is not compared with the whole revenue.
+- **The actual controller** is read in both layouts:
+  - the Shanghai form, "名称 …" or "姓名 …";
+  - the Shenzhen form, a header row such as "实际控制人姓名 与本公司的关系 国籍 …" with the values on the next row.
+  
+  Persons acting together are kept together ("王传福、吕向阳").
+
+### Price sources (v2.0.8)
+
+Prices come from a public feed you choose under **Settings > Price source**:
+- **Eastmoney** (`EASTMONEY_PUBLIC`);
+- **Tencent** (`TENCENT_PUBLIC`);
+- **None:** import prices from CSV only.
+
+Neither public feed is exchange-authoritative, and their terms are yours to check. "Test price sources" (`diagnose-prices 600519`) asks each feed for one company's last month and stores nothing. It then says which answered from your network and whether to change the setting.
+- **Downloads and the daily update** follow the setting; "Download daily prices" can override it for one run (`--provider`).
+- **Refusals.** The daily backfill stops after three companies refused in a row; the rest wait for the next run.
+- **Preference.** Prices imported from CSV are always preferred to a public feed's for the same day.
+
+### Findings (v2.0.8)
+
+"Show findings" (`show-flags`) opens with the number of findings by rule and severity, and the 20 companies with most findings. A company, a rule (`--rule SEGMENT_SUM_MISMATCH`) or "List every finding" (`--details`) lists the rows, each with its company code. `--export exports/findings.csv` writes them all to a CSV file.
 
 ### Top shareholders (v2.0.7)
 

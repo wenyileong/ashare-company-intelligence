@@ -1,7 +1,7 @@
 ; NSIS installer for A-share Company Intelligence (v2.0)
 ;
 ; Build after PyInstaller has produced dist\AShareScraper\ :
-;   makensis /DVERSION=2.0.7 packaging\installer.nsi
+;   makensis /DVERSION=2.0.8 packaging\installer.nsi
 ; (build_windows.bat does this when NSIS is installed; on Linux, apt install nsis.)
 ;
 ; The installer is per-user (no administrator rights are needed). It installs
@@ -18,7 +18,7 @@ SetCompressorDictSize 64
 RequestExecutionLevel user
 
 !ifndef VERSION
-  !define VERSION "2.0.7"
+  !define VERSION "2.0.8"
 !endif
 !ifndef DIST
   !define DIST "..\dist\AShareScraper"
@@ -63,8 +63,50 @@ VIAddVersionKey "LegalCopyright" "Research software; see docs\compliance.md"
 !insertmacro MUI_UNPAGE_INSTFILES
 !insertmacro MUI_LANGUAGE "English"
 
+; v2.0.8 (finding 74): Windows locks a running program's file, so copying over a running AShareScraper.exe or
+; ashare-cli.exe failed with a bare "Error opening file for writing", and "Ignore" left the old program among the new
+; files. Each is first opened for writing: if that fails, it is running, and the user is asked to close it.
+!macro CHECK_RUNNING_BODY
+  check_again:
+    StrCpy $R1 ""
+    IfFileExists "$INSTDIR\AShareScraper.exe" 0 check_cli
+      ClearErrors
+      FileOpen $R0 "$INSTDIR\AShareScraper.exe" a
+      IfErrors 0 +3
+        StrCpy $R1 "AShareScraper.exe"
+        Goto check_cli
+      FileClose $R0
+  check_cli:
+    IfFileExists "$INSTDIR\ashare-cli.exe" 0 check_done
+      ClearErrors
+      FileOpen $R0 "$INSTDIR\ashare-cli.exe" a
+      IfErrors 0 +3
+        StrCpy $R1 "$R1 ashare-cli.exe"
+        Goto check_done
+      FileClose $R0
+  check_done:
+    StrCmp $R1 "" check_ok
+    IfSilent 0 +3
+      SetErrorLevel 5
+      Abort "${APP} is running ($R1). Close it and run the installer again."
+    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "${APP} is still running ($R1).$\r$\n$\r$\nClose its window \
+      (and any command prompt running ashare-cli), then choose Retry. If its window is already closed, a copy may \
+      still be running in the background: end it in Task Manager." IDRETRY check_again
+    Abort "Installation cancelled: ${APP} is running."
+  check_ok:
+!macroend
+
+Function CheckRunning
+  !insertmacro CHECK_RUNNING_BODY
+FunctionEnd
+
+Function un.CheckRunning
+  !insertmacro CHECK_RUNNING_BODY
+FunctionEnd
+
 Section "Program (desktop and command line)" SecMain
   SectionIn RO
+  Call CheckRunning
   ; an upgrade replaces the program files; the data folder is elsewhere
   RMDir /r "$INSTDIR\_internal"
   SetOutPath "$INSTDIR"
@@ -122,6 +164,7 @@ SectionEnd
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
 
 Section "Uninstall"
+  Call un.CheckRunning
   Delete "$DESKTOP\${APP}.lnk"
   RMDir /r "$SMPROGRAMS\${APP}"
   RMDir /r "$INSTDIR\_internal"

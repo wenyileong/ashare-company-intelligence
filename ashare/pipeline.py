@@ -44,10 +44,13 @@ def enrich_listing_status(info: dict | None = None) -> dict:
                 info, note = {}, f"listing dates not fetched: {type(exc).__name__}: {exc}"
     complete = getattr(info, "complete", len(info) > 3000)
     s = SessionLocal()
-    counts = {"LISTED": 0, "DELISTED": 0, "NOT_IN_QUOTE_LIST": 0, "listing_dates_added": 0,
-              "listing_dates_by_source": {"exchanges": 0, "quote_list": 0}}
+    counts = {"LISTED": 0, "DELISTED": 0, "NOT_IN_QUOTE_LIST": 0, "NOT_IN_EXCHANGE_LIST": 0,
+              "listing_dates_added": 0, "listing_dates_by_source": {"exchanges": 0, "quote_list": 0}}
+    lists_whole = exchanges is not None and bool(exchanges.complete)
+    changed: list[str] = []
     try:
         for c in s.query(Company):
+            before = (c.listing_date, c.status)
             ex = (exchanges or {}).get(c.security_code)
             row = info.get(c.security_code)
             if ex and ex.get("listing_date") and not c.listing_date:
@@ -63,13 +66,39 @@ def enrich_listing_status(info: dict | None = None) -> dict:
                     c.status = "LISTED"
             elif looks_delisted(c.short_name_cn):
                 c.status = "DELISTED"
+            elif lists_whole:
+                # v2.0.8 (finding 71): in neither exchange's whole list, and not named as delisted. Since v2.0.7 the
+                # quote list is skipped when the exchange lists are whole, so NOT_IN_QUOTE_LIST was never set.
+                c.status = "NOT_IN_EXCHANGE_LIST"
             elif complete:
                 c.status = "NOT_IN_QUOTE_LIST"
             if c.status in counts:
                 counts[c.status] += 1
+            if (c.listing_date, c.status) != before:
+                changed.append(c.security_code)
         s.commit()
     finally:
         s.close()
+    # v2.0.8 (finding 92): a listing history derived before these dates were known would hide them from panels;
+    # that includes histories derived before an earlier update added the dates (as in the author's database).
+    from .models import SecurityHistory
+    s = SessionLocal()
+    try:
+        starts: dict[int, list] = {}
+        for cid, vf in s.query(SecurityHistory.company_id, SecurityHistory.valid_from).filter(
+                SecurityHistory.source == "DERIVED"):
+            starts.setdefault(cid, []).append(vf)
+        dated = {c.id: c.security_code for c in s.query(Company.id, Company.security_code, Company.listing_date)
+                 if c.listing_date}
+        changed += [dated[cid] for cid, vfs in starts.items() if cid in dated and not any(vfs)
+                    and dated[cid] not in changed]
+    finally:
+        s.close()
+    if changed:
+        from .security_master import rebuild_security_history
+        counts["history_rebuilt"] = rebuild_security_history(codes=changed)["companies"]
+    else:
+        counts["history_rebuilt"] = 0
     if exchanges is not None:
         from .exchange_lists import summary
         counts["exchange_lists"] = summary(exchanges)

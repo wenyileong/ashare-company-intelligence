@@ -14,6 +14,7 @@ from pypdf import PdfReader
 
 from .models import SessionLocal, Company, Disclosure, FinancialFact
 from .disclosures import REPORT_KINDS
+from .numbers import well_formed_amount, glue_split, power_of_ten  # noqa: F401  (v2.0.8)
 
 _KIND_ALIASES = {"annual": "annual_report", "interim": "interim_report", "quarterly": "quarterly_report"}
 
@@ -172,12 +173,14 @@ _UNIT_CODES = {"亿元": ("CNY_100M", 1e8), "百万元": ("CNY_1M", 1e6), "万�
 def declared_unit(pages: list[str], page_no: int, pos: int) -> tuple[str, float] | None:
     """Unit declared by the nearest preceding '单位：…' line (v1.4).
 
-    Searches the page up to ``pos``, then earlier pages from the end. A
-    figure mentioned in narrative ("营业收入1,500亿元") is not a declaration,
-    which is why v1.3's whole-document scan could scale tables by the wrong
-    factor.
+    Searches the page up to ``pos``, then the page before. A figure mentioned in narrative ("营业收入1,500亿元") is
+    not a declaration, which is why v1.3's whole-document scan could scale tables by the wrong factor.
+
+    v2.0.8 (finding 84): the search no longer runs back through every earlier page. A table without its own
+    declaration took the unit of an unrelated table pages earlier (for example 万元 from a fund-raising table),
+    so one reading of a figure was 10,000 times the other. Beyond the page before, the unit is not known.
     """
-    for i in range(page_no - 1, -1, -1):
+    for i in range(page_no - 1, max(page_no - 3, -1), -1):
         text = re.sub(r"[ \t]+", " ", pages[i])
         if i == page_no - 1:
             text = text[:pos]
@@ -356,21 +359,25 @@ def pdf_facts_from_pages(pages: list[str], title: str, fallback_period: str | No
                     continue
                 formatted = [n for n in nums if "," in n or "，" in n or "." in n]
                 raw = (formatted or nums)[0]
-                found = (page_no, m.group(1), raw, 0.60 if formatted else 0.40, m.start())
+                conf = 0.60 if formatted else 0.40
+                unit_mult = declared_unit(pages, page_no, m.start())
+                if unit_mult is None:
+                    if any_declared:
+                        # v2.0.8 (finding 84): declared elsewhere in the document but not for this table
+                        unit_mult = ("CNY_ASSUMED", 1.0)
+                    else:  # no table declares a unit: fall back to a document scan, less confidently
+                        unit_mult = legacy_unit
+                    conf *= 0.75
+                # v2.0.8 (finding 85): an amount cut at a separator or line break ("22,103", "1,355.2") is skipped
+                if metric != "employees" and not well_formed_amount(raw.strip(), unit_mult[1]):
+                    continue
+                found = (page_no, m.group(1), raw, conf, m.start(), unit_mult)
                 break
             if found:
                 break
         if not found:
             continue
-        page_no, label, raw, confidence, pos = found
-        unit_mult = declared_unit(pages, page_no, pos)
-        if unit_mult is None:
-            if any_declared:
-                unit_mult = ("CNY", 1.0)
-            else:  # no table declares a unit: fall back to a document scan, less confidently
-                unit_mult = legacy_unit
-                confidence *= 0.75
-        unit, multiplier = unit_mult
+        page_no, label, raw, confidence, pos, (unit, multiplier) = found
         from .evaluation import calibrated_confidence
         confidence = round(calibrated_confidence("financials", 0.60) * confidence / 0.60, 3)
         value = _normalise_number(raw)
@@ -397,6 +404,32 @@ def _find_disclosure(session, company: Company, path: Path) -> Disclosure | None
         Disclosure.company_id == company.id,
         Disclosure.local_path == str(path),
     ).one_or_none()
+
+
+def reconcile_readings(facts: list[dict]) -> list[dict]:
+    """v2.0.8 (finding 84): one document, two readers. When the headline reader and the statement reader give the
+    same metric and the values differ by an exact power of ten (1,000, 10,000, a million, a hundred million), the
+    statement reading, whose unit is declared on its own page, decides; the headline value is rescaled and the
+    note says so."""
+    import json as _json
+    table = {f["metric"]: f for f in facts if f.get("method") == "PDF_STATEMENT_TABLE" and f.get("value")}
+    for f in facts:
+        if f.get("method") != "PDF_TEXT_HEURISTIC" or f["metric"] not in table or not f.get("value"):
+            continue
+        ref = table[f["metric"]]
+        k = power_of_ten(f["value"], ref["value"])
+        if k is None:
+            continue
+        note = {}
+        try:
+            note = _json.loads(f.get("extraction_note") or "{}")
+        except ValueError:
+            pass
+        note["rescaled"] = {"from": f["value"], "factor": 10 ** -k, "by": "statement table, same document",
+                            "unit_was": f.get("unit")}
+        f["value"], f["unit"] = ref["value"], ref.get("unit") or "CNY"
+        f["extraction_note"] = _json.dumps(note, ensure_ascii=False)
+    return facts
 
 
 def extract_document(company: Company, disclosure: Disclosure) -> list[dict]:
@@ -464,7 +497,7 @@ def extract_document(company: Company, disclosure: Disclosure) -> list[dict]:
                                                          "CF": "CASH_FLOW"}[it["statement"]],
                 "page": it["page"], "method": "PDF_STATEMENT_TABLE", "context": CHART_VERSION,
                 "confidence": record_confidence(it, 0.65), "extraction_note": extraction_note(it)})
-        return facts
+        return reconcile_readings(facts)
     return []
 
 
@@ -519,7 +552,7 @@ def persist_facts(company: Company, disclosure: Disclosure, facts: Iterable[dict
 
 
 # v2.0.6: raise when the extraction logic changes, so that documents are read again by the new version.
-EXTRACTOR_VERSION = "financials-1"
+EXTRACTOR_VERSION = "financials-2"   # v2.0.8: units, amounts, notices (findings 84 and 85)
 
 
 def _duration(seconds: float) -> str:
@@ -547,6 +580,16 @@ def extract_financials(security_code: str | None = None, kind: str = "reports", 
     totals = {"companies": 0, "documents": 0, "facts_inserted": 0, "facts_updated": 0, "skipped": 0,
               "already_read": 0, "missing_files": 0, "to_read": 0, "errors": []}
     try:
+        # v2.0.8 (finding 84): notices about a report were stored as reports by earlier versions; reclassify them,
+        # and remove the figures read from them.
+        from .disclosures import reclassify_report_kinds
+        totals["reclassified"] = reclassify_report_kinds()
+        notice_ids = [d.id for d in session.query(Disclosure.id).filter(Disclosure.kind == "report_notice")]
+        removed = 0
+        for i in range(0, len(notice_ids), 500):
+            removed += _remove_facts(session, notice_ids[i:i + 500])
+        totals["notice_facts_removed"] = removed
+        session.commit()
         q = (session.query(Disclosure, Company).join(Company, Disclosure.company_id == Company.id)
              .filter(Disclosure.local_path.isnot(None)))
         if security_code:
@@ -580,6 +623,14 @@ def extract_financials(security_code: str | None = None, kind: str = "reports", 
                 else:
                     try:
                         facts = extract_document(company, disclosure)
+                        if Path(disclosure.local_path).suffix.lower() == ".pdf":
+                            # v2.0.8: a figure the current readers no longer produce from this document (one
+                            # misread before) is removed, so it does not linger beside the corrected one.
+                            keep = {(f.get("period"), f.get("period_type"), f["metric"], f.get("method"))
+                                    for f in facts}
+                            totals["stale_facts_removed"] = totals.get("stale_facts_removed", 0) + _remove_facts(
+                                session, [disclosure.id], keep)
+                            session.commit()
                         if facts:
                             result = persist_facts(company, disclosure, facts)
                             totals["documents"] += 1
@@ -603,6 +654,27 @@ def extract_financials(security_code: str | None = None, kind: str = "reports", 
         return totals
     finally:
         session.close()
+
+
+_PDF_METHODS = ("PDF_TEXT_HEURISTIC", "PDF_STATEMENT_TABLE")
+
+
+def _remove_facts(session, disclosure_ids: list[int], keep: set | None = None) -> int:
+    """Delete PDF-read facts of these documents (all, or those not in ``keep``), with their review items."""
+    from .models import ReviewItem
+    if not disclosure_ids:
+        return 0
+    rows = session.query(FinancialFact).filter(FinancialFact.disclosure_id.in_(disclosure_ids),
+                                                FinancialFact.extraction_method.in_(_PDF_METHODS)).all()
+    gone = [r for r in rows if keep is None
+            or (r.reporting_period, r.period_type, r.metric, r.extraction_method) not in keep]
+    if gone:
+        ids = [r.id for r in gone]
+        session.query(ReviewItem).filter(ReviewItem.table_name == "financial_facts",
+                                         ReviewItem.row_id.in_(ids)).delete(synchronize_session=False)
+        for r in gone:
+            session.delete(r)
+    return len(gone)
 
 
 def validate_financials(security_code: str | None = None) -> dict:

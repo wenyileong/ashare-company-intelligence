@@ -304,8 +304,11 @@ def _risk_periods(session, company_id) -> list[tuple[str, str | None]]:
     return sorted(out)
 
 
-def rebuild_security_history(security_code: str | None = None) -> dict:
-    """Derive identity periods per company from events (imports keep priority)."""
+def rebuild_security_history(security_code: str | None = None, codes: list[str] | None = None) -> dict:
+    """Derive identity periods per company from events (imports keep priority).
+
+    v2.0.8: ``codes`` limits the rebuild to those companies (used by "Update the company list" for the companies
+    whose listing date or status it changed)."""
     init_db()
     s = SessionLocal()
     totals = {"companies": 0, "periods": 0, "imported_kept": 0}
@@ -313,6 +316,10 @@ def rebuild_security_history(security_code: str | None = None) -> dict:
         q = s.query(Company)
         if security_code:
             q = q.filter(Company.security_code == str(security_code).zfill(6))
+        if codes is not None:
+            if not codes:
+                return totals
+            q = q.filter(Company.security_code.in_([str(x).zfill(6) for x in codes]))
         for c in q.all():
             if s.query(SecurityHistory).filter(SecurityHistory.company_id == c.id,
                                                SecurityHistory.source != "DERIVED").count():
@@ -356,7 +363,7 @@ def rebuild_security_history(security_code: str | None = None) -> dict:
                 for k, (old, new) in changes[d].items():
                     state[k] = new
             basis = ["listing date: " + ("IPO announcement" if ipo else "company record" if start else "unknown")]
-            if not end and c.status == "DELISTED":     # v2.0.2: delisted by name, date not yet known
+            if not end and c.status in ("DELISTED", "NOT_IN_EXCHANGE_LIST"):   # v2.0.2/v2.0.8: date not yet known
                 basis.append("DELISTING_DATE_UNKNOWN")
             for d in points + [None]:
                 s.add(SecurityHistory(company_id=c.id, security_code=state["security_code"], exchange=c.exchange,
@@ -414,6 +421,11 @@ def universe_at(on: str, boards: list[str] | None = None, report: dict | None = 
         out = []
         for c in s.query(Company).all():
             rows = hist.get(c.id)
+            if rows and not any(r.source != "DERIVED" for r in rows) and \
+                    not min(rows, key=lambda r: r.valid_from or "").valid_from and normalise_date(c.listing_date):
+                # v2.0.8 (finding 92): a derived history built before the listing date was known has no start;
+                # the company record, which now has the date, is used instead of excluding the company.
+                rows = None
             if rows:
                 imported = [r for r in rows if r.source != "DERIVED"]
                 rows = imported or rows
@@ -440,7 +452,7 @@ def universe_at(on: str, boards: list[str] | None = None, report: dict | None = 
                     continue
                 if ld > on:
                     continue
-                if c.status == "DELISTED":
+                if c.status in ("DELISTED", "NOT_IN_EXCHANGE_LIST"):
                     rep["excluded_delisting_date_unknown"] += 1
                     rep["excluded_codes"].append(c.security_code)
                     continue

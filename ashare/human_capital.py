@@ -188,8 +188,9 @@ def _period(d: Disclosure) -> str | None:
     return f"{m.group(1)}-06-30" if "半年" in (d.title_cn or "") else f"{m.group(1)}-12-31"
 
 
-def extract_human_capital(security_code: str | None = None) -> dict:
-    from .corporate_actions import _document_pages
+def extract_human_capital(security_code: str | None = None, again: bool = False, progress=None) -> dict:
+    """R&D, workforce and patents from annual and interim reports (v2.0.8: targeted pages, progress, resume)."""
+    from .extractstate import run
     init_db()
     session = SessionLocal()
     totals = {"reports": 0, "values": 0, "inserted": 0, "updated": 0, "errors": []}
@@ -198,25 +199,25 @@ def extract_human_capital(security_code: str | None = None) -> dict:
             Disclosure.kind.in_(("annual_report", "interim_report")), Disclosure.local_path.isnot(None))
         if security_code:
             q = q.filter(Company.security_code == str(security_code).zfill(6))
-        for d, c in q.all():
-            try:
-                path, period = Path(d.local_path), _period(d)
-                if not path.exists() or not period:
-                    continue
-                vals, info = dual_run("human_capital", path, {"title": d.title_cn})
-                tally_dual(totals, info, d.id)
-                totals["reports"] += 1
-                for v in vals:
-                    totals["values"] += 1
-                    totals[_upsert(session, c.id, d.id, period, v["item"], v["value"], d.source or "CNINFO",
-                                   d.local_path or d.document_url, v["page"], v["raw"], v["label"],
-                                   PARSERS[v["_variant"]].method, record_confidence(v, v["confidence"]),
-                                   extraction_note(v))] += 1
-                session.commit()
-            except Exception as exc:
-                session.rollback()
-                totals["errors"].append({"disclosure_id": d.id, "error": repr(exc)})
-        return totals
+
+        def handle(d, c, reader):
+            path, period = Path(d.local_path), _period(d)
+            if not period:
+                return None
+            vals, info = dual_run("human_capital", path, {"title": d.title_cn}, reader=reader,
+                                  sections=["human_capital"])
+            tally_dual(totals, info, d.id)
+            totals["reports"] += 1
+            for v in vals:
+                totals["values"] += 1
+                totals[_upsert(session, c.id, d.id, period, v["item"], v["value"], d.source or "CNINFO",
+                               d.local_path or d.document_url, v["page"], v["raw"], v["label"],
+                               PARSERS[v["_variant"]].method, record_confidence(v, v["confidence"]),
+                               extraction_note(v))] += 1
+            return "READ" if vals else "EMPTY"
+
+        rows = q.order_by(Company.security_code, Disclosure.announcement_date, Disclosure.id).all()
+        return run("human_capital", rows, handle, totals, again, progress, session)
     finally:
         session.close()
 

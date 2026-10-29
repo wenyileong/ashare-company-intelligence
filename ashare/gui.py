@@ -29,6 +29,7 @@ from . import __version__
 
 APP_NAME = "A-share Company Intelligence"
 TODAY = _dt.date.today().isoformat()
+LAST_YEAR_END = f"{_dt.date.today().year - 1}-12-31"   # v2.0.8 (finding 93): the last complete fiscal year
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 # ---------------------------------------------------------------------------
@@ -190,12 +191,18 @@ SECTIONS = [
      ]},
 
     {"id": "market", "group": "Collect", "title": "4  Market data",
-     "intro": "Daily prices. The built-in public feed is labelled EASTMONEY_PUBLIC and is not exchange-authoritative; "
-              "licensed data can be imported from CSV.",
+     "intro": "Daily prices. The public feeds (EASTMONEY_PUBLIC, TENCENT_PUBLIC) are not exchange-authoritative; "
+              "choose one under Settings > Price source, after 'Test price sources'. Licensed data can be imported "
+              "from CSV, and is preferred to a public feed for the same day.",
      "actions": [
+         A("Test price sources", "diagnose-prices", [
+             F("code", "Company", "code", "600519", None, "Any listed company; nothing is stored.")],
+           "Asks each public source for this company's last month of prices and reports what each returned."),
          A("Download daily prices", "acquire-market", [
              CODE_OPT(), F("start", "From", "date", "2026-01-01", "--start", required=True),
              F("end", "To", "date", TODAY, "--end", required=True),
+             F("provider", "Source", "choice:,eastmoney,tencent", "", "--provider",
+               "Blank = the source chosen in Settings."),
              F("adjust", "Adjustment", "choice:none,forward,backward", "none", "--adjust",
                "Keep one adjustment type per analysis.")]),
          A("Import prices from CSV", "import-market-csv", [CSV_FILE, CODE_OPT("Only if the file holds one company."), SOURCE],
@@ -207,9 +214,9 @@ SECTIONS = [
      "intro": "Shareholders, pledges, controllers and share capital over time: read from the reports or imported "
               "from an authorised dataset.",
      "actions": [
-         A("Read top-10 shareholders from reports", "extract-top-holders", [CODE_OPT()],
+         A("Read top-10 shareholders from reports", "extract-top-holders", [CODE_OPT(), F("again", "Read reports again", "bool", False, ("--again", None), "Normally reports already read by this version are skipped, so a stopped run continues where it stopped.")],
            "From 前十名股东持股情况 and the tradable-holder table of downloaded periodic reports."),
-         A("Read controlling shareholder and actual controller", "extract-control", [CODE_OPT()],
+         A("Read controlling shareholder and actual controller", "extract-control", [CODE_OPT(), F("again", "Read reports again", "bool", False, ("--again", None), "Normally reports already read by this version are skipped, so a stopped run continues where it stopped.")],
            "Also classifies ownership (central SOE, local SOE, private, foreign, collective, none) and records why."),
          A("Read share pledges", "extract-pledges", [CODE_OPT()],
            "Pledge and release announcements (catalogue with kind 'all' first)."),
@@ -253,7 +260,8 @@ SECTIONS = [
               "audit opinions, risk warnings (ST/*ST) and suspensions.",
      "actions": [
          A("Extract from announcements", "extract-regulatory-events", [
-             CODE_OPT(), F("docs", "Read downloaded documents", "bool", True, ("--use-documents", "--titles-only"))],
+             CODE_OPT(), F("docs", "Read downloaded documents", "bool", True, ("--use-documents", "--titles-only")),
+             F("again", "Read reports again", "bool", False, ("--again", None), "Normally reports already read by this version are skipped, so a stopped run continues where it stopped.")],
            "Catalogue disclosures with type 'all' first: these matters are filed under several categories."),
          A("Import a regulator's decision", "import-regulatory-document", [
              F("path", "File or web address", "file", "", None, "A CSRC or exchange decision (PDF, HTML or text).", required=True),
@@ -284,7 +292,8 @@ SECTIONS = [
               "officer table (tenure, shareholding, pay) from annual reports.",
      "actions": [
          A("Extract from announcements and annual reports", "extract-management", [
-             CODE_OPT(), F("docs", "Read downloaded documents", "bool", True, ("--use-documents", "--titles-only"))],
+             CODE_OPT(), F("docs", "Read downloaded documents", "bool", True, ("--use-documents", "--titles-only")),
+             F("again", "Read reports again", "bool", False, ("--again", None), "Normally reports already read by this version are skipped, so a stopped run continues where it stopped.")],
            "Catalogue disclosures with type 'all' (announcements) and 'annual' (reports) first."),
          A("Import a roster", "import-management-csv", [CSV_FILE, SOURCE],
            "Columns: security_code, observation_date, person_name, role, gender, age, tenure_start, tenure_end, remuneration."),
@@ -296,9 +305,9 @@ SECTIONS = [
      "intro": "Revenue by industry, product, region and sales model, and the group's subsidiaries and associates, "
               "read from downloaded annual and interim reports.",
      "actions": [
-         A("Extract segments from reports", "extract-segments", [CODE_OPT()],
+         A("Extract segments from reports", "extract-segments", [CODE_OPT(), F("again", "Read reports again", "bool", False, ("--again", None), "Normally reports already read by this version are skipped, so a stopped run continues where it stopped.")],
            "Reads the 营业收入构成 table and the segment gross-margin table. Catalogue reports with documents first."),
-         A("Extract subsidiaries from reports", "extract-subsidiaries", [CODE_OPT()],
+         A("Extract subsidiaries from reports", "extract-subsidiaries", [CODE_OPT(), F("again", "Read reports again", "bool", False, ("--again", None), "Normally reports already read by this version are skipped, so a stopped run continues where it stopped.")],
            "Reads 企业集团的构成 (stakes, places, acquisition method) and 主要控股参股公司分析 (financials)."),
          A("Import segments from CSV", "import-segments-csv", [CSV_FILE, SOURCE],
            "Columns: security_code, reporting_period, dimension, segment_name, revenue, cost, gross_margin."),
@@ -311,7 +320,7 @@ SECTIONS = [
      "intro": "R&D spending and staff, workforce composition and education, patents, environmental and social "
               "disclosures, sustainability reports and third-party ESG ratings.",
      "actions": [
-         A("Extract R&D and workforce from reports", "extract-human-capital", [CODE_OPT()],
+         A("Extract R&D and workforce from reports", "extract-human-capital", [CODE_OPT(), F("again", "Read reports again", "bool", False, ("--again", None), "Normally reports already read by this version are skipped, so a stopped run continues where it stopped.")],
            "Reads the 研发投入 table, 员工情况 (functions and education) and patent counts."),
          A("Extract ESG from reports", "extract-esg", [CODE_OPT()],
            "Reads annual reports and sustainability/ESG reports: pollutant-discharge status, emissions, GHG, "
@@ -406,7 +415,8 @@ SECTIONS = [
              F("align", "Alignment", "choice:fiscal,pit", "fiscal", "--align",
                "fiscal = values for each fiscal period; pit = what was published by each date"),
              F("start", "From", "date", "2018-01-01", "--start", required=True),
-             F("end", "To", "date", TODAY, "--end"),
+             F("end", "To", "date", LAST_YEAR_END, "--end",
+               "Fiscal rows need a year that has ended; use Unit = quarter for this year's interim figures."),
              F("as_of", "Known by", "date", "", "--as-of", "Optional: use only information published by then"),
              F("index", "Index", "text", "", "--index", "Optional, e.g. 000300"),
              F("winsor", "Winsorise (%)", "number", "", "--winsor", "Optional, e.g. 1"),
@@ -455,7 +465,12 @@ SECTIONS = [
          A("Run all checks", "validate-all", [CODE_OPT()],
            "Also links related events (e.g. an investigation and its penalty). Re-run after adding data."),
          A("Show findings", "show-flags", [
-             CODE_OPT(""), F("severity", "Severity", "choice:,ERROR,WARN,INFO", "", "--severity")]),
+             CODE_OPT(""), F("severity", "Severity", "choice:,ERROR,WARN,INFO", "", "--severity"),
+             F("rule", "Rule", "text", "", "--rule", "Optional, e.g. SEGMENT_SUM_MISMATCH: lists that rule's rows"),
+             F("details", "List every finding", "bool", False, ("--details", None),
+               "Off: a count by rule and the companies with most findings."),
+             F("export", "Export to CSV", "text", "", "--export", "Optional file name, e.g. exports/findings.csv")],
+           "Starts with a summary; a company, a rule or 'List every finding' shows the rows, with company codes."),
      ]},
 
     {"id": "research", "group": "Analyse", "title": "Research",
@@ -703,6 +718,13 @@ RESUME_NOTES = {
     "recatalogue-busy-days": "running it again resumes with the first unfinished day",
     "download-documents": "running it again downloads only the documents still missing",
     "extract-financials": "documents read so far are saved; running it again continues with the rest",
+    # v2.0.8 (findings 76 and 79): the table extractors resume too
+    "extract-top-holders": "reports read so far are saved; running it again continues with the rest",
+    "extract-control": "reports read so far are saved; running it again continues with the rest",
+    "extract-segments": "reports read so far are saved; running it again continues with the rest",
+    "extract-subsidiaries": "reports read so far are saved; running it again continues with the rest",
+    "extract-human-capital": "reports read so far are saved; running it again continues with the rest",
+    "extract-management": "annual reports read so far are saved; running it again continues with the rest",
     "update-universe": "quote-list pages fetched today are kept; running it again continues",
     "job-run": "running the job again resumes where it stopped",
 }
@@ -790,6 +812,7 @@ class App(tk.Tk):
         self.folder = Path(self.settings.get("data_folder") or default_data_folder())
         apply_data_folder(self.folder)
         os.environ["ASHARE_OPTIONAL_BOARDS"] = ",".join(self.settings.get("optional_boards") or [])
+        os.environ["ASHARE_PRICE_SOURCE"] = self.settings.get("price_source") or "eastmoney"
         self.out_queue: queue.Queue = queue.Queue()
         self.busy = False
         self.run_buttons: list[ttk.Button] = []
@@ -1109,6 +1132,20 @@ class App(tk.Tk):
             self.board_vars[key] = var
             ttk.Checkbutton(inner, text=label, variable=var, style="Plain.TCheckbutton",
                             command=self._save_boards).pack(anchor="w", pady=(4, 0))
+        ttk.Label(inner, text="Price source", font=self.f_bold).pack(anchor="w", pady=(22, 4))
+        ttk.Label(inner, text="Where daily prices come from: downloads, the backfill and the daily update. Both public "
+                              "sources are unofficial feeds, not exchange-authoritative; their terms are yours to "
+                              "check. 'Test price sources' (Market data) shows which one answers from your network. "
+                              "'None' downloads nothing: import licensed prices from CSV instead. Imported prices "
+                              "are always preferred to a public feed's for the same day.", style="Muted.TLabel",
+                  wraplength=760, justify="left").pack(anchor="w")
+        self.price_var = tk.StringVar(value=self.settings.get("price_source") or "eastmoney")
+        prow = ttk.Frame(inner)
+        prow.pack(fill="x", pady=(6, 0))
+        for key, label in (("eastmoney", "Eastmoney (public)"), ("tencent", "Tencent (public)"),
+                           ("none", "None: CSV import only")):
+            ttk.Radiobutton(prow, text=label, value=key, variable=self.price_var,
+                            command=self._save_price_source).pack(side="left", padx=(0, 14))
         ttk.Label(inner, text="Updates", font=self.f_bold).pack(anchor="w", pady=(22, 4))
         ttk.Label(inner, text="The program contacts no update server unless you enter one here. The check only "
                               "reports whether a newer version exists; it never downloads or installs anything.",
@@ -1135,6 +1172,13 @@ class App(tk.Tk):
             extra = f"\n{r['url']}\nSHA-256: {r.get('sha256') or 'not given'}" if r.get("url") else ""
             self.after(0, lambda: messagebox.showinfo(APP_NAME, r["message"] + extra))
         threading.Thread(target=work, daemon=True).start()
+
+    def _save_price_source(self):
+        v = self.price_var.get()
+        self.settings["price_source"] = v
+        save_settings(self.settings)
+        os.environ["ASHARE_PRICE_SOURCE"] = v
+        self._log(f"Price source: {v}\n", "muted")
 
     def _save_boards(self):
         on = [k for k, v in self.board_vars.items() if v.get()]

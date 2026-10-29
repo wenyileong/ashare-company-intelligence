@@ -50,11 +50,15 @@ def _closes(session, company_id, adjustment="none") -> list[tuple[str, float]]:
     rows = (session.query(MarketBar.trade_date, MarketBar.close, MarketBar.source)
             .filter(MarketBar.company_id == company_id, MarketBar.adjustment == adjustment,
                     MarketBar.close.isnot(None)).order_by(MarketBar.trade_date).all())
-    by_day = {}
-    for d, c, src in rows:          # one close per day; prefer a licensed/import source over the public feed
-        if d not in by_day or src != "EASTMONEY_PUBLIC":
-            by_day[d] = c
+    by_day, rank = {}, {}
+    for d, c, src in rows:          # one close per day; prefer a licensed/import source over any public feed
+        r = 0 if _PUBLIC_FEED.match(src or "") else 1            # v2.0.8: Tencent as well as Eastmoney
+        if d not in by_day or r > rank[d]:
+            by_day[d], rank[d] = c, r
     return sorted(by_day.items())
+
+
+_PUBLIC_FEED = __import__("re").compile(r"^(EASTMONEY|TENCENT|SINA|PUBLIC_FEED)")
 
 
 def compute_adjustment_factors(security_code: str | None = None) -> dict:

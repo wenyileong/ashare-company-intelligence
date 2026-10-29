@@ -148,8 +148,9 @@ _FIELDS = ("relationship", "principal_place", "registered_place", "jurisdiction_
            "total_assets", "net_assets", "revenue", "net_profit")
 
 
-def extract_subsidiaries(security_code: str | None = None) -> dict:
-    from .corporate_actions import _document_pages
+def extract_subsidiaries(security_code: str | None = None, again: bool = False, progress=None) -> dict:
+    """Subsidiaries and associates from annual and interim reports (v2.0.8: targeted pages, progress, resume)."""
+    from .extractstate import run
     init_db()
     session = SessionLocal()
     totals = {"reports": 0, "entities": 0, "inserted": 0, "updated": 0, "errors": []}
@@ -158,42 +159,42 @@ def extract_subsidiaries(security_code: str | None = None) -> dict:
             Disclosure.kind.in_(("annual_report", "interim_report")), Disclosure.local_path.isnot(None))
         if security_code:
             q = q.filter(Company.security_code == str(security_code).zfill(6))
-        for d, c in q.all():
-            try:
-                path = Path(d.local_path)
-                m = re.search(r"(20\d{2})\s*年", d.title_cn or "")
-                if not path.exists() or not m:
-                    continue
-                obs_date = f"{m.group(1)}-06-30" if "半年" in (d.title_cn or "") else f"{m.group(1)}-12-31"
-                rows, info = dual_run("subsidiaries", path, {"title": d.title_cn})
-                tally_dual(totals, info, d.id)
-                totals["reports"] += 1
-                for r in rows:
-                    totals["entities"] += 1
-                    row = session.query(SubsidiaryObservation).filter_by(
-                        company_id=c.id, observation_date=obs_date, entity_name=r["entity_name"],
-                        source=d.source or "CNINFO").one_or_none()
-                    if row is None:
-                        row = SubsidiaryObservation(company_id=c.id, observation_date=obs_date,
-                                                    entity_name=r["entity_name"], source=d.source or "CNINFO",
-                                                    extraction_method="PDF_TABLE_HEURISTIC")
-                        session.add(row)
-                        totals["inserted"] += 1
-                    else:
-                        totals["updated"] += 1
-                    for k in _FIELDS:
-                        setattr(row, k, r.get(k))
-                    row.disclosure_id, row.source_document = d.id, d.local_path or d.document_url
-                    row.source_page, row.raw_value = r.get("page"), r.get("raw")
-                    row.extraction_method = PARSERS[r["_variant"]].method
-                    row.confidence = record_confidence(r, 0.55)
-                    row.extraction_note = extraction_note(r)
-                    row.retrieved_at = utcnow()
-                session.commit()
-            except Exception as exc:
-                session.rollback()
-                totals["errors"].append({"disclosure_id": d.id, "error": repr(exc)})
-        return totals
+
+        def handle(d, c, reader):
+            path = Path(d.local_path)
+            m = re.search(r"(20\d{2})\s*年", d.title_cn or "")
+            if not m:
+                return None
+            obs_date = f"{m.group(1)}-06-30" if "半年" in (d.title_cn or "") else f"{m.group(1)}-12-31"
+            rows, info = dual_run("subsidiaries", path, {"title": d.title_cn}, reader=reader,
+                                  sections=["subsidiaries"])
+            tally_dual(totals, info, d.id)
+            totals["reports"] += 1
+            for r in rows:
+                totals["entities"] += 1
+                row = session.query(SubsidiaryObservation).filter_by(
+                    company_id=c.id, observation_date=obs_date, entity_name=r["entity_name"],
+                    source=d.source or "CNINFO").one_or_none()
+                if row is None:
+                    row = SubsidiaryObservation(company_id=c.id, observation_date=obs_date,
+                                                entity_name=r["entity_name"], source=d.source or "CNINFO",
+                                                extraction_method="PDF_TABLE_HEURISTIC")
+                    session.add(row)
+                    totals["inserted"] += 1
+                else:
+                    totals["updated"] += 1
+                for k in _FIELDS:
+                    setattr(row, k, r.get(k))
+                row.disclosure_id, row.source_document = d.id, d.local_path or d.document_url
+                row.source_page, row.raw_value = r.get("page"), r.get("raw")
+                row.extraction_method = PARSERS[r["_variant"]].method
+                row.confidence = record_confidence(r, 0.55)
+                row.extraction_note = extraction_note(r)
+                row.retrieved_at = utcnow()
+            return "READ" if rows else "EMPTY"
+
+        rows = q.order_by(Company.security_code, Disclosure.announcement_date, Disclosure.id).all()
+        return run("subsidiaries", rows, handle, totals, again, progress, session)
     finally:
         session.close()
 

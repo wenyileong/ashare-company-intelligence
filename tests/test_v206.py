@@ -434,7 +434,8 @@ def test_a_window_is_one_row_with_its_gap_once():
     assert u[1]["day"] == "2026-01-13"
 
 
-def test_catalogue_days_counts_a_window_once(universe):
+def test_catalogue_days_counts_a_window_once(universe, monkeypatch):
+    monkeypatch.setenv("COLUMNS", "160")       # the table's width must not depend on what ran before (v2.0.8)
     from typer.testing import CliRunner
     from ashare.cli import app
     from ashare.models import SessionLocal

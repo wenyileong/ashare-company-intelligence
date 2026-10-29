@@ -1,6 +1,28 @@
-# China A-share Company Intelligence v2.0.7
+# China A-share Company Intelligence v2.0.8
 
-A provenance-preserving research data system for SSE Main Board, STAR Market, SZSE Main Board and ChiNext companies. The architecture is set out in `ashare_scraper_build_plan.md`. Changes by version, and the findings behind them, are in `CHANGELOG.md`; the live-run findings are in `docs/live_run_findings_v2.0.2.md`, `docs/live_run_findings_v2.0.3.md` and `docs/live_run_findings_v2.0.5.md` and `docs/live_run_findings_v2.0.6.md`.
+A provenance-preserving research data system for SSE Main Board, STAR Market, SZSE Main Board and ChiNext companies. The architecture is set out in `ashare_scraper_build_plan.md`. Changes by version, and the findings behind them, are in `CHANGELOG.md`. The live-run findings are in:
+- `docs/live_run_findings_v2.0.2.md`;
+- `docs/live_run_findings_v2.0.3.md`;
+- `docs/live_run_findings_v2.0.5.md`;
+- `docs/live_run_findings_v2.0.6.md`;
+- `docs/live_run_findings_v2.0.7.md`.
+
+The register of all 95 findings, and the plan for the next releases, is `docs/plan_v2.0.8_and_visualisation.md`.
+
+v2.0.8 corrects data before anything else (findings 70 to 95):
+
+- **Financial figures.**
+  - Notices about a report (提示性公告, 更正公告) are no longer read as the report.
+  - A table's unit is no longer borrowed from an unrelated table pages earlier.
+  - Amounts cut short, and note numbers glued to amounts, are caught.
+  - Figures misread before are removed when a report is read again.
+- **Panels use the listing dates.** A listing history built before the dates arrived no longer hides them. A panel names any fiscal year that has not ended.
+- **Faster table extraction, with progress and resume.** Shareholders, control, segments, R&D and workforce, subsidiaries and the officer roster read only the pages of their tables. They show documents done and left, and a stopped run continues with the next report.
+- **Segments and controllers.** Segment tables continued over a page break are read in full, and subtotals are kept out of the sums. The actual controller is read from both exchanges' report layouts.
+- **Price sources.** A second public source (Tencent), a test of each source, and a setting to choose one or none (CSV import only).
+- **Installer and findings.** The installer asks for a running copy to be closed. "Show findings" opens with a summary and exports to CSV.
+
+After upgrading, see `CHANGELOG.md` for the four steps that re-read the reports.
 
 v2.0.7 fixes two faults found by a review of a live release (findings 68 and 69, `docs/live_run_findings_v2.0.6.md`):
 

@@ -427,7 +427,7 @@ def build_release(out_dir: str = "releases", name: str | None = None, security_c
                    "sha256": _sha256_file(f)} for f in files],
         "notes": [
             "Every observation retains its source, extraction method, confidence and validation status.",
-            "Public market feeds (EASTMONEY_PUBLIC) are not exchange-authoritative; the provider's terms apply.",
+            "Public market feeds (EASTMONEY_PUBLIC, TENCENT_PUBLIC) are not exchange-authoritative; the provider's terms apply.",
             "Local file paths (replaced by the document URL) and raw provider payloads are removed from every release.",
             "Operational tables (jobs, high-water marks, raw records, query log, review queue) are not released.",
         ],

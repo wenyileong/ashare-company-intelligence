@@ -84,6 +84,28 @@ CHINA_TZ = timezone(timedelta(hours=8))
 SUSTAINABILITY_RE = re.compile(r"(社会责任报告|可持续发展报告|ESG报告|ESG 报告|环境、社会及(?:公司)?治理(?:\(ESG\)|（ESG）)?报告|环境、社会和(?:公司)?治理报告)")
 
 REPORT_KINDS = ("annual_report", "interim_report", "quarterly_report")
+_REPORT_NOTICE = re.compile(r"提示性公告|披露提示|更正公告|补充公告|补充更正|的公告|情况说明|更正说明|致歉|延期披露")
+_REPORT_REVISED = re.compile(r"更正后|修订版|修订稿|更新后|全文")
+_REPORT_FAMILY = REPORT_KINDS + tuple(k + s for k in REPORT_KINDS for s in ("_summary", "_english")) + ("report_notice",)
+
+
+def reclassify_report_kinds() -> int:
+    """v2.0.8: apply the current title rules to stored periodic-report kinds (earlier versions called notices
+    about a report the report itself). Returns the number of documents whose kind changed."""
+    from .models import SessionLocal, Disclosure, init_db
+    init_db()
+    s = SessionLocal()
+    n = 0
+    try:
+        for d in s.query(Disclosure).filter(Disclosure.kind.in_(_REPORT_FAMILY)):
+            k = classify_title(d.title_cn)
+            if k != d.kind:
+                d.kind = k
+                n += 1
+        s.commit()
+        return n
+    finally:
+        s.close()
 
 
 def classify_title(title: str | None) -> str:
@@ -106,6 +128,11 @@ def classify_title(title: str | None) -> str:
     elif "年度报告" in title or "年报" in title:
         base = "annual_report"
     if base:
+        # v2.0.8 (finding 84): a notice about a report (a correction notice, a supplement, the same-day notice that
+        # the report is published) is not the report, although its title names it. A corrected or revised full
+        # report (更正后, 修订版) is still the report.
+        if _REPORT_NOTICE.search(title) and (not _REPORT_REVISED.search(title) or title.lstrip().startswith("关于")):
+            return "report_notice"
         if "摘要" in title:
             return base + "_summary"
         if "英文" in title or "English" in title:

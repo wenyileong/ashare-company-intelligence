@@ -189,9 +189,104 @@ def import_bars_csv(path: str, security_code: str | None = None, source: str = "
         session.close()
 
 
-def acquire_market_data(security_code: str | None, start: str, end: str, provider: str = "eastmoney", adjust: str = "none") -> dict:
+# --- v2.0.8 (finding 73): a second public source, and the author's choice ------------------------------------------
+
+TENCENT_KLINE_URL = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
+_TENCENT_FQ = {"none": "", "forward": "qfq", "backward": "hfq"}
+
+
+def _tencent_symbol(company: Company) -> str:
+    prefix = {"SSE": "sh", "SZSE": "sz", "BSE": "bj"}.get(company.exchange or "", "sh" if
+                                                            str(company.security_code).startswith("6") else "sz")
+    return f"{prefix}{company.security_code}"
+
+
+def _windows(start: str, end: str, years: int = 2):
+    from datetime import date
+    a, b = date.fromisoformat(start), date.fromisoformat(end)
+    while a <= b:
+        c = min(b, date(a.year + years, a.month, min(a.day, 28)))
+        yield a.isoformat(), c.isoformat()
+        a = date.fromordinal(c.toordinal() + 1)
+
+
+def fetch_tencent_bars(company: Company, start: str, end: str, adjust: str = "none") -> list[dict]:
+    """Daily bars from Tencent's public quote service (labelled TENCENT_PUBLIC).
+
+    Like Eastmoney's, this is an unofficial public feed, not exchange-authoritative, and its terms are the user's
+    to check. The request is the one its public pages send: ``param=sh600519,day,START,END,640,FQ`` (FQ empty,
+    ``qfq`` or ``hfq``), answered with rows ``[date, open, close, high, low, volume in lots]``. At most 640 rows come
+    back per request, so long periods are asked for two years at a time."""
+    fq = _TENCENT_FQ.get(adjust, "")
+    sym = _tencent_symbol(company)
+    key = {"": "day", "qfq": "qfqday", "hfq": "hfqday"}[fq]
+    client = RateLimitedClient(USER_AGENT, MARKET_RPS)
+    bars: dict[str, dict] = {}
+    try:
+        for a, b in _windows(start, end):
+            r = client.get(TENCENT_KLINE_URL, params={"param": f"{sym},day,{a},{b},640,{fq}"})
+            raw_bytes = r.content
+            payload = r.json()
+            digest = hashlib.sha256(raw_bytes).hexdigest()
+            base = market_raw_dir()
+            base.mkdir(parents=True, exist_ok=True)
+            raw_path = base / f"{digest}.json"
+            if not raw_path.exists():
+                raw_path.write_bytes(raw_bytes)
+            from .storage import register_raw
+            register_raw("TENCENT_PUBLIC", str(r.url), digest, raw_path, {
+                "content_type": "application/json", "company_id": company.id, "security_code": company.security_code,
+                "start": a, "end": b, "adjustment": adjust})
+            node = ((payload or {}).get("data") or {}).get(sym) or {}
+            rows = node.get(key) or node.get("day") or []
+            for row in rows:
+                if not isinstance(row, list) or len(row) < 6:
+                    continue
+                d = _normalise_date(row[0])
+                bars[d] = {"trade_date": d, "open": _num(row[1]), "close": _num(row[2]), "high": _num(row[3]),
+                           "low": _num(row[4]), "volume": _num(row[5]), "amount": None, "adjustment": adjust,
+                           "volume_unit": "LOTS_100_SHARES", "source": "TENCENT_PUBLIC",
+                           "raw_json": json.dumps({"provider": "TENCENT_PUBLIC", "raw_record": row,
+                                                   "raw_sha256": digest, "raw_path": str(raw_path)},
+                                                  ensure_ascii=False)}
+    finally:
+        client.close()
+    out = [bars[k] for k in sorted(bars)]
+    for prev, cur in zip(out, out[1:]):
+        cur["prev_close"] = prev["close"]
+        if prev["close"] and cur["close"] is not None:
+            cur["change"] = round(cur["close"] - prev["close"], 4)
+            cur["pct_change"] = round((cur["close"] / prev["close"] - 1) * 100, 4)
+    return out
+
+
+PROVIDERS = {"eastmoney": ("EASTMONEY_PUBLIC", "fetch_eastmoney_bars"),
+             "tencent": ("TENCENT_PUBLIC", "fetch_tencent_bars")}
+PRICE_SOURCES = tuple(PROVIDERS) + ("none",)
+
+
+def price_source() -> str:
+    """The author's chosen price source (Settings; ASHARE_PRICE_SOURCE): eastmoney, tencent or none."""
+    import os
+    v = (os.environ.get("ASHARE_PRICE_SOURCE") or "eastmoney").strip().lower()
+    return v if v in PRICE_SOURCES else "eastmoney"
+
+
+def _fetcher(provider: str):
+    if provider not in PROVIDERS:
+        raise ValueError(f"Unknown price source: {provider} (choose {', '.join(PROVIDERS)}; or import a CSV)")
+    return globals()[PROVIDERS[provider][1]]
+
+
+def acquire_market_data(security_code: str | None, start: str, end: str, provider: str | None = None,
+                        adjust: str = "none", raise_errors: bool = False) -> dict:
+    """Daily bars from the chosen public source (v2.0.8: eastmoney or tencent; default from Settings)."""
+    provider = (provider or price_source()).lower()
+    if provider == "none":
+        raise ValueError("The price source is 'none': import prices from a CSV file instead ('Import prices').")
+    fetch = _fetcher(provider)
     session = SessionLocal()
-    totals = {"companies": 0, "bars_inserted": 0, "bars_updated": 0, "errors": []}
+    totals = {"provider": provider, "companies": 0, "bars_inserted": 0, "bars_updated": 0, "errors": []}
     try:
         q = session.query(Company)
         if security_code:
@@ -200,18 +295,48 @@ def acquire_market_data(security_code: str | None, start: str, end: str, provide
         for company in companies:
             totals["companies"] += 1
             try:
-                if provider == "eastmoney":
-                    bars = fetch_eastmoney_bars(company, start, end, adjust)
-                else:
-                    raise ValueError(f"Unknown market provider: {provider}")
+                bars = fetch(company, start, end, adjust)
                 result = persist_bars(company, bars)
                 totals["bars_inserted"] += result["inserted"]
                 totals["bars_updated"] += result["updated"]
             except Exception as exc:
+                if raise_errors:
+                    raise
                 totals["errors"].append((company.security_code, str(exc)))
         return totals
     finally:
         session.close()
+
+
+def diagnose_prices(security_code: str, days: int = 30) -> dict:
+    """'Test price sources': ask each public source for one company's last ``days`` days, store nothing, and
+    report what each returned, so that the author can choose (finding 73)."""
+    from datetime import date, timedelta
+    from .models import init_db
+    init_db()
+    s = SessionLocal()
+    try:
+        c = s.query(Company).filter_by(security_code=str(security_code).zfill(6)).first()
+    finally:
+        s.close()
+    if c is None:
+        raise ValueError(f"no company {security_code}")
+    end = date.today()
+    start = (end - timedelta(days=days)).isoformat()
+    out = []
+    for name in PROVIDERS:
+        try:
+            bars = _fetcher(name)(c, start, end.isoformat())
+            out.append({"provider": name, "ok": bool(bars), "bars": len(bars),
+                        "last": bars[-1]["trade_date"] if bars else None, "last_close": bars[-1]["close"] if bars else None,
+                        "error": None if bars else "answered, but with no prices"})
+        except Exception as exc:
+            from .quotelist import _describe
+            out.append({"provider": name, "ok": False, "bars": 0, "last": None, "last_close": None,
+                        "error": _describe(exc)})
+    ok = [x["provider"] for x in out if x["ok"]]
+    return {"security_code": c.security_code, "from": start, "to": end.isoformat(), "providers": out,
+            "suggestion": ok[0] if ok else "none", "current": price_source()}
 
 
 def show_market(security_code: str, start: str | None = None, end: str | None = None):

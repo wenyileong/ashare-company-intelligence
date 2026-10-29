@@ -327,8 +327,9 @@ def parse_roster_pages(pages: list[str]) -> list[dict]:
     return rows
 
 
-def extract_rosters(security_code: str | None = None) -> dict:
-    """Read the officer tables of downloaded annual reports."""
+def extract_rosters(security_code: str | None = None, again: bool = False, progress=None) -> dict:
+    """Read the officer tables of downloaded annual reports (v2.0.8: targeted pages, progress, resume)."""
+    from .extractstate import run
     init_db()
     session = SessionLocal()
     totals = {"reports": 0, "rows": 0, "inserted": 0, "updated": 0, "errors": []}
@@ -337,45 +338,42 @@ def extract_rosters(security_code: str | None = None) -> dict:
             Disclosure.kind == "annual_report", Disclosure.local_path.isnot(None))
         if security_code:
             q = q.filter(Company.security_code == str(security_code).zfill(6))
-        for d, c in q.all():
-            try:
-                path = Path(d.local_path)
-                if not path.exists():
-                    continue
-                rows, info = dual_run("roster", path, {"title": d.title_cn})
-                tally_dual(totals, info, d.id)
-                m = re.search(r"(20\d{2})\s*年", d.title_cn or "")
-                obs_date = f"{m.group(1)}-12-31" if m else d.announcement_date
-                totals["reports"] += 1
-                for r in rows:
-                    for code, part in r["roles"]:
-                        totals["rows"] += 1
-                        row = session.query(ManagementObservation).filter_by(
-                            company_id=c.id, observation_date=obs_date, person_name=r["person_name"],
-                            role=code, source=d.source or "CNINFO").one_or_none()
-                        if row is None:
-                            row = ManagementObservation(company_id=c.id, observation_date=obs_date,
-                                                        person_name=r["person_name"], role=code,
-                                                        source=d.source or "CNINFO", extraction_method="PDF_TABLE_HEURISTIC")
-                            session.add(row)
-                            totals["inserted"] += 1
-                        else:
-                            totals["updated"] += 1
-                        row.role_cn, row.gender, row.age = part, r["gender"], r["age"]
-                        row.status, row.tenure_start, row.tenure_end = r["status"], r["tenure_start"], r["tenure_end"]
-                        row.shares_start, row.shares_end = r["shares_start"], r["shares_end"]
-                        row.remuneration, row.paid_by_related_party = r["remuneration"], r["paid_by_related_party"]
-                        row.disclosure_id, row.source_document = d.id, d.local_path or d.document_url
-                        row.source_page, row.raw_value = r["page"], r["raw"]
-                        row.extraction_method = PARSERS[r["_variant"]].method
-                        row.confidence = record_confidence(r, 0.5)
-                        row.extraction_note = extraction_note(r)
-                        row.retrieved_at = utcnow()
-                session.commit()
-            except Exception as exc:
-                session.rollback()
-                totals["errors"].append({"disclosure_id": d.id, "error": repr(exc)})
-        return totals
+
+        def handle(d, c, reader):
+            path = Path(d.local_path)
+            rows, info = dual_run("roster", path, {"title": d.title_cn}, reader=reader, sections=["roster"])
+            tally_dual(totals, info, d.id)
+            m = re.search(r"(20\d{2})\s*年", d.title_cn or "")
+            obs_date = f"{m.group(1)}-12-31" if m else d.announcement_date
+            totals["reports"] += 1
+            for r in rows:
+                for code, part in r["roles"]:
+                    totals["rows"] += 1
+                    row = session.query(ManagementObservation).filter_by(
+                        company_id=c.id, observation_date=obs_date, person_name=r["person_name"],
+                        role=code, source=d.source or "CNINFO").one_or_none()
+                    if row is None:
+                        row = ManagementObservation(company_id=c.id, observation_date=obs_date,
+                                                    person_name=r["person_name"], role=code,
+                                                    source=d.source or "CNINFO", extraction_method="PDF_TABLE_HEURISTIC")
+                        session.add(row)
+                        totals["inserted"] += 1
+                    else:
+                        totals["updated"] += 1
+                    row.role_cn, row.gender, row.age = part, r["gender"], r["age"]
+                    row.status, row.tenure_start, row.tenure_end = r["status"], r["tenure_start"], r["tenure_end"]
+                    row.shares_start, row.shares_end = r["shares_start"], r["shares_end"]
+                    row.remuneration, row.paid_by_related_party = r["remuneration"], r["paid_by_related_party"]
+                    row.disclosure_id, row.source_document = d.id, d.local_path or d.document_url
+                    row.source_page, row.raw_value = r["page"], r["raw"]
+                    row.extraction_method = PARSERS[r["_variant"]].method
+                    row.confidence = record_confidence(r, 0.5)
+                    row.extraction_note = extraction_note(r)
+                    row.retrieved_at = utcnow()
+            return "READ" if rows else "EMPTY"
+
+        rows = q.order_by(Company.security_code, Disclosure.announcement_date, Disclosure.id).all()
+        return run("roster", rows, handle, totals, again, progress, session)
     finally:
         session.close()
 

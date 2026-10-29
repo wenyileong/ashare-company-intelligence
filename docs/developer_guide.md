@@ -57,6 +57,10 @@ ashare-cli evaluate-parsers --corpus build/synth --write-baseline packaging/pars
 
 The test suite fails if precision on the synthetic corpus falls by more than one percentage point against the baseline.
 
+### Reading only the pages a parser needs (v2.0.8)
+
+A table extractor reads a report through `ashare.reportreader.ReportReader`. Pass `reader=` and `sections=` to `parsers.dual_run`. The reader finds the sections' pages with pdfium's page text, and gives the parser pages of the document's full length, blank outside the sections, so page numbers stay right. A new extractor should name its section (heading patterns, and how many pages after the heading belong to it) in `SECTIONS`. It should run through `extractstate.run`, which counts the documents, reports progress and records each document read in `extraction_state`. `tests/test_v208.py::test_targeted_reading_matches_full_reading_on_the_synthetic_corpus` checks that targeted and full readings agree.
+
 ## 4. Adding a source
 
 1. Write an adapter in `sources/` that uses `RateLimitedClient` (never `httpx` directly), so that pacing, retries and offline test transports apply.
@@ -113,7 +117,7 @@ PyInstaller does not cross-compile: build the Windows programs on Windows (a Win
 
 1. Raise `__version__` in `ashare/__init__.py` (the default user agent follows it), the version in `packaging/installer.nsi` and the first line of `packaging/READ_ME_FIRST.txt`.
 2. Add a migration if the schema changed, and a test.
-3. If the financial extraction changed, raise `EXTRACTOR_VERSION` in `ashare/financials.py` (v2.0.6), so that documents read by the earlier version are read again; otherwise a rerun skips them.
+3. If the financial extraction changed, raise `EXTRACTOR_VERSION` in `ashare/financials.py` (v2.0.6), so that documents read by the earlier version are read again; otherwise a rerun skips them. For the table extractors (top-10 holders, control, segments, R&D and workforce, subsidiaries, roster), raise their entry in `VERSIONS` in `ashare/extractstate.py` (v2.0.8). If you add a section to `SECTIONS` in `ashare/reportreader.py`, raise `INDEX_VERSION` there, so that the cached section indexes are rebuilt.
 4. Update `README.md`, `CHANGELOG.md`, the build plan's status and `CITATION.cff`.
 5. Run the tests on SQLite and PostgreSQL, and the offline self-test.
 6. Build and sign the installer and the portable zips, and write `SHA256SUMS.txt` for the downloads.

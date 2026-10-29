@@ -58,6 +58,24 @@ def _flag(session, rule, severity, layer, company_id, table, row_ids, details, s
                                run_at=utcnow()))
 
 
+_REVISED = __import__("re").compile(r"更正后|修订版|修订稿|更新后")
+
+
+def _difference_pattern(a, b) -> str:
+    """v2.0.8: what kind of difference two readings show, to guide review (findings 84 and 85)."""
+    from .numbers import glue_split, power_of_ten
+
+    def raw(x):
+        return x.raw_value or (f"{x.value:,.2f}" if x.value is not None else "")
+    if glue_split(raw(a), raw(b)) or glue_split(raw(b), raw(a)):
+        return "DIGITS_GLUED"
+    if power_of_ten(a.value, b.value) is not None:
+        return "POWER_OF_TEN"
+    if a.value and b.value and abs(abs(a.value) - abs(b.value)) <= 0.001 * abs(a.value):
+        return "SIGN"
+    return "OTHER"
+
+
 def cross_validate(security_code: str | None = None) -> dict:
     init_db()
     session = SessionLocal()
@@ -75,6 +93,7 @@ def cross_validate(security_code: str | None = None) -> dict:
         session.flush()
 
         dates = {d.id: d.announcement_date for d in session.query(Disclosure.id, Disclosure.announcement_date)}
+        titles = {d.id: d.title_cn or "" for d in session.query(Disclosure.id, Disclosure.title_cn)}
         for c in companies:
             facts = session.query(FinancialFact).filter(FinancialFact.company_id == c.id).all()
 
@@ -105,16 +124,21 @@ def cross_validate(security_code: str | None = None) -> dict:
                     if _close(a.value, b.value):
                         continue
                     da, db = dates.get(a.disclosure_id) or "", dates.get(b.disclosure_id) or ""
-                    explained = [e.id for e in restatements if da <= (e.event_date or e.announcement_date or "") <= db]
+                    # v2.0.8 (finding 86): between documents filed the same day, any restatement filed that day
+                    # "explained" the difference; it explains nothing. A corrected report is named as such.
+                    explained = [e.id for e in restatements if da <= (e.event_date or e.announcement_date or "") <= db] \
+                        if da != db else []
+                    corrected = any(_REVISED.search(titles.get(x.disclosure_id, "")) for x in (a, b))
                     both_xbrl = a.extraction_method.startswith("XBRL") and b.extraction_method.startswith("XBRL")
-                    rule = "RESTATEMENT_EXPLAINED" if explained else ("RESTATEMENT_OR_DISCREPANCY" if both_xbrl
-                                                                      else "EXTRACTION_DISCREPANCY")
-                    sev = "INFO" if explained else "WARN"
+                    rule = "RESTATEMENT_EXPLAINED" if explained else "CORRECTED_REPORT" if corrected else (
+                        "RESTATEMENT_OR_DISCREPANCY" if both_xbrl else "EXTRACTION_DISCREPANCY")
+                    sev = "INFO" if explained or corrected else "WARN"
                     _flag(session, rule, sev, "financials", c.id, "financial_facts", [a.id, b.id], {
                         "period": period, "metric": metric, "scope": scope,
                         "earlier": {"value": a.value, "published": da, "method": a.extraction_method, "disclosure_id": a.disclosure_id},
                         "later": {"value": b.value, "published": db, "method": b.extraction_method, "disclosure_id": b.disclosure_id},
                         "relative_change": (b.value - a.value) / abs(a.value) if a.value else None,
+                        "pattern": _difference_pattern(a, b),
                         "restatement_announcements": explained}, seen)
                     counts[rule] += 1
 
@@ -248,7 +272,13 @@ def cross_validate(security_code: str | None = None) -> dict:
                     if dim == "TOTAL":
                         continue
                     parts = [x for x in items if not x.is_total and x.revenue is not None]
-                    total = next((x.revenue for x in items if x.is_total and x.revenue), None) or \
+                    own_total = next((x.revenue for x in items if x.is_total and x.revenue
+                                      and x.segment_name != "小计"), None)
+                    # v2.0.8 (finding 83): the margin table lists only segments above 10% of revenue; without its
+                    # own total row it is not compared with the whole revenue.
+                    if parts and not own_total and all(getattr(x, "table_kind", None) == "margin" for x in parts):
+                        continue
+                    total = own_total or \
                         (overall.revenue if overall else None) or (rev_fact.value if rev_fact else None)
                     if not parts or not total:
                         continue
@@ -467,3 +497,52 @@ def show_flags(security_code: str | None = None, severity: str | None = None, ru
         return q.order_by(ValidationFlag.severity, ValidationFlag.rule, ValidationFlag.id).all()
     finally:
         session.close()
+
+
+def _codes(session) -> dict[int, str]:
+    return {c.id: c.security_code for c in session.query(Company.id, Company.security_code)}
+
+
+def flag_summary(security_code: str | None = None, top: int = 20) -> dict:
+    """v2.0.8 (finding 91): counts by rule and severity, and the companies with most findings."""
+    from collections import Counter
+    rows = show_flags(security_code)
+    init_db()
+    s = SessionLocal()
+    try:
+        codes = _codes(s)
+    finally:
+        s.close()
+    by_rule = Counter((f.rule, f.severity) for f in rows)
+    by_company = Counter(codes.get(f.company_id, "") for f in rows if f.company_id)
+    order = {"ERROR": 0, "WARN": 1, "INFO": 2}
+    return {"total": len(rows),
+            "by_rule": [{"rule": r, "severity": sv, "count": n}
+                        for (r, sv), n in sorted(by_rule.items(), key=lambda x: (order.get(x[0][1], 3), -x[1], x[0][0]))],
+            "by_company": [{"code": c, "count": n} for c, n in by_company.most_common(top)]}
+
+
+def flag_rows(security_code: str | None = None, severity: str | None = None, rule: str | None = None) -> list[dict]:
+    rows = show_flags(security_code, severity, rule)
+    s = SessionLocal()
+    try:
+        codes = _codes(s)
+    finally:
+        s.close()
+    return [{"id": f.id, "code": codes.get(f.company_id, ""), "severity": f.severity, "rule": f.rule, "layer": f.layer,
+             "table": f.table_name, "rows": f.row_ids, "details": f.details} for f in rows]
+
+
+def export_flags(path: str, security_code: str | None = None, severity: str | None = None,
+                 rule: str | None = None) -> str:
+    """All findings (or a filtered set) to CSV, with the company code (UTF-8 with BOM, for Excel)."""
+    import csv
+    from pathlib import Path
+    rows = flag_rows(security_code, severity, rule)
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with p.open("w", encoding="utf-8-sig", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=["id", "code", "severity", "rule", "layer", "table", "rows", "details"])
+        w.writeheader()
+        w.writerows(rows)
+    return str(p)

@@ -732,8 +732,15 @@ def build_panel(variables_: list[str] | None = None, unit: str = "year", start: 
               "lag_days": lag_days, "as_of": as_of, "codes": codes, "index": index_code, "boards": boards,
               "exclude_financials": exclude_financials, "min_class": min_class, "reviewed_only": reviewed_only,
               "winsor": winsor, "lags": lags, "universe_basis": universe_basis}
+    # v2.0.8 (finding 93): a fiscal period that has not ended has no annual figures yet; say so, and how many rows
+    # carry no financial figure at all.
+    today = date.today().isoformat()
+    not_ended = sorted({int(p[:4]) for p, _, _ in spec if p and p > today}) if align == "fiscal" else []
+    fin = [n for n in names if VARIABLES[n].group in ("financial", "derived", "ratio")]
+    no_fin = sum(1 for r in rows if fin and all(r.get(n) is None for n in fin))
     return {"rows": rows, "params": params, "max_published": max_pub or None, "dropped": dict(dropped),
-            "companies": len(companies), "periods": len(spec)}
+            "companies": len(companies), "periods": len(spec), "fiscal_years_not_ended": not_ended,
+            "rows_without_financials": no_fin}
 
 
 _YEAR_RE = None
@@ -960,6 +967,8 @@ def write_panel(result: dict, out_dir: str, name: str = "panel", formats: tuple[
     manifest = {"created_at": utcnow().isoformat(timespec="seconds") + "Z", "software": f"ashare {__version__}",
                 "parameters": result["params"], "rows": len(rows), "columns": cols,
                 "max_published_date": result["max_published"], "dropped": result["dropped"],
+                "fiscal_years_not_ended": result.get("fiscal_years_not_ended", []),
+                "rows_without_financials": result.get("rows_without_financials", 0),
                 "database_fingerprint": database_fingerprint(),
                 "files": {p.name: _sha(p) for p in files}}
     (out / f"{name}_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")

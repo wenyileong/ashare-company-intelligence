@@ -235,12 +235,19 @@ def parse_top10_tradable_pages(pages: list[str]) -> list[dict]:
     return out
 
 
-def extract_top_holders(security_code: str | None = None) -> dict:
-    """Top-10 and top-10 tradable holders from downloaded periodic reports."""
+def extract_top_holders(security_code: str | None = None, again: bool = False, progress=None) -> dict:
+    """Top-10 and top-10 tradable holders from downloaded periodic reports.
+
+    v2.0.8 (findings 76, 77 and 79): each report is opened once, and only the pages of the two shareholder tables
+    are read (:mod:`ashare.reportreader`); progress is shown in documents, and a stopped run continues with the
+    next report (:mod:`ashare.extractstate`). The extractor's version is new, so the first run re-reads every
+    report and completes the re-extraction that v2.0.7's layout fix needs."""
     from .parsers import dual_run, record_confidence, extraction_note, tally_dual, PARSERS
+    from .extractstate import run
     init_db()
     s = SessionLocal()
     totals = {"reports": 0, "holders": 0, "inserted": 0, "updated": 0, "errors": []}
+    sections = ["top10", "top10_tradable"]
     try:
         q = s.query(Disclosure, Company).join(Company, Disclosure.company_id == Company.id).filter(
             Disclosure.kind.in_(("annual_report", "interim_report", "quarterly_report")),
@@ -248,60 +255,58 @@ def extract_top_holders(security_code: str | None = None) -> dict:
         if security_code:
             q = q.filter(Company.security_code == str(security_code).zfill(6))
         from .financials import infer_period
-        for d, c in q.all():
-            try:
-                path = Path(d.local_path)
-                period, _ = infer_period(d.title_cn or "", "", d.announcement_date)
-                if not path.exists() or not period:
-                    continue
-                rows, info = dual_run("top10", path, {"title": d.title_cn})
-                tradable, _ = dual_run("top10_tradable", path, {"title": d.title_cn})
-                tally_dual(totals, info, d.id)
-                # v2.0.7 (finding 68): rows an earlier parser read from this document, and that the current one
-                # does not, are removed (with their review items), so a misread table does not linger.
-                keep = {r["shareholder_name"] for r in rows}
-                stale = [o for o in s.query(OwnershipObservation).filter_by(company_id=c.id, disclosure_id=d.id)
-                         if o.shareholder_name not in keep]
-                if stale:
-                    ids = [o.id for o in stale]
-                    s.query(ReviewItem).filter(ReviewItem.table_name == "ownership_observations",
-                                               ReviewItem.row_id.in_(ids)).delete(synchronize_session=False)
-                    for o in stale:
-                        s.delete(o)
-                    totals["removed"] = totals.get("removed", 0) + len(stale)
-                    s.commit()
-                if not rows:
-                    continue
-                totals["reports"] += 1
-                tmap = {t["shareholder_name"]: t for t in tradable}
-                for r in rows:
-                    row = s.query(OwnershipObservation).filter_by(
-                        company_id=c.id, observation_date=period, shareholder_name=r["shareholder_name"],
-                        source=d.source or "CNINFO").one_or_none()
-                    if row is None:
-                        row = OwnershipObservation(company_id=c.id, observation_date=period,
-                                                   shareholder_name=r["shareholder_name"], source=d.source or "CNINFO")
-                        s.add(row)
-                        totals["inserted"] += 1
-                    else:
-                        totals["updated"] += 1
-                    for k in ("rank", "shares", "ownership_pct", "restricted_shares", "pledged_shares",
-                              "change_shares", "shareholder_type", "shareholder_nature"):
-                        setattr(row, k, r.get(k))
-                    t = tmap.get(r["shareholder_name"])
-                    row.tradable_shares = t["tradable_shares"] if t else None
-                    row.disclosure_id, row.source_document = d.id, d.local_path or d.document_url
-                    row.source_page, row.raw_text = r.get("page"), r.get("raw")
-                    row.extraction_method = PARSERS[r["_variant"]].method
-                    row.confidence = record_confidence(r, 0.55)
-                    row.extraction_note = extraction_note(r)
-                    row.retrieved_at = utcnow()
-                    totals["holders"] += 1
-                s.commit()
-            except Exception as exc:
-                s.rollback()
-                totals["errors"].append({"disclosure_id": d.id, "error": repr(exc)})
-        return totals
+
+        def handle(d, c, reader):
+            path = Path(d.local_path)
+            period, _ = infer_period(d.title_cn or "", "", d.announcement_date)
+            if not period:
+                return None
+            rows, info = dual_run("top10", path, {"title": d.title_cn}, reader=reader, sections=sections)
+            tradable, _ = dual_run("top10_tradable", path, {"title": d.title_cn}, reader=reader, sections=sections)
+            tally_dual(totals, info, d.id)
+            # v2.0.7 (finding 68): rows an earlier parser read from this document, and that the current one
+            # does not, are removed (with their review items), so a misread table does not linger.
+            keep = {r["shareholder_name"] for r in rows}
+            stale = [o for o in s.query(OwnershipObservation).filter_by(company_id=c.id, disclosure_id=d.id)
+                     if o.shareholder_name not in keep]
+            if stale:
+                ids = [o.id for o in stale]
+                s.query(ReviewItem).filter(ReviewItem.table_name == "ownership_observations",
+                                           ReviewItem.row_id.in_(ids)).delete(synchronize_session=False)
+                for o in stale:
+                    s.delete(o)
+                totals["removed"] = totals.get("removed", 0) + len(stale)
+            if not rows:
+                return "EMPTY"
+            totals["reports"] += 1
+            tmap = {t["shareholder_name"]: t for t in tradable}
+            for r in rows:
+                row = s.query(OwnershipObservation).filter_by(
+                    company_id=c.id, observation_date=period, shareholder_name=r["shareholder_name"],
+                    source=d.source or "CNINFO").one_or_none()
+                if row is None:
+                    row = OwnershipObservation(company_id=c.id, observation_date=period,
+                                               shareholder_name=r["shareholder_name"], source=d.source or "CNINFO")
+                    s.add(row)
+                    totals["inserted"] += 1
+                else:
+                    totals["updated"] += 1
+                for k in ("rank", "shares", "ownership_pct", "restricted_shares", "pledged_shares",
+                          "change_shares", "shareholder_type", "shareholder_nature"):
+                    setattr(row, k, r.get(k))
+                t = tmap.get(r["shareholder_name"])
+                row.tradable_shares = t["tradable_shares"] if t else None
+                row.disclosure_id, row.source_document = d.id, d.local_path or d.document_url
+                row.source_page, row.raw_text = r.get("page"), r.get("raw")
+                row.extraction_method = PARSERS[r["_variant"]].method
+                row.confidence = record_confidence(r, 0.55)
+                row.extraction_note = extraction_note(r)
+                row.retrieved_at = utcnow()
+                totals["holders"] += 1
+            return "READ"
+
+        rows = q.order_by(Company.security_code, Disclosure.announcement_date, Disclosure.id).all()
+        return run("top_holders", rows, handle, totals, again, progress, s)
     finally:
         s.close()
 
@@ -445,41 +450,119 @@ def classify_ownership(controller: str | None, nature: str | None = None, no_con
     return "UNKNOWN", f"controller '{name}' with nature '{nat}' not classified; review"
 
 
+_CTRL_HEADINGS = {
+    "与本公司的关系", "与公司的关系", "与实际控制人关系", "与实际控制人的关系", "国籍", "是否取得其他国家或地区居留权",
+    "法定代表人", "单位负责人", "法定代表人/单位负责人", "单位负责人或法定代表人", "成立日期", "组织机构代码",
+    "统一社会信用代码", "主要经营业务", "主要职业及职务", "名称", "姓名", "控股股东名称", "控股股东姓名",
+    "实际控制人名称", "实际控制人姓名", "注册资本", "不适用", "无", "/", "-", "适用", "√适用", "□适用"}
+_CTRL_FIELD = re.compile(r"(?:法定代表人|单位负责人|成立日期|组织机构代码|统一社会信用代码|主要经营业务|国籍|"
+                         r"是否取得|与(?:本公司|公司|实际控制人)的?关系|主要职业)")
+_CTRL_STOP = re.compile(r"^(?:主要职业|报告期内|过去10年|过去十年|其他|公司与实际控制人|实际控制人通过|"
+                        r"[（(]?[一二三四五六七八九十\d]+[)）、.]|第[一二三四五六七八九十]+节|\d+\s|"
+                        r"控股股东|实际控制人|一致行动人|公司最终控制|报告期)")
+_NO_CTRL = re.compile(r"^(?:无|不存在|无实际控制人|无控股股东|无控股主体|不适用)$")
+
+
+def _ctrl_name(token: str) -> str | None:
+    t = token.strip(" ：:；;，,。")
+    if not t or t in _CTRL_HEADINGS or _CTRL_FIELD.match(t) or re.search(r"[:：]", t) or len(t) < 2:
+        return None
+    if re.fullmatch(r"[\d\-./年月日%（）()A-Z]+", t):
+        return None
+    return t
+
+
+def _section(lines: list[str], start: int, limit: int = 40) -> list[str]:
+    out = []
+    for ln in lines[start + 1:start + 1 + limit]:
+        if re.search(r"(?:控股股东|实际控制人)(?:情况|及其一致行动人)\s*$", ln) and out:
+            break
+        out.append(ln)
+    return out
+
+
+def _names_in(body: list[str], several: bool) -> list[str]:
+    """Names from a controller section, in either layout:
+
+    * label and value (Shanghai): "名称 中国贵州茅台酒厂（集团）有限责任公司", "姓名 李四";
+    * header row, then value rows (Shenzhen): "实际控制人姓名 与实际控制人关系 国籍 …" / "王传福 本人 中国 否".
+    """
+    names: list[str] = []
+    k = 0
+    while k < len(body):
+        ln = body[k].strip()
+        head = re.match(r"^(?:控股股东|实际控制人)?(?:名称|姓名)(?=\s|[:：]|$)\s*[:：]?\s*(.*)$", ln)
+        if head:
+            rest = head.group(1).strip()
+            if not rest or _CTRL_FIELD.match(rest) or rest.split()[0] in _CTRL_HEADINGS:
+                # a header row: the values are on the rows below, one row per person or entity
+                k += 1
+                while k < len(body):
+                    row = body[k].strip()
+                    if not row:
+                        k += 1
+                        continue
+                    if _CTRL_STOP.match(row) or re.match(r"^(?:控股股东|实际控制人)?(?:名称|姓名)(?=\s|[:：]|$)", row):
+                        break
+                    name = _ctrl_name(row.split()[0])
+                    if name and name not in names:
+                        names.append(name)
+                    if not several:
+                        break
+                    k += 1
+                continue
+            value = re.split(r"\s{2,}|\s(?=单位负责人|法定代表人|成立日期|国籍|是否取得|统一社会信用代码)", rest)[0]
+            name = _ctrl_name(value)
+            if name and name not in names:
+                names.append(name)
+        k += 1
+    return names if several else names[:1]
+
+
 def parse_control_text(pages: list[str]) -> dict:
-    """Controlling shareholder and actual controller from the share-capital section."""
+    """Controlling shareholder and actual controller from the share-capital section.
+
+    v2.0.8 (findings 78 and 89): reads both exchanges' layouts. Shenzhen reports head the section
+    "公司实际控制人及其一致行动人" and give the values on the row after a header row ("实际控制人姓名 与本公司的关系
+    国籍 …"); v2.0.7 looked only for "实际控制人情况" and took the word after 姓名, which there is a heading. A
+    heading is never taken as a name, and several natural persons acting together are kept together ("王传福、吕向阳")."""
     text = "\n".join(pages)
     t = re.sub(r"[ \t　]+", " ", text)
+    lines = [ln.strip() for ln in t.splitlines()]
     out = {"controlling_shareholder": None, "controlling_nature": None, "actual_controller": None,
            "controller_nature": None, "no_controlling_shareholder": None, "no_actual_controller": None, "page": None}
-    name_rx = r"([^\n，,。；;]{2,60}?)(?:\s+[^\n]*)?$"
-    sec = re.search(r"控股股东情况([\s\S]{0,1500})", t)
-    if sec:
-        body = sec.group(1)
-        body = re.split(r"(?<!和)实际控制人情况", body)[0]
-        m = re.search(r"(?:^|\n)\s*(?:控股股东)?(?:名称|姓名)\s*[:：]?\s*" + name_rx, body, re.M)
-        if m:
-            out["controlling_shareholder"] = m.group(1).strip()
-        m = re.search(r"控股股东(?:性质|类型)\s*[:：]?\s*([^\n]{2,30})", t)
-        if m:
-            out["controlling_nature"] = m.group(1).strip()
-    if re.search(r"(?:公司|本公司)(?:不存在|无|没有)控股股东|控股股东(?:报告期内)?变更.{0,6}无控股股东", t):
-        out["no_controlling_shareholder"] = True
-    sec = re.search(r"(?<!和)实际控制人情况([\s\S]{0,1500})", t)
-    if sec:
-        body = sec.group(1)
-        m = re.search(r"(?:^|\n)\s*(?:实际控制人)?(?:名称|姓名)\s*[:：]?\s*" + name_rx, body, re.M)
-        if m:
-            out["actual_controller"] = m.group(1).strip()
-    m = re.search(r"实际控制人(?:性质|类型)\s*[:：]?\s*([^\n]{2,30})", t)
+
+    def heading(ln: str, which: str) -> bool:
+        if which == "holder":
+            return bool(re.search(r"控股股东情况\s*$", ln)) and "实际控制人" not in ln
+        return bool(re.search(r"实际控制人(?:情况|及其一致行动人)\s*$", ln)) and "控股股东" not in ln
+
+    for which, key, nkey, several in (("holder", "controlling_shareholder", "controlling_nature", False),
+                                      ("actual", "actual_controller", "controller_nature", True)):
+        for idx, ln in enumerate(lines):
+            if not heading(ln, which):
+                continue
+            body = _section(lines, idx)
+            names = _names_in(body, several)
+            if names:
+                out[key] = "、".join(names)
+                break
+    m = re.search(r"控股股东(?:性质|类型)\s*[:：]\s*([^\n]{1,30})", t)
+    if m:
+        out["controlling_nature"] = m.group(1).strip()
+    m = re.search(r"实际控制人性质\s*[:：]\s*([^\n]{1,30})", t) or re.search(r"实际控制人类型\s*[:：]\s*([^\n]{1,30})", t)
     if m:
         out["controller_nature"] = m.group(1).strip()
-    if re.search(r"(?:公司|本公司)(?:不存在|无|没有)实际控制人|实际控制人.{0,4}[:：]?\s*无\b", t):
+    if re.search(r"(?:公司|本公司)(?:不存在|无|没有)控股股东|控股股东(?:报告期内)?变更.{0,6}无控股股东", t) or \
+            (out["controlling_nature"] and _NO_CTRL.match(out["controlling_nature"])):
+        out["no_controlling_shareholder"] = True
+    if re.search(r"(?:公司|本公司)(?:不存在|无|没有)实际控制人|实际控制人.{0,4}[:：]?\s*无(?:\s|$)|无实际控制人", t):
         out["no_actual_controller"] = True
-    for k in ("controlling_shareholder", "actual_controller"):
-        v = out[k]
-        if v:
-            v = re.split(r"\s{2,}|\s(?=单位负责人|法定代表人|成立日期|国籍|是否取得)", v)[0].strip()
-            out[k] = v if not re.fullmatch(r"(?:无|不适用|/|-)", v) else None
+    for k in ("controlling_nature", "controller_nature"):
+        if out[k] and _NO_CTRL.match(out[k]):
+            out[k] = None
+    if out["no_actual_controller"] and out["actual_controller"]:
+        out["no_actual_controller"] = None          # a name was read; the phrase was about something else
     for pno, p in enumerate(pages, start=1):
         if "实际控制人" in p or "控股股东情况" in p:
             out["page"] = pno
@@ -487,29 +570,40 @@ def parse_control_text(pages: list[str]) -> dict:
     return out
 
 
-def extract_control(security_code: str | None = None) -> dict:
-    """Controlling shareholder, actual controller and ownership type from annual reports."""
+def extract_control(security_code: str | None = None, again: bool = False, progress=None) -> dict:
+    """Controlling shareholder, actual controller and ownership type from annual and interim reports.
+
+    v2.0.8: only the control section's pages are read, in both the layout and the plain text, and the reading
+    that names more parties is kept; progress and resume as for the other extractors."""
+    from .extractstate import run
+    from .financials import infer_period
     init_db()
     s = SessionLocal()
-    totals = {"reports": 0, "with_controller": 0, "types": defaultdict(int)}
+    totals = {"reports": 0, "with_controller": 0, "types": defaultdict(int), "errors": []}
     try:
         q = s.query(Disclosure, Company).join(Company, Disclosure.company_id == Company.id).filter(
             Disclosure.kind.in_(("annual_report", "interim_report")), Disclosure.local_path.isnot(None))
         if security_code:
             q = q.filter(Company.security_code == str(security_code).zfill(6))
-        from .financials import infer_period
-        from .parsers import pages_for
-        for d, c in q.all():
-            path = Path(d.local_path)
+
+        def score(r):
+            return (bool(r["actual_controller"]) + bool(r["controlling_shareholder"])
+                    + bool(r["no_actual_controller"]) * 0.5)
+
+        def handle(d, c, reader):
             period, _ = infer_period(d.title_cn or "", "", d.announcement_date)
-            if not path.exists() or not period:
-                continue
-            pages = pages_for(path, "layout") or pages_for(path, "text")
-            r = parse_control_text(pages)
+            if not period:
+                return None
+            readings = [parse_control_text(p) for p in (reader.pages("layout", ["control"]),
+                                                         reader.pages("text", ["control"])) if p]
+            if not readings:
+                return "EMPTY"
+            r = max(readings, key=score)          # stable: the layout reading wins a tie
             if not any(r[k] for k in ("controlling_shareholder", "actual_controller", "no_actual_controller")):
-                continue
+                return "EMPTY"
             totals["reports"] += 1
-            typ, basis = classify_ownership(r["actual_controller"], r["controller_nature"], bool(r["no_actual_controller"]))
+            typ, basis = classify_ownership(r["actual_controller"], r["controller_nature"],
+                                            bool(r["no_actual_controller"]))
             row = s.query(ControlObservation).filter_by(company_id=c.id, observation_date=period,
                                                         source=d.source or "CNINFO").one_or_none()
             if row is None:
@@ -526,7 +620,10 @@ def extract_control(security_code: str | None = None) -> dict:
             if r["actual_controller"]:
                 totals["with_controller"] += 1
             _chain_from(s, c, period, r, d.source or "CNINFO")
-        s.commit()
+            return "READ"
+
+        rows = q.order_by(Company.security_code, Disclosure.announcement_date, Disclosure.id).all()
+        run("control", rows, handle, totals, again, progress, s)
         totals["types"] = dict(totals["types"])
         return totals
     finally:

@@ -47,29 +47,52 @@ def _unit(text: str) -> tuple[str, float]:
     return first_declared(text) or ("CNY", 1.0)
 
 
+_SEG_PAGE = re.compile(r"(营业收入构成|主营业务分行业|主营业务分产品|主营业务分地区|分行业情况|分产品情况|分地区情况)")
+# v2.0.8 (finding 83): where a segment table ends. The cost-analysis and output tables that follow have the same
+# 分行业/分产品 row heads, and their rows are not revenue segments.
+_SEG_END = re.compile(r"(成本分析表|成本构成|营业成本构成|产销量|销售量|生产量|主要销售客户|前五名|主要供应商|"
+                      r"^第[一二三四五六七八九十]+节|^[一二三四五六七八九十]+、)")
+
+
 def parse_segment_pages(pages: list[str]) -> list[dict]:
     """Parse revenue-composition and segment-margin tables.
 
     Composition table rows: name, amount, share%, prior amount, prior share%, yoy%.
     Margin table rows (header mentions 毛利率): name, revenue, cost, margin%,
     revenue yoy%, cost yoy%, margin change.
+
+    v2.0.8 (finding 83): a table continued on the next page keeps its dimension, unit and kind (v2.0.7 started
+    each page afresh and skipped a page without a heading, losing the rows after a page break); "其中：" breakdown
+    rows are not segments, and "小计" rows are subtotals. Each row records the kind of table it came from:
+    the composition table lists every segment, the margin table only those above 10% of revenue.
     """
     rows = []
+    mode = dimension = None       # mode: 'composition' or 'margin'
+    unit, mult = "CNY", 1.0
+    active = False
     for pno, page in enumerate(pages, start=1):
-        if not re.search(r"(营业收入构成|主营业务分行业|主营业务分产品|主营业务分地区|分行业情况|分产品情况|分地区情况)", page):
+        if _SEG_PAGE.search(page):
+            if not active:
+                unit, mult = _unit(page)
+            active = True
+        elif not active:
             continue
-        unit, mult = _unit(page)
-        mode = None       # 'composition' or 'margin'
-        dimension = None
         for raw_line in page.splitlines():
             line = raw_line.replace("　", " ").strip()
             if not line:
+                continue
+            if _SEG_END.search(line) and not _SEG_PAGE.search(line):
+                active, mode, dimension = False, None, None
+                continue
+            if _SEG_PAGE.search(line):
+                active = True
+            if not active:
                 continue
             declared = first_declared(line)
             if declared:
                 unit, mult = declared
             if re.search(r"营业收入构成", line):
-                mode = "composition"
+                mode, dimension = "composition", None
             if "毛利率" in line:
                 mode = "margin"
             head = re.match(r"^(分行业|分产品|分地区|分销售模式|分渠道|分销售渠道|分部|分业务|分板块)", line)
@@ -89,13 +112,16 @@ def parse_segment_pages(pages: list[str]) -> list[dict]:
             name = "".join(toks[:k])
             if re.search(r"\d{4}年|单位|项目|金额|比重|同比|营业成本|毛利率", name):
                 continue
+            if re.match(r"^其中\s*[:：]?", name):          # a breakdown of the row above, not a segment
+                continue
+            subtotal = name in ("小计", "合计小计")
             if dimension is None and not _TOTAL.match(name):
                 continue
             values = [(t.endswith("%"), _num(t.rstrip("%"))) for t in toks[k:] if t not in ("-", "－", "—")]
             plain = [v for is_pct, v in values if not is_pct and v is not None]
             pct = [v for is_pct, v in values if is_pct and v is not None]
             rec = {"dimension": dimension or "TOTAL", "segment_name": name, "page": pno, "raw": line, "unit": unit,
-                   "is_total": bool(_TOTAL.match(name))}
+                   "is_total": bool(_TOTAL.match(name)) or subtotal}
             if mode == "margin":
                 if len(plain) < 2:
                     continue
@@ -110,6 +136,7 @@ def parse_segment_pages(pages: list[str]) -> list[dict]:
                            revenue_prior=plain[1] * mult if len(plain) > 1 else None,
                            revenue_yoy=pct[-1] / 100 if len(pct) >= 3 else None)
                 rec["table"] = "composition"
+            rec["table_kind"] = rec["table"]
             if rec["dimension"] == "REGION":
                 rec["region_class"] = region_class(name)
             rows.append(rec)
@@ -130,6 +157,8 @@ def _merge(rows: list[dict]) -> list[dict]:
                     cur[k] = r[k]
             if cur.get("revenue") is None:
                 cur["revenue"] = r.get("revenue")
+            if r.get("table_kind") == "composition":
+                cur["table_kind"] = "composition"
     return list(merged.values())
 
 
@@ -140,8 +169,13 @@ def _period_of(d: Disclosure) -> str | None:
     return f"{m.group(1)}-06-30" if "半年" in (d.title_cn or "") else f"{m.group(1)}-12-31"
 
 
-def extract_segments(security_code: str | None = None) -> dict:
-    from .corporate_actions import _document_pages
+def extract_segments(security_code: str | None = None, again: bool = False, progress=None) -> dict:
+    """Segments from annual and interim reports.
+
+    v2.0.8: only the pages of the segment tables are read (:mod:`ashare.reportreader`), with progress and resume
+    (:mod:`ashare.extractstate`); rows an earlier parser read from a document, and the current one does not
+    (cost-analysis rows, rows cut at a page break), are removed."""
+    from .extractstate import run
     init_db()
     session = SessionLocal()
     totals = {"reports": 0, "segments": 0, "inserted": 0, "updated": 0, "errors": []}
@@ -150,42 +184,48 @@ def extract_segments(security_code: str | None = None) -> dict:
             Disclosure.kind.in_(("annual_report", "interim_report")), Disclosure.local_path.isnot(None))
         if security_code:
             q = q.filter(Company.security_code == str(security_code).zfill(6))
-        for d, c in q.all():
-            try:
-                path = Path(d.local_path)
-                period = _period_of(d)
-                if not path.exists() or not period:
-                    continue
-                rows, info = dual_run("segments", path, {"title": d.title_cn})
-                tally_dual(totals, info, d.id)
-                totals["reports"] += 1
-                for r in rows:
-                    totals["segments"] += 1
-                    row = session.query(SegmentObservation).filter_by(
-                        company_id=c.id, reporting_period=period, dimension=r["dimension"],
-                        segment_name=r["segment_name"], source=d.source or "CNINFO", disclosure_id=d.id).one_or_none()
-                    if row is None:
-                        row = SegmentObservation(company_id=c.id, reporting_period=period, dimension=r["dimension"],
-                                                 segment_name=r["segment_name"], source=d.source or "CNINFO",
-                                                 disclosure_id=d.id, extraction_method="PDF_TABLE_HEURISTIC")
-                        session.add(row)
-                        totals["inserted"] += 1
-                    else:
-                        totals["updated"] += 1
-                    for k in ("revenue", "revenue_share", "revenue_prior", "revenue_yoy", "cost", "gross_margin",
-                              "region_class", "is_total", "unit"):
-                        setattr(row, k, r.get(k))
-                    row.source_document = d.local_path or d.document_url
-                    row.source_page, row.raw_value = r["page"], r["raw"]
-                    row.extraction_method = PARSERS[r["_variant"]].method
-                    row.confidence = record_confidence(r, 0.55)
-                    row.extraction_note = extraction_note(r)
-                    row.retrieved_at = utcnow()
-                session.commit()
-            except Exception as exc:
-                session.rollback()
-                totals["errors"].append({"disclosure_id": d.id, "error": repr(exc)})
-        return totals
+
+        def handle(d, c, reader):
+            path = Path(d.local_path)
+            period = _period_of(d)
+            if not period:
+                return None
+            rows, info = dual_run("segments", path, {"title": d.title_cn}, reader=reader, sections=["segments"])
+            tally_dual(totals, info, d.id)
+            keep = {(r["dimension"], r["segment_name"]) for r in rows}
+            for old in session.query(SegmentObservation).filter_by(company_id=c.id, disclosure_id=d.id):
+                if (old.dimension, old.segment_name) not in keep:
+                    session.delete(old)
+                    totals["removed"] = totals.get("removed", 0) + 1
+            if not rows:
+                return "EMPTY"
+            totals["reports"] += 1
+            for r in rows:
+                totals["segments"] += 1
+                row = session.query(SegmentObservation).filter_by(
+                    company_id=c.id, reporting_period=period, dimension=r["dimension"],
+                    segment_name=r["segment_name"], source=d.source or "CNINFO", disclosure_id=d.id).one_or_none()
+                if row is None:
+                    row = SegmentObservation(company_id=c.id, reporting_period=period, dimension=r["dimension"],
+                                             segment_name=r["segment_name"], source=d.source or "CNINFO",
+                                             disclosure_id=d.id, extraction_method="PDF_TABLE_HEURISTIC")
+                    session.add(row)
+                    totals["inserted"] += 1
+                else:
+                    totals["updated"] += 1
+                for k in ("revenue", "revenue_share", "revenue_prior", "revenue_yoy", "cost", "gross_margin",
+                          "region_class", "is_total", "unit", "table_kind"):
+                    setattr(row, k, r.get(k))
+                row.source_document = d.local_path or d.document_url
+                row.source_page, row.raw_value = r["page"], r["raw"]
+                row.extraction_method = PARSERS[r["_variant"]].method
+                row.confidence = record_confidence(r, 0.55)
+                row.extraction_note = extraction_note(r)
+                row.retrieved_at = utcnow()
+            return "READ"
+
+        rows = q.order_by(Company.security_code, Disclosure.announcement_date, Disclosure.id).all()
+        return run("segments", rows, handle, totals, again, progress, session)
     finally:
         session.close()
 

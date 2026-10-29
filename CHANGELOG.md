@@ -2,6 +2,96 @@
 
 This log records what changed in each version and the important findings behind the changes. The live-run findings are kept in full in `docs/live_run_findings_v2.0.2.md` (findings 1 to 19) `docs/live_run_findings_v2.0.3.md` (findings 20 to 34) and `docs/live_run_findings_v2.0.5.md` (findings 35 to 57, the first live runs of the v2.0.4 catalogue engine) `docs/live_run_findings_v2.0.6.md` (findings 58 to 69) and `docs/live_run_findings_v2.0.7.md` (findings 70 to 95). Earlier versions are described in `README.md` and in section 18 of `ashare_scraper_build_plan.md`.
 
+## v2.0.8 (29 October 2026)
+
+**Aim:** correct data first. The live runs under v2.0.7 (findings 70 to 95, `docs/live_run_findings_v2.0.7.md`) showed wrong financial figures, segment totals that did not add up, shareholder tables too slow to re-read, and panels that ignored the new listing dates. The plan, with a review of the code that found the causes, is `docs/plan_v2.0.8_and_visualisation.md` (sections 4 and 10).
+
+**After upgrading:**
+1. "Update the company list" (it rebuilds the listing history of the companies whose dates changed);
+2. "Extract figures from reports", "Read top-10 shareholders", "Read controlling shareholder and actual controller" and "Extract segments from reports": each reads every report again once, because its version is new, and a stopped run continues where it stopped;
+3. "Run all checks";
+4. build panels for a fiscal year that has ended (for example `--start 2025-01-01 --end 2025-12-31`).
+
+### Universe and panels (findings 92, 93 and 71)
+
+- **Listing dates used (finding 92).** A listing history derived before the listing dates were known has no start date. It hid the company's listing date, so 5,223 of 5,225 panel rows came from report evidence. Such a history now gives way to the company record. "Update the company list" rebuilds the history of every company whose listing date or status it changed.
+- **Fiscal years not ended (finding 93).** A fiscal-year row for a year that has not ended has no annual figures. The panel now names such years and counts rows with no financial figure, in the output and the manifest. The desktop form ends at the last complete fiscal year.
+- **NOT_IN_EXCHANGE_LIST (finding 71).** A company in neither exchange's whole list, and not named as delisted, gets this status. It is treated as delisted on an unknown date, until a delisting event in the listing events gives the date.
+
+### Financial figures (findings 84 to 87)
+
+- **Notices are not reports.**
+  - **The fault.** Titles such as 年度报告披露提示性公告, 关于…年度报告的更正公告 and 补充公告 were classed as annual reports, so their figures were compared with the report's.
+  - **The fix.** They are now `report_notice`. Stored kinds are reclassified at the start of each extraction, and the figures read from notices are removed.
+  - **Corrected reports.** A corrected full report (更正后, 修订版) is still a report.
+- **Units.** A table without its own unit took the unit of an unrelated table any number of pages earlier, for example 万元 from a fund-raising table. The search now stops at the page before. A figure whose unit is not declared there is marked `CNY_ASSUMED`, with lower confidence.
+- **Power of ten within a document.** When the headline reader and the statement reader of one document differ by exactly 1,000, 10,000, a million or a hundred million, the statement reading, whose unit is declared on its page, is kept. The note records the rescaling.
+- **Amounts cut short.** An amount in yuan must have two decimals ("22,103" and "1,355.2" are no longer read); amounts in larger units may have up to four.
+- **Glued note numbers.** A note reference glued to an amount ("1" + "1,791,960,892.40") gives a well-formed number. When the other reading of the same figure is the same digits without the one or two in front, it is kept.
+- **Old readings removed.** A figure the readers no longer produce from a document is removed when the document is read again, with its review items.
+- **Restatements (finding 86).** A difference between documents filed the same day is no longer "explained" by a restatement. It is CORRECTED_REPORT (information) when one of them is a corrected report.
+- **Patterns named.** Each difference is labelled DIGITS_GLUED, POWER_OF_TEN, SIGN or OTHER, to guide review.
+- `EXTRACTOR_VERSION` is "financials-2", so every report is read again once.
+
+### Targeted reading, progress and resume (findings 76, 77, 79 and 82)
+
+- **One reading per report.** `ashare/reportreader.py` opens a report once. It finds the sections sought with pdfium's page text, and reads the plain text and layout only of those pages, each at most once. The pages index is kept beside the documents, so the other extractors skip the search. Without a section, or without pdfium, the whole document is read as before.
+- **The extractors moved to it:** top-10 and tradable holders (one reading for both tables), control, segments, R&D and workforce, subsidiaries, and the management roster.
+- **Measured on a generated 251-page report**, with the two shareholder tables on two pages:
+  - v2.0.7 read both tables in 84.5 seconds;
+  - v2.0.8 reads them in 20 seconds the first time and in under one second once the index exists;
+  - the same rows come out.
+  
+  The first pass is dominated by loading each page in pdfium, which is slow for this file's non-embedded fonts. Reports with embedded fonts should be faster, and the author's run will show by how much.
+- **Progress and resume.** Every one of these extractors counts the documents first, then prints "250 of 9,800 documents; 8.7 s each; about …". Each document read is recorded in `extraction_state` with the extractor's version (migration 0006), so a stopped run continues with the next report. `--again`, or "Read reports again" in the desktop, reads them all.
+- **New versions.** The top-10, control and segment extractors start at new versions, so a normal run re-reads every report. This finishes the shareholder re-extraction that v2.0.7 needs (finding 77).
+
+### Segments and control (findings 83, 78 and 89)
+
+- **Segments.**
+  - **Page breaks.** A table continued on the next page keeps its dimension, unit and kind; v2.0.7 lost the rows after a page break.
+  - **Subtotals and breakdowns.** "其中：" rows are not segments, and "小计" rows are subtotals.
+  - **Where tables end.** Cost-analysis and output tables after the segment tables are no longer read as segments.
+  - **Table kind.** Each row records its table: composition, listing every segment, or margin, listing only those above 10% of revenue. A dimension read only from the margin table, without its own total, is not compared with the whole revenue.
+- **Control.**
+  - **Shenzhen reports.** The parser now reads the section headed "公司实际控制人及其一致行动人", and the header-row layout ("实际控制人姓名 与本公司的关系 国籍 …" with the values on the next row).
+  - **Headings.** A heading is never taken as a name (finding 89: "与本公司的关系").
+  - **Persons acting together** are kept together ("王传福、吕向阳").
+  
+  The layout and the plain text of the control pages are both read, and the reading that names more parties is kept.
+
+### Installer and findings (findings 74 and 91)
+
+- **Installer.** The installer and the uninstaller check that AShareScraper.exe and ashare-cli.exe are not running before they copy or delete. If either is, they ask for it to be closed (Retry or Cancel); in silent mode they stop with exit code 5.
+- **Show findings.** It opens with counts by rule and severity and the 20 companies with most findings. Every row carries the company code. `--details`, `--rule` or `--security-code` lists the rows, and `--export file.csv` writes them all.
+
+### Price sources (finding 73)
+
+- **A second public source.** Tencent's daily bars (`TENCENT_PUBLIC`), read two years per request.
+  - **Status.** Like Eastmoney's, it is an unofficial feed, not exchange-authoritative, and its terms are the user's to check.
+  - **Not tested live.** Its request format follows its public use. The build environment could not reach it, so "Test price sources" is how it is confirmed.
+- **Test price sources** (`diagnose-prices CODE`). It asks each source for one company's last month and stores nothing. It then says which source answered and whether to change the setting.
+- **The choice.** Settings > Price source: Eastmoney, Tencent or None (CSV import only). `ASHARE_PRICE_SOURCE` does the same from the command line. "Download daily prices" can override the choice for one run.
+- **The daily update** follows the setting:
+  - **None** asks for nothing;
+  - **Tencent** brings the day through the backfill;
+  - **Stopping.** The backfill stops after three companies refused in a row, instead of asking for each of about 5,500 companies a day while Eastmoney refuses them all.
+- **Preference.** An imported (CSV) price is preferred to any public feed's for the same day.
+
+### Tests
+
+- **New tests.** 56 in `tests/test_v208.py`:
+  - each fault above;
+  - the synthetic corpus read in full and targeted, giving the same records from every table family;
+  - the Tencent request and response;
+  - a listing history left stale by an earlier update.
+- **Changed tests.** Two v1.5 tests now ask for a second reading with `again`, and one v2.0.6 test fixes its table width.
+- **Results:**
+  - 303 pass on Linux Python 3.12 (two skips);
+  - 293 on Python 3.13 (ten skips, the desktop tests without tkinter);
+  - 300 against PostgreSQL 16 (five skips).
+- **The installer under Wine.** It installed; it stopped with exit code 5 over a running copy; it reinstalled once the copy was closed; and it uninstalled.
+
 ## v2.0.7 (24 October 2026)
 
 **Aim:** fix two faults found by a review of a live release, then close the last catalogue gap and give listing dates a second source. The findings are 58 to 69 in `docs/live_run_findings_v2.0.6.md`.
