@@ -731,3 +731,37 @@ def test_update_rebuilds_a_history_left_stale_by_an_earlier_update(company, monk
         assert {h.valid_from for h in s.query(SecurityHistory)} == {"2001-08-27"}
     finally:
         s.close()
+
+
+def test_history_rebuild_with_a_warning_imposed_and_lifted_the_same_day(company):
+    """v2.0.8 live fault: two risk-warning events on one date (one imposed, one lifted) made the sort compare None
+    with 'ST', and "Update the company list" failed with a TypeError."""
+    from ashare.models import SessionLocal, RegulatoryEvent
+    from ashare.security_master import rebuild_security_history, universe_at
+    _set("600519", listing_date="2001-08-27", status="LISTED")
+    s = SessionLocal()
+    try:
+        for i, st in enumerate(("IMPOSED", "LIFTED")):
+            s.add(RegulatoryEvent(company_id=company.id, event_id=f"W{i}", event_type="DELISTING_RISK",
+                                  event_subtype="OTHER_RISK_WARNING", legal_classification="ADMINISTRATIVE",
+                                  status=st, event_date="2024-05-06", announcement_date="2024-05-06",
+                                  source="CNINFO", extraction_method="TITLE"))
+        s.commit()
+    finally:
+        s.close()
+    assert rebuild_security_history()["companies"] == 1
+    assert [r["current_code"] for r in universe_at("2025-12-31")] == ["600519"]
+
+
+def test_update_survives_a_failed_history_rebuild(company, monkeypatch):
+    from ashare import exchange_lists, pipeline, security_master
+    info = exchange_lists.ExchangeListing({"600519": {"name": "贵州茅台", "listing_date": "2001-08-27",
+                                                      "source": "sse_main"}})
+    info.lists = {k: {"name": n, "rows": m, "dated": m, "error": None, "whole": True} for k, n, m in exchange_lists.LISTS}
+    info.complete = True
+    monkeypatch.setattr(exchange_lists, "exchange_listing_info", lambda *a, **k: info)
+    monkeypatch.setattr(security_master, "rebuild_security_history",
+                        lambda **k: (_ for _ in ()).throw(TypeError("boom")))
+    counts = pipeline.enrich_listing_status()
+    assert counts["listing_dates_added"] == 1 and counts["history_rebuilt"] == 0
+    assert "Build listing history" in counts["history_note"] and "boom" in counts["history_note"]

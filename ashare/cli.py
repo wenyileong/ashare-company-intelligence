@@ -160,6 +160,8 @@ def update_universe_cmd(
           + (f" Listing history rebuilt for {st['history_rebuilt']:,} companies whose dates or status changed."
              if st.get("history_rebuilt") else "")
           + (f" Note: {st['note']}" if st.get("note") else ""))
+    if st.get("history_note"):
+        print(f"[yellow]Note: {st['history_note']}.[/yellow]")
 
 
 @app.command("validate-universe")

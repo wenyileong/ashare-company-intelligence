@@ -301,7 +301,9 @@ def _risk_periods(session, company_id) -> list[tuple[str, str | None]]:
             out.append((d, "*ST" if e.status == "IMPOSED" else None))
         elif e.event_subtype == "OTHER_RISK_WARNING" and e.status in ("IMPOSED", "LIFTED"):
             out.append((d, "ST" if e.status == "IMPOSED" else None))
-    return sorted(out)
+    # v2.0.8: a warning imposed and lifted on the same day gave (d, "ST") and (d, None); sorting the pairs compared
+    # None with "ST" and "Update the company list" failed with a TypeError. Sorted by date only (stable).
+    return sorted(out, key=lambda x: x[0])
 
 
 def rebuild_security_history(security_code: str | None = None, codes: list[str] | None = None) -> dict:

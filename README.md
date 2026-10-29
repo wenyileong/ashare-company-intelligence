@@ -1,4 +1,4 @@
-# China A-share Company Intelligence v2.0.8
+# China A-share Company Intelligence v2.0.9
 
 A provenance-preserving research data system for SSE Main Board, STAR Market, SZSE Main Board and ChiNext companies. The architecture is set out in `ashare_scraper_build_plan.md`. Changes by version, and the findings behind them, are in `CHANGELOG.md`. The live-run findings are in:
 - `docs/live_run_findings_v2.0.2.md`;
@@ -8,6 +8,8 @@ A provenance-preserving research data system for SSE Main Board, STAR Market, SZ
 - `docs/live_run_findings_v2.0.7.md`.
 
 The register of all 95 findings, and the plan for the next releases, is `docs/plan_v2.0.8_and_visualisation.md`.
+
+v2.0.9 fixes a fault in v2.0.8: "Update the company list" failed with a TypeError when a company had a risk warning imposed and lifted on the same day. If the listing history cannot be rebuilt, the update now finishes anyway and says so.
 
 v2.0.8 corrects data before anything else (findings 70 to 95):
 

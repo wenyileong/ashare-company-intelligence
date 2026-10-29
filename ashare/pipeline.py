@@ -94,9 +94,14 @@ def enrich_listing_status(info: dict | None = None) -> dict:
                     and dated[cid] not in changed]
     finally:
         s.close()
+    counts["history_rebuilt"] = 0
     if changed:
-        from .security_master import rebuild_security_history
-        counts["history_rebuilt"] = rebuild_security_history(codes=changed)["companies"]
+        from . import security_master
+        try:
+            counts["history_rebuilt"] = security_master.rebuild_security_history(codes=changed)["companies"]
+        except Exception as exc:          # never fails the update: the list and dates are already saved
+            counts["history_note"] = (f"listing history not rebuilt ({type(exc).__name__}: {exc}); run 'Build "
+                                      "listing history' (rebuild-security-history)")
     else:
         counts["history_rebuilt"] = 0
     if exchanges is not None:
