@@ -1,6 +1,6 @@
 # Findings register, fix plan (v2.0.8) and the visualisation engine layer
 
-**Status:** plan, 28 October 2026. Nothing in it is built yet.
+**Status:** plan, 28 October 2026; decisions taken and build design added 29 October 2026 (sections 9 to 11). v2.0.8 is built from section 10.
 
 **Basis:**
 - the live-run findings 1 to 95, in five files under `docs/` (section 1);
@@ -21,7 +21,9 @@
 6. The NVF Topology Tester v0.1: test results
 7. The visualisation engine layer
 8. Order of work
-9. Decisions needed
+9. Decisions (29 October 2026)
+10. v2.0.8 build design, after a review of the code
+11. The first episode: semiconductor policy events (candidates)
 
 ---
 
@@ -200,11 +202,12 @@ These need no new build, and their results shape v2.0.8.
 1. **Installer.** The installer checks for a running AShareScraper.exe or ashare-cli.exe and asks for it to be closed.
 2. **Findings display.** "Show findings" opens with a count by rule and company. Each row carries the company code, and the findings can be exported to CSV.
 
-### Workstream F (conditional): prices (finding 73)
+### Workstream F: price sources the author chooses (finding 73)
 
-If the author's test (section 3 item 4) shows that price histories are refused too:
-- a second public source, chosen after a check of its terms;
-- otherwise, CSV import as the documented route, with the user guide saying so.
+Decided on 29 October 2026 (section 9): the program lets the author choose, rather than deciding for them.
+- **Test.** "Test price sources" asks each public source for one company's last month of prices and reports what each returned.
+- **Choose.** A price-source setting: Eastmoney (the present source), a second public source (Tencent's public daily-bar service), or none (CSV import only). Downloads, the backfill job and the daily update all follow it.
+- **Import.** CSV import stays available whatever the setting, and an imported price is preferred to a public-feed price for the same day.
 
 ### Tests and release
 
@@ -427,11 +430,143 @@ V0 can be designed while v2.0.8 is built, since it touches no extractor. Nothing
 
 ---
 
-## 9. Decisions needed
+## 9. Decisions (29 October 2026)
 
-1. **Where the viewer lives.** Inside this repository, as an optional part of the desktop (recommended for V0 to V2, so it shares the provenance, privacy and release code). Or in `research-suite-core` from the start, reading the snapshot.
-2. **Order against v2.1.** Visualisation V0 and V1 beside v2.1, or after it.
-3. **The first episode.** Semiconductors (CSRC C39) with which policy events and dates.
-4. **Expectations.** Accept management guidance (业绩预告) as a labelled proxy, obtain licensed analyst forecasts, or leave the layer as a gap.
-5. **Prices.** Depends on the author's test (section 3, item 4): a second public source, or CSV import only.
-6. **The NVF measures.** Variables, intervals and falsification conditions for Institutional Visibility and the Fractal Investment Clock, before any are computed.
+| # | Question | Decision | Where it goes |
+|---|---|---|---|
+| 1 | Where the viewer lives | Inside this repository, as an optional part of the desktop | V0 to V2 under `ashare/viz/`; the snapshot format stays documented so `research-suite-core` can read it later |
+| 2 | Order against v2.1 | Visualisation V0 and V1 beside v2.1 | After v2.0.8 (section 8, step 6) |
+| 3 | First episode | Semiconductors (CSRC division C39) | Policy events and dates proposed in section 11, for the author to confirm |
+| 4 | Expectations | Management guidance (业绩预告 and 业绩快报) first, labelled as a proxy, with the structure ready for licensed analyst forecasts | Section 10.7 |
+| 5 | Prices | Selectable: the author's test, a public source, or CSV import | v2.0.8, Workstream F (section 4); design in section 10.6 |
+| 6 | NVF measures | Still open: defined by the author before anything is computed | Section 7.5 |
+
+---
+
+## 10. v2.0.8 build design, after a review of the code
+
+Before building, each workstream was traced through the code that it changes, to test the plan's logic and look for faults the findings had not yet shown. The review changed the plan in eight places; they are marked **(review)**.
+
+### 10.1 Universe and panels (Workstream A)
+
+- **The fault (finding 92).** `universe_at` uses the derived history whenever a company has one. A derived period without a start date then excludes the company, and its listing date is never read.
+- **The fix.** A derived history whose first period has no start is ignored in favour of the company record, which has the listing date and status. Imported histories keep priority as before.
+- **Update the company list.** It rebuilds the derived history of every company whose listing date or status it changed, and reports how many.
+- **NOT_IN_EXCHANGE_LIST (finding 71).** A company is given this status only when:
+  - both exchange lists are whole;
+  - the company is in neither;
+  - its name does not mark it as delisted (those stay DELISTED).
+  
+  **(review)** The present code sets NOT_IN_QUOTE_LIST only from a complete quote list. Since v2.0.7 skips the quote list when the exchange lists are whole, that status was never set; the new one replaces it in that case.
+- **Panels (finding 93).** The result carries `fiscal_years_not_ended` and `rows_without_financials`, and the command prints a warning for both. The desktop form's default period becomes the last complete fiscal year.
+
+### 10.2 Financial figures (Workstream B)
+
+- **Which documents (finding 84).** **(review)** The title classifier calls any title containing 年度报告 an annual report. That includes "关于2025年年度报告的更正公告" (a correction notice), "2025年年度报告披露提示性公告" (a notice that the report is out, often filed the same day as the report) and 补充公告 (a supplement). These short notices are the most likely second documents of finding 84's same-day pairs. They are now classed `report_notice`, and stored kinds are reclassified at the start of each extraction. A corrected full report (年度报告（更正后）, 修订版) stays a report.
+- **Units (finding 84).** **(review)** `declared_unit` searches back through every earlier page and takes the nearest declaration. A figure in a key-figures table with no declaration of its own can therefore take the unit of an unrelated table pages earlier, for example 万元 from a fund-raising table. The search is limited to the figure's own page (above the figure) and the end of the page before. With no declaration there, the figure is stored in 元 but marked `unit: CNY_ASSUMED`, its confidence lowered, and checked against the statement reader below.
+- **Power-of-ten check within a document.** When the headline reader and the statement reader give the same metric in the same document, and the values differ by 1,000, 10,000, a million or a hundred million, the statement reading (whose unit is declared on its page) is kept, the headline reading is rescaled, and the note records it.
+- **Numbers (finding 85).** **(review)** The well-formed check of v2.0.7 does not catch this fault, because a glued note number gives a well-formed figure: "1" + "1,791,960,892.40" reads as "11,791,960,892.40". Two rules replace it:
+  - a figure that directly follows a note reference (七、1, 五、45, 附注) with no space is ambiguous. Both readings, one-digit and two-digit note, are tried. The reading is kept only if one of them matches another reader of the same document; otherwise it is dropped and counted;
+  - an amount in 元 must carry two decimals ("22,103" and "1,355.2" are rejected); in 万元 or larger units, up to four.
+- **Restatements (finding 86).** A difference between two documents filed on the same day is never "explained". If one of them is a corrected report, the finding is CORRECTED_REPORT (information); otherwise it stays EXTRACTION_DISCREPANCY.
+- **Re-extraction.** `EXTRACTOR_VERSION` becomes "financials-2".
+
+### 10.3 Targeted reading, progress and resume (Workstream C)
+
+- **One reader per report.** A `ReportReader` opens the PDF once. It keeps:
+  - the fast page text (pdfium, the whole page at a time) for finding sections;
+  - the plain text (pypdf) of the pages asked for only;
+  - the layout rows of the pages asked for only.
+- **Sections.** Each extractor names the sections it needs, by pattern (for example 前十名股东持股情况), and how many pages after each heading belong to it. The reader returns pages of the full length, blank outside the sections, so page numbers and the parsers are unchanged.
+- **Fallbacks.** If no section is found, or pdfium is not installed, the whole document is read as before, so nothing that worked before is lost.
+- **The extractors moved to it:** top-10 and tradable holders (one reading for both), control, segments, R&D and workforce, subsidiaries, and the management roster.
+- **Resume.** A new table, `extraction_state`, records each (document, extractor) pair with the extractor's version (migration 0006). Financial extraction keeps its own columns from v2.0.6.
+- **Progress.** One helper gives every extractor the line financial extraction has: total first, then documents done and left, seconds each, and an estimate (finding 79).
+- **Versions.** The top-10, control and segment extractors start at new versions. A normal run therefore re-reads every report and finishes the shareholder re-extraction (finding 77).
+
+### 10.4 Segments and control (Workstream D)
+
+- **Segments (finding 83).** **(review)** The review found three faults in the parser:
+  - The parser forgets the table's dimension and unit at each new page, and skips a page without a heading. Rows continued on the next page are therefore lost, which explains most sums below the total. The state now carries over to the next page while the table continues.
+  - "小计" rows and "其中：" breakdown rows are counted as segments, which explains sums above the total. They are now kept out of the sum, and stored with `is_total` for subtotals and not stored for breakdowns.
+  - The margin table (主营业务分行业…, "占公司营业收入或营业利润10%以上") lists only major segments by rule. A dimension read only from that table is compared with its own 合计 row if it has one, and otherwise not compared with total revenue. The table kind is stored (`table_kind`, migration 0006).
+- **Control (findings 78 and 89).** **(review)** Two faults explain 6 of 293:
+  - Shenzhen reports head the controller section "公司实际控制人及其一致行动人", which the parser never looks for.
+  - Shenzhen reports lay the section out as a header row ("控股股东名称 法定代表人/单位负责人 成立日期 …" or "实际控制人姓名 与本公司的关系 国籍 …") with the values on the next row. The parser took the next word after 姓名, which is the heading 与本公司的关系 (finding 89).
+  
+  The new parser reads both layouts:
+  - label and value (Shanghai);
+  - header row and value row (Shenzhen);
+  - the 实际控制人性质 and 类型 lines.
+  
+  A set of known headings is never accepted as a name, and several natural persons joined by 、 are kept together.
+
+### 10.5 Installer and findings display (Workstream E)
+
+- **Installer (finding 74).** Before copying, the installer tries to open the installed AShareScraper.exe and ashare-cli.exe for writing. If either is locked, it asks for the program to be closed, with Retry and Cancel. In silent mode it stops with an error code instead of writing over a running program.
+- **Findings (finding 91).** "Show findings" opens with counts by rule and severity and the 20 companies with most findings. Every row has the company code. `--details` lists the rows, and `--export file.csv` writes them all.
+
+### 10.6 Price sources (Workstream F)
+
+- **Providers.** A small registry: `eastmoney` (push2his daily bars) and `tencent` (the public daily-bar service, labelled TENCENT_PUBLIC). Both are unofficial public feeds, not exchange-authoritative; their terms are the user's to check, as the release notes already say for Eastmoney. The Tencent request format is taken from its public use, and was not reachable from the build environment; "Test price sources" is how the author confirms it.
+- **Setting.** `price_source`: eastmoney, tencent or none. It is chosen in the desktop's Settings and applies to "Download daily prices", the backfill job and the daily update.
+- **(review)** When the daily snapshot fails, the daily update queues a backfill for every company without a recent bar. With Eastmoney refusing, that is about 5,500 failing requests a day. The backfill now follows the setting, and stops after three refused companies in a row, as the quote list does.
+- **Preference.** One close per day is kept: imported (CSV) first, then the chosen public source.
+
+### 10.7 Expectations: guidance first, analyst forecasts later
+
+Built with V0, beside v2.1 (decision 2), not in v2.0.8.
+- **Table.** `expectation_observations` holds one row per company, period and measure. Each row records:
+  - the measure (net profit attributable, revenue, and so on);
+  - the low and high values, and the change range in per cent;
+  - `source_kind`: MANAGEMENT_GUIDANCE or ANALYST_FORECAST;
+  - the issuer (the company, or the broker for a forecast);
+  - the publication date, and the document and page.
+- **Guidance.** 业绩预告 and 业绩快报 are read for their ranges and dates.
+- **Analyst forecasts.** `import-analyst-forecasts-csv`, with the licence recorded, fills the same table with `source_kind = ANALYST_FORECAST`. The visualisation's expectations layer reads either, says which, and never mixes them in one series.
+
+### 10.8 Tests written before the code
+
+Each fault above gets a test that fails on v2.0.7 and passes on v2.0.8:
+- the stale history;
+- the fiscal year not ended;
+- NOT_IN_EXCHANGE_LIST;
+- a notice title classed as a report;
+- a unit taken from an unrelated earlier page;
+- a glued note number;
+- a figure cut at a separator;
+- a same-day "explained" restatement;
+- a segment table continued over a page, with 小计 and 其中 rows;
+- both controller layouts;
+- the backfill after a failed snapshot;
+- resume after a stop for the new extractors;
+- targeted reading giving the same rows as a full reading on the synthetic corpus.
+
+---
+
+## 11. The first episode: semiconductor policy events (candidates)
+
+For the author to confirm before V3. Dates are the issuing or registration dates as stated by the sources. The authoritative document is listed first. Where only a secondary source was checked, the table says so, and the primary document should be retrieved before use.
+
+| Date | Event | Type | Source checked |
+|---|---|---|---|
+| 2014-06-24 (published 26 June 2014) | 《国家集成电路产业发展推进纲要》, approved by the State Council and issued by MIIT; provides for a national industry investment fund | Strategy | Reposted text on the Cyberspace Administration of China site (cac.gov.cn, 26 June 2014). The issue date of 24 June is to be confirmed against MIIT's original |
+| 2014-09-24 | National IC Industry Investment Fund (国家集成电路产业投资基金, "Big Fund I") established | Funding vehicle | Secondary only (The Paper, 25 October 2019, citing public information) |
+| 2019-07-22 | STAR Market opens: a listing route used by many semiconductor firms | Market institution | Not checked here; to confirm from SSE |
+| 2019-10-22 | Big Fund II registered, capital RMB 204.15 bn | Funding vehicle | Secondary (The Paper, citing the National Enterprise Credit Information Publicity System) |
+| 2020-07-27 (published 4 to 6 August 2020) | 国发〔2020〕8号, 新时期促进集成电路产业和软件产业高质量发展若干政策: tax, financing, R&D, import and export, talent, IP, market and international policies | Policy package | Ministry of Ecology and Environment repost of the State Council notice (mee.gov.cn): 成文日期 27 July 2020; publication date to confirm on gov.cn |
+| 2022-10-07 | United States export controls on advanced computing and semiconductor manufacturing items (Federal Register 2022-21658, published 13 October 2022) | External shock | Federal Register API record |
+| 2023 (date to confirm) | 财税〔2023〕17号: an additional VAT deduction for listed IC enterprises, for 2023 to 2027 | Tax preference | Referred to by the 2023 and 2025 list notices on chinatax.gov.cn; the notice itself, its rate and date to retrieve |
+| 2023-08-28 | 工信部联电子函〔2023〕228号: requirements for the 2023 list of IC enterprises eligible for the VAT deduction | Eligibility list | State Taxation Administration policy database (fgk.chinatax.gov.cn) |
+| 2024-03-22 | NDRC and others: the 2024 list of IC and software enterprises and projects eligible for tax preferences | Eligibility list | NDRC notice (ndrc.gov.cn), as used in the prototype |
+| 2024-05-24 | Big Fund III registered, capital RMB 344 bn | Funding vehicle | Secondary (China Securities Journal, cs.com.cn, citing the National Enterprise Credit Information Publicity System) |
+| 2025-09-16 | 工信部联电子函〔2025〕234号: the 2025 VAT-deduction list | Eligibility list | State Taxation Administration policy database |
+
+**Exposure.** None of these events is linked to a company until the company's own document shows exposure, for example:
+- a report naming the preference it enjoys;
+- a government grant;
+- the Big Fund among its top-10 shareholders.
+
+That last case can be read from the top-10 tables once v2.0.8 has re-read them. The fund's shareholdings in listed companies are a documented, dated and company-specific link, which makes them the strongest first exposure measure.
+
+**Inclusion rule (proposed).** Companies classified in CSRC 2012 division C39 (计算机、通信和其他电子设备制造业) whose segment tables name integrated circuits, semiconductors, wafers, chips or semiconductor equipment and materials. The list is frozen at each panel date, with the classification history of `industry.py`.
