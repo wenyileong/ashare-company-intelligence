@@ -9,7 +9,13 @@ This log records what changed in each version and the important findings behind 
 - **The cause.** v2.0.8 rebuilds the listing history of the companies whose dates or status changed. The rebuild sorts each company's risk-warning changes, and where a warning was imposed and lifted on the same day (two events with one date), the sort compared the warning "ST" with None. The databases in the tests had no such pair; the author's, with 21,963 regulatory events read from titles, did. "Build listing history" would have failed the same way.
 - **The fix.** The changes are sorted by date alone.
 - **No more failed updates from the rebuild.** If the rebuild fails for another reason, "Update the company list" still finishes, since the list and the listing dates are already saved. It then says to run "Build listing history".
-- **Tests.** Two new tests: the same-day pair, and an update that survives a failed rebuild.
+- **Tests.** Two new tests: the same-day pair, and an update that survives a failed rebuild. Results:
+  - 305 pass on Linux Python 3.12 (two skips);
+  - 295 on Python 3.13 (ten skips);
+  - 302 against PostgreSQL 16 (five skips);
+  - 303 on Windows CPython 3.12 under Wine (four skips).
+  
+  The installer installs and uninstalls under Wine.
 
 Nothing else changed. The steps after upgrading are those of v2.0.8 below.
 
