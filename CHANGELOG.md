@@ -1,6 +1,6 @@
 # Change log
 
-This log records what changed in each version and the important findings behind the changes. The live-run findings are kept in full in `docs/live_run_findings_v2.0.2.md` (findings 1 to 19) `docs/live_run_findings_v2.0.3.md` (findings 20 to 34) and `docs/live_run_findings_v2.0.5.md` (findings 35 to 57, the first live runs of the v2.0.4 catalogue engine) `docs/live_run_findings_v2.0.6.md` (findings 58 to 69) and `docs/live_run_findings_v2.0.7.md` (findings 70 to 95). Earlier versions are described in `README.md` and in section 18 of `ashare_scraper_build_plan.md`.
+This log records what changed in each version and the important findings behind the changes. The live-run findings are kept in full in `docs/live_run_findings_v2.0.2.md` (findings 1 to 19) `docs/live_run_findings_v2.0.3.md` (findings 20 to 34) and `docs/live_run_findings_v2.0.5.md` (findings 35 to 57, the first live runs of the v2.0.4 catalogue engine) `docs/live_run_findings_v2.0.6.md` (findings 58 to 69) and `docs/live_run_findings_v2.0.7.md` (findings 70 to 95) and `docs/live_run_findings_v2.0.8.md` (findings 96 to 102). Earlier versions are described in `README.md` and in section 18 of `ashare_scraper_build_plan.md`.
 
 ## v2.0.9 (30 October 2026)
 
