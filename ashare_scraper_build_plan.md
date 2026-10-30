@@ -1402,8 +1402,8 @@ The end state (v2.0) is followed by maintenance releases driven by the author's 
 | v2.0.6 | Built, 23 October 2026 | Listing dates in full, extraction with progress and resume, the last catalogue gaps | `docs/plan_v2.0.6.md`; `CHANGELOG.md` |
 | v2.0.8 | Built, 29 October 2026 | Correct data first: listing history and panels, financial units and numbers, targeted reading with progress and resume, segments and control, installer check | `docs/plan_v2.0.8_and_visualisation.md` (sections 2 to 4); `docs/live_run_findings_v2.0.7.md` (findings 70 to 95) |
 | v2.0.9 | Built, 30 October 2026 | Fix: "Update the company list" failed on a risk warning imposed and lifted the same day | `CHANGELOG.md` |
-| v2.0.10 | Planned, 30 October 2026 | Optional boards kept listed and dated, financial extraction by section, top-10 coverage and `inspect-tables`, full errors in the run log, findings as rates | `docs/plan_v2.0.10.md`; `docs/live_run_findings_v2.0.8.md` (findings 96 to 111) |
-| v2.1 | Planned | Chinese desktop interface, extraction speed, polish | `docs/plan_v2.1.md`; `docs/glossary_zh_CN.md` |
+| v2.0.10 | Merged into v2.1, 30 October 2026 | (see v2.1) | `docs/plan_v2.0.10.md` (superseded) |
+| v2.1 | Planned, revised 30 October 2026 | Data corrections from the live runs (optional boards, top-10 coverage, errors in full, findings as rates), extraction speed (financials by section, parallel), Chinese desktop interface, polish, visualisation V0 and V1 | `docs/plan_v2.1.md`; `docs/glossary_zh_CN.md` |
 | v2.2 to v2.3 | Proposed | Visualisation engine layer for the Nested Valuation Framework: graph snapshot, 2D layered view, optional offline interactive viewer, first episode, measures registry | `docs/plan_v2.0.8_and_visualisation.md` (sections 6 and 7) |
 
 **v2.0.4 (patch; released 18 October 2026).** The first live whole-market catalogue under v2.0.3 confirmed the limit and resumption, but left 12 days short. The causes:

@@ -1,6 +1,6 @@
 # v2.0.10 patch plan: the remaining live-run faults, cumulatively
 
-**Status:** plan, 30 October 2026. Nothing in it is built yet.
+**Status:** merged into v2.1 at the author's request, 30 October 2026: see `docs/plan_v2.1.md`, which corrects this plan in places (its section 12). Kept for the record.
 
 **Basis:**
 - the v2.0.8 and v2.0.9 live runs (findings 96 to 111, `docs/live_run_findings_v2.0.8.md`);
