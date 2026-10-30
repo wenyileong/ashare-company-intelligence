@@ -62,20 +62,25 @@ def render_tk(canvas, spec: ChartSpec, on_click=None) -> list[dict]:
                 return p
         return None
 
+    def at(e):
+        """The event's position on the drawing, which differs from the window's once it scrolls (v2.1)."""
+        return canvas.canvasx(e.x), canvas.canvasy(e.y)
+
     def motion(e):
         hide()
-        p = find(e.x, e.y)
+        x, y = at(e)
+        p = find(x, y)
         if not p:
             return
-        tx = e.x + 14 if e.x < spec.width - 260 else e.x - 260
-        tip["id"] = canvas.create_text(tx + 6, e.y + 6, text=p["tip"], anchor="nw", font=(FONT, -11),
+        tx = x + 14 if x < spec.width - 260 else x - 260
+        tip["id"] = canvas.create_text(tx + 6, y + 6, text=p["tip"], anchor="nw", font=(FONT, -11),
                                        fill="#1f2328")
         x0, y0, x1, y1 = canvas.bbox(tip["id"])
         tip["box"] = canvas.create_rectangle(x0 - 6, y0 - 4, x1 + 6, y1 + 4, fill="#fffbe6", outline="#d0b000")
         canvas.tag_raise(tip["id"])
 
     def click(e):
-        p = find(e.x, e.y)
+        p = find(*at(e))
         if p and on_click:
             on_click(p.get("meta") or {})
 

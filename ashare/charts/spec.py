@@ -34,7 +34,8 @@ class Series:
 
 @dataclass
 class ChartSpec:
-    kind: str                       # line, bar, hbar; v1.7: scatter, hist, box, heatmap, stacked; v1.8: chain, tree, network
+    kind: str                       # line, bar, hbar; v1.7: scatter, hist, box, heatmap, stacked; v1.8: chain, tree, network;
+    #                                 v2.1: layers
     title: str
     series: list[Series]
     x_type: str = "category"        # 'time' (ISO dates), 'category' or 'number'
@@ -57,6 +58,8 @@ class ChartSpec:
 
     def data_rows(self) -> list[dict]:
         """Exactly the plotted data, for CSV export."""
+        if self.graph and "observations" in self.graph:      # v2.1 layered view: the observations it draws
+            return [dict(r) for r in self.graph["observations"]]
         if self.graph:
             nodes = {n["id"]: n for n in self.graph.get("nodes", [])}
             return [{"from": nodes.get(e["from"], {}).get("label", e["from"]),

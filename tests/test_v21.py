@@ -1,7 +1,6 @@
 """v2.1: data corrections from the live runs (findings 96 to 109), extraction speed, the visualisation layer's first
 phases, polish and the Chinese interface. Each test reproduces a fault planned in docs/plan_v2.1.md (with the review
 round that found it, where it came from the review) and fails on v2.0.9."""
-import json
 from pathlib import Path
 
 import httpx

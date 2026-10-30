@@ -51,10 +51,14 @@ class ChartWindow(tk.Toplevel):
             ttk.Button(bar, text="Save PNG…", style="Small.TButton", command=self._png).pack(side="right", padx=(6, 0))
         ttk.Button(bar, text="Save data (CSV)…", style="Small.TButton", command=self._csv).pack(side="right", padx=(6, 0))
         ttk.Button(bar, text="Save SVG…", style="Small.TButton", command=self._svg).pack(side="right", padx=(6, 0))
-        self.canvas = tk.Canvas(self, highlightthickness=0, bg="#ffffff")
-        self.canvas.pack(fill="both", expand=True, padx=12)
         ttk.Label(self, text="Hover over a point or bar to see its source; click it to show the full trace in "
-                             "the output panel.", style="Muted.TLabel").pack(anchor="w", padx=12, pady=(4, 10))
+                             "the output panel.", style="Muted.TLabel").pack(side="bottom", anchor="w", padx=12,
+                                                                             pady=(4, 10))
+        # v2.1: a chart taller than the screen (the layered view of many companies) scrolls
+        self.scroll = ttk.Scrollbar(self, orient="vertical")
+        self.canvas = tk.Canvas(self, highlightthickness=0, bg="#ffffff", yscrollcommand=self.scroll.set)
+        self.scroll.configure(command=self.canvas.yview)
+        self.canvas.pack(side="left", fill="both", expand=True, padx=(12, 0))
         self.protocol("WM_DELETE_WINDOW", self.withdraw)
 
     def show(self, spec):
@@ -62,7 +66,14 @@ class ChartWindow(tk.Toplevel):
         self.spec = spec
         self.heading.configure(text=spec.title)
         render_tk(self.canvas, spec, on_click=self._clicked)
-        self.geometry(f"{spec.width + 24}x{spec.height + 90}")
+        self.canvas.configure(scrollregion=(0, 0, spec.width, spec.height))
+        room = max(300, self.winfo_screenheight() - 160)
+        if spec.height + 90 > room:
+            self.scroll.pack(side="right", fill="y")
+        else:
+            self.scroll.pack_forget()
+        self.canvas.yview_moveto(0)
+        self.geometry(f"{spec.width + 40}x{min(spec.height + 90, room)}")
         self.deiconify()
         self.lift()
 
@@ -351,6 +362,14 @@ def _group_tree(v):
     return group_tree_chart(v["code"], (v.get("date") or "").strip() or None)
 
 
+def _topology(v):
+    """v2.1: the layered chart of the snapshot just written."""
+    from .charts.layers import layers_chart
+    snap = json.loads((Path(v.get("out") or "topology") / "snapshot.json").read_text(encoding="utf-8"))
+    return layers_chart(snap)
+
+
+CHARTS["topology"] = _topology
 CHARTS.update({"event-study": _event_study, "price-chart": _price, "control": _control, "interlocks": _interlocks,
                "subsidiaries": _group_tree})
 

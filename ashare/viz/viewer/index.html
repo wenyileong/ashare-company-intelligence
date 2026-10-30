@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NVF topology · A-share Company Intelligence</title>
+  <style>/*STYLES*/</style>
+  <!-- Libraries bundled at pinned versions (vendor/LICENSES.txt); nothing is fetched from a network. -->
+  <script>/*LIB:3d-force-graph.min.js*/</script>
+  <script>/*LIB:force-graph.min.js*/</script>
+  <script>/*LIB:chart.umd.js*/</script>
+  <script type="application/json" id="snapshot">/*SNAPSHOT*/</script>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <div class="eyebrow" id="eyebrow">RESEARCH VIEW · SNAPSHOT SCHEMA</div>
+      <h1>NVF topology</h1>
+      <p class="subtitle" id="subtitle">Institutional context, capability, fundamentals, expectations and valuation, with the gaps</p>
+    </div>
+    <div class="topbar-right">
+      <span class="pill" id="asOfPill">As of …</span>
+      <button id="exportBtn" class="button secondary" title="Save the observations shown in the map as a CSV file">Export visible observations</button>
+    </div>
+  </header>
+  <main class="page">
+    <section class="kpis" id="kpis"></section>
+
+    <section class="panel control-panel">
+      <div class="control-grid">
+        <label>View mode
+          <select id="viewMode"><option value="3d">3D topology</option><option value="2d">2D slice</option></select>
+        </label>
+        <label>Company
+          <select id="companyFilter"><option value="all">All companies</option></select>
+        </label>
+        <label>Fiscal year
+          <select id="yearFilter"><option value="all">All years</option></select>
+        </label>
+        <label>NVF layer
+          <select id="layerFilter"><option value="all">All layers</option></select>
+        </label>
+        <label class="check-label"><input id="showOwnership" type="checkbox" checked> Show disclosed ownership and control</label>
+        <label class="check-label"><input id="showGaps" type="checkbox" checked> Show data coverage gaps</label>
+      </div>
+    </section>
+
+    <section class="main-grid">
+      <div class="panel graph-panel">
+        <div class="panel-heading">
+          <div><h2>NVF topology map</h2><p>Click a node or a line to inspect its source and evidential status. Drag to rotate; scroll to zoom.</p></div>
+          <span class="mini-status" id="graphStatus">Loading graph…</span>
+        </div>
+        <div class="layer-legend" id="layerLegend"></div>
+        <div class="layer-legend" id="edgeLegend"></div>
+        <div id="graphCanvas" aria-label="Interactive NVF topology view"></div>
+        <div class="axis-note" id="axisNote"><b>3D encoding:</b> X = NVF layer · Y = company lane · Z = year. Positions are fixed by the snapshot, not by a simulation.</div>
+        <div class="graph-caption">A line represents the stated relationship only. Its existence does not establish causal transmission from policy to valuation.</div>
+      </div>
+      <aside class="panel detail-panel">
+        <div class="panel-heading"><div><h2>Evidence inspector</h2><p>Select a node or a line.</p></div></div>
+        <div id="detailContent" class="detail-content"><div class="empty-state">Select a node in the map to inspect its dates, value, provenance and evidential status.</div></div>
+      </aside>
+    </section>
+
+    <section class="chart-grid">
+      <div class="panel chart-panel"><div class="panel-heading"><div><h2 id="chart1Title">Revenue</h2><p id="chart1Note">Reported annual figures, CNY billions.</p></div></div><canvas id="revenueChart" height="250"></canvas></div>
+      <div class="panel chart-panel"><div class="panel-heading"><div><h2 id="chart2Title">Net profit attributable</h2><p id="chart2Note">CNY billions. Negative values are retained.</p></div></div><canvas id="profitChart" height="250"></canvas></div>
+    </section>
+
+    <section class="bottom-grid">
+      <div class="panel table-panel">
+        <div class="panel-heading"><div><h2>Evidence coverage</h2><p>Coverage is part of the result, not a defect to hide.</p></div></div>
+        <div id="coverageTable"></div>
+      </div>
+      <div class="panel table-panel">
+        <div class="panel-heading"><div><h2>Reading this view</h2><p>What the view shows, and what it does not.</p></div></div>
+        <div id="observationNotes" class="notes"></div>
+      </div>
+    </section>
+
+    <footer>
+      <span id="footerSourceCount">Snapshot loading…</span>
+      <span id="footerSoftware">Offline snapshot · libraries bundled</span>
+    </footer>
+  </main>
+  <script>/*APP*/</script>
+</body>
+</html>

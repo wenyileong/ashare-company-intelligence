@@ -1413,6 +1413,88 @@ def review_stats_cmd():
           "use evaluate-parsers on a golden corpus for calibration.[/dim]")
 
 
+@app.command("read-guidance")
+def read_guidance_cmd(security_code: str = typer.Option(None, help="Optional six-digit code"),
+                      again: bool = typer.Option(False, "--again", help="Read documents already read again"),
+                      download: bool = typer.Option(True, "--download/--no-download",
+                                                    help="Download the earnings forecasts and flash reports first")):
+    """Management guidance from earnings forecasts (业绩预告) and flash reports (业绩快报) (v2.1).
+
+    Guidance is a disclosed proxy for expectations, not investors' expectations; it is kept apart from analyst
+    forecasts, which enter only by import."""
+    from .expectations import read_guidance
+    r = read_guidance(security_code, again=again, progress=lambda m: print(m), download=download)
+    print({k: v for k, v in r.items() if k != "errors"})
+    if r["errors"]:
+        print(f"[yellow]{len(r['errors'])} document(s) could not be read; they are tried again next time.[/yellow]")
+
+
+@app.command("import-analyst-forecasts-csv")
+def import_analyst_forecasts_cmd(path: str = typer.Argument(..., help="CSV file"),
+                                 licence: str = typer.Option(..., "--licence",
+                                                             help="The licence under which you use the forecasts"),
+                                 source: str = typer.Option("ANALYST_CSV", help="A label for the file's source")):
+    """Analyst forecasts from a file you are licensed to use (v2.1). Columns: code, period, measure, low, high (or
+    value), issuer, published_date. Kept apart from management guidance; excluded from releases by default."""
+    from .expectations import import_analyst_forecasts_csv
+    try:
+        print(import_analyst_forecasts_csv(path, licence, source))
+    except ValueError as exc:
+        print(f"[red]{exc}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command("topology")
+def topology_cmd(codes: str = typer.Option(None, help="Comma-separated security codes"),
+                 industry: str = typer.Option(None, help="Or every company in a CSRC industry, e.g. C39"),
+                 start: str = typer.Option(..., help="First day of the span, e.g. 2021-01-01"),
+                 end: str = typer.Option(..., help="Last day of the span, e.g. 2024-12-31"),
+                 as_of: str = typer.Option(None, "--as-of", help="Only what was published by this date (default: today)"),
+                 expectations: str = typer.Option("guidance", help="guidance (management guidance) or analyst"),
+                 date_basis: str = typer.Option("published", help="Years placed by publication or by period"),
+                 top_holders: int = typer.Option(5, help="Shareholders shown per company"),
+                 include_licensed: bool = typer.Option(False, "--include-licensed",
+                                                       help="Include licensed rows (for your own use only)"),
+                 episode: str = typer.Option(None, help="A name for the view, e.g. semiconductors-2024"),
+                 out: str = typer.Option("topology", help="Output folder"),
+                 viewer: bool = typer.Option(True, "--viewer/--no-viewer", help="Write the offline viewer page")):
+    """The NVF topology view (v2.1): a graph snapshot of the companies over the span, with the observations behind
+    it, the layered chart (SVG and CSV) and the offline viewer (topology.html). Every line is a documented fact;
+    gaps are shown, not filled; natural persons are masked as in releases."""
+    from datetime import date as _date
+    from pathlib import Path
+    from .viz.snapshot import build_snapshot, codes_in_industry, SnapshotError
+    from .viz.export import export_snapshot
+    from .charts.layers import layers_chart
+    from .charts.builders import export_chart
+    init_db()
+    as_of = as_of or _date.today().isoformat()
+    picked = [c.strip() for c in (codes or "").split(",") if c.strip()]
+    if industry:
+        picked += codes_in_industry(industry, as_of)
+        if not picked:
+            print(f"[red]No company is classified in {industry} on {as_of}. Import industry classifications first "
+                  "(Research: 'Import industry classifications').[/red]")
+            raise typer.Exit(1)
+    kind = {"guidance": "MANAGEMENT_GUIDANCE", "analyst": "ANALYST_FORECAST"}.get(expectations.lower(),
+                                                                                  expectations.upper())
+    try:
+        snap = build_snapshot(picked, start, end, as_of=as_of, date_basis=date_basis, expectations=kind,
+                              top_holders=top_holders, include_licensed=include_licensed, episode=episode)
+    except SnapshotError as exc:
+        print(f"[red]{exc}[/red]")
+        raise typer.Exit(1)
+    r = export_snapshot(snap, out, viewer=viewer)
+    files = r["files"] + export_chart(layers_chart(snap), str(Path(out) / "layers"))
+    print(f"Topology: {len(picked)} compan{'y' if len(picked) == 1 else 'ies'}, {r['nodes']:,} nodes, "
+          f"{r['edges']:,} documented links, as of {as_of}")
+    for c in snap["coverage"]:
+        print(f"  {c['layer']:<13} {c['status']:<9} {c['note']}")
+    print({"folder": r["folder"], "files": [Path(f).name for f in files]})
+    if viewer:
+        print(f"Viewer: {Path(out) / 'topology.html'}")
+
+
 @app.command("chart")
 def chart_cmd(kind: str = typer.Argument(..., help="financials, segments, history, flags, price, segment-mix, "
                                                     "workforce, industry, peers, control, group-tree or interlocks"),

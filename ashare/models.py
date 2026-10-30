@@ -830,6 +830,43 @@ class AdjustmentFactor(Base):
     __table_args__ = (UniqueConstraint("company_id", "ex_date", "source", name="uq_adjustment_factor"),)
 
 
+class ExpectationObservation(Base):
+    """An expectation about one company's figure for one period (v2.1, plan workstream E2).
+
+    ``source_kind`` keeps the two sources apart, and nothing mixes them in one series:
+    * MANAGEMENT_GUIDANCE: the company's own earnings forecast (业绩预告) or flash report (业绩快报), a disclosed proxy
+      for expectations, read from the announcement;
+    * ANALYST_FORECAST: a broker's forecast, only by import from a licensed file, with the licence recorded.
+    A forecast gives a range (``low`` to ``high``); a flash report gives one figure (``low`` = ``high``)."""
+    __tablename__ = "expectation_observations"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    disclosure_id: Mapped[int | None] = mapped_column(ForeignKey("disclosures.id"), index=True)
+    source_kind: Mapped[str] = mapped_column(String(30), index=True)        # MANAGEMENT_GUIDANCE / ANALYST_FORECAST
+    document_kind: Mapped[str | None] = mapped_column(String(20))            # FORECAST / FLASH / IMPORT
+    reporting_period: Mapped[str] = mapped_column(String(20), index=True)
+    period_type: Mapped[str | None] = mapped_column(String(10))
+    measure: Mapped[str] = mapped_column(String(60), index=True)            # net_profit_parent, revenue, eps ...
+    low: Mapped[float | None] = mapped_column()
+    high: Mapped[float | None] = mapped_column()
+    change_low_pct: Mapped[float | None] = mapped_column()
+    change_high_pct: Mapped[float | None] = mapped_column()
+    prior_value: Mapped[float | None] = mapped_column()
+    direction: Mapped[str | None] = mapped_column(String(20))               # 预增, 预减, 扭亏, 首亏, 续亏 ...
+    unit: Mapped[str | None] = mapped_column(String(20))
+    issuer: Mapped[str | None] = mapped_column(String(200))                 # the company, or the broker
+    published_date: Mapped[str | None] = mapped_column(String(20), index=True)
+    source: Mapped[str] = mapped_column(String(100))
+    source_page: Mapped[int | None] = mapped_column(Integer)
+    licence: Mapped[str | None] = mapped_column(String(200))                # for imported forecasts
+    raw_value: Mapped[str | None] = mapped_column(Text)
+    extraction_method: Mapped[str] = mapped_column(String(50))
+    confidence: Mapped[float | None] = mapped_column()
+    retrieved_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    __table_args__ = (UniqueConstraint("company_id", "source_kind", "reporting_period", "measure", "issuer",
+                                       "published_date", "source", name="uq_expectation_observation"),)
+
+
 class PledgeEvent(Base):
     """A share pledge or release announced by a listed company (v1.8)."""
     __tablename__ = "pledge_events"

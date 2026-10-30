@@ -631,7 +631,6 @@ def extract_financials(security_code: str | None = None, kind: str = "reports", 
     seconds per document, an estimated finish) every 25 documents and at least once a minute. Each document
     read is marked with ``EXTRACTOR_VERSION``, so a stopped run continues with the next document; ``again``
     reads every document regardless."""
-    import time
     from .http import quiet_heartbeat
     say = progress or (lambda m: None)
     session = SessionLocal()

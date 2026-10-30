@@ -20,6 +20,7 @@ VERSIONS = {
     "human_capital": "human_capital-1",
     "subsidiaries": "subsidiaries-1",
     "roster": "roster-1",
+    "guidance": "guidance-1",            # v2.1: earnings forecasts and flash reports (plan E2)
 }
 
 

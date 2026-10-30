@@ -129,4 +129,6 @@ def network(spec: ChartSpec) -> list[dict]:
     return out
 
 
-DIAGRAMS = {"chain": chain, "tree": tree, "network": network}
+from .layers import layers  # noqa: E402  (v2.1: the NVF layered view)
+
+DIAGRAMS = {"chain": chain, "tree": tree, "network": network, "layers": layers}

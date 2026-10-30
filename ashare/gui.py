@@ -458,6 +458,40 @@ SECTIONS = [
            "command line). Writes per-event CARs, the average with t-statistic, and a chart."),
      ]},
 
+    {"id": "topology", "group": "Analyse", "title": "Topology",
+     "intro": "The NVF layers for a set of companies over a span of years: institutional coordination, productive "
+              "capability, corporate fundamentals, investor expectations and market valuation, with the documents "
+              "behind each item and the gaps where a layer has no data. Every line is a documented fact; a line is "
+              "not evidence that one thing caused another.",
+     "actions": [
+         A("Read guidance", "read-guidance", [
+             CODE_OPT(), F("again", "Read again", "bool", False, ("--again", None),
+                           "Also documents already read by this version.")],
+           "Earnings forecasts (业绩预告) and flash reports (业绩快报): downloads them first, then reads their ranges "
+           "and dates. Guidance is a disclosed proxy for expectations, not investors' expectations."),
+         A("Import analyst forecasts", "import-analyst-forecasts-csv", [
+             CSV_FILE, F("licence", "Licence", "text", "", "--licence",
+                         "The licence under which you use the forecasts, e.g. your terminal's terms", required=True),
+             F("source", "Source label", "text", "ANALYST_CSV", "--source")],
+           "Columns: code, period, measure, low, high (or value), issuer, published_date. Kept apart from guidance, "
+           "and left out of releases unless you include licensed data."),
+         A("Build the topology view", "topology", [
+             F("codes", "Companies", "text", "600519", "--codes", "Comma-separated codes"),
+             F("industry", "Or an industry", "text", "", "--industry", "A CSRC division, e.g. C39 (semiconductors)"),
+             F("start", "From", "date", "2021-01-01", "--start", required=True),
+             F("end", "To", "date", f"{int(TODAY[:4]) - 1}-12-31", "--end", required=True),
+             F("as_of", "As published by", "date", TODAY, "--as-of"),
+             F("expectations", "Expectations", "choice:guidance,analyst", "guidance", "--expectations"),
+             F("top_holders", "Shareholders shown", "integer", "5", "--top-holders"),
+             F("include_licensed", "Include licensed data", "bool", False, ("--include-licensed", None),
+               "Only for your own use."),
+             F("episode", "Name", "text", "", "--episode", "Optional, e.g. semiconductors-2024"),
+             F("out", "Folder", "folder", "topology", "--out")],
+           "Shows the layered chart here, and opens the interactive view (2D and 3D, with the evidence inspector) in "
+           "your browser. It works offline. The folder also holds the observations (CSV), the snapshot (JSON) and "
+           "a manifest.", after="open_topology"),
+     ]},
+
     {"id": "validate", "group": "Analyse", "title": "Validate",
      "intro": "Checks the data without changing it: accounting identities, capital reconciliation, figures that "
               "differ between reports (restatements), ownership consistency, and conflicts between sources.",
@@ -1340,6 +1374,11 @@ class App(tk.Tk):
             panel = (self.folder / "panels" / f"{vals.get('name') or 'panel'}.csv") if action["command"] == "build-panel" \
                 else None
             ExplorerWindow(self, str(panel) if panel and panel.exists() else None)
+        if code == 0 and action.get("after") == "open_topology":
+            m = re.search(r"Viewer:\s*(.+\.html)", out)
+            if m:
+                page = Path(m.group(1).strip())
+                webbrowser.open((page if page.is_absolute() else self.folder / page).resolve().as_uri())
         if code == 0 and action.get("after") == "open_report":
             m = re.search(r"(?:Report written|Report):\s*(.+\.html)", out)
             if m:
