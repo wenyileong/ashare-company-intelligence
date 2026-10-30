@@ -326,6 +326,9 @@ def dual_run(family: str, path: Path, meta: dict | None = None, text_pages: list
             r["_agreement"] = "AGREE"
             info["agree"] += 1
     info["secondary_only"] = sum(1 for k in by_key if k not in seen)
+    # v2.1 (finding 98): the rows only the other reading found, for a family that can check them (top-10 holders)
+    info["secondary_rows"] = [dict(r, _variant=secondary.name, _agreement="SINGLE") for k, r in by_key.items()
+                              if k not in seen]
     return records, info
 
 

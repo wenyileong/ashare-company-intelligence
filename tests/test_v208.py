@@ -396,8 +396,9 @@ def test_progress_line_counts_documents_not_readings():
 
 def test_extractor_versions_force_a_reread():
     from ashare.extractstate import VERSIONS
-    assert VERSIONS["top_holders"].endswith("-2") and VERSIONS["segments"].endswith("-2")
-    assert VERSIONS["control"].endswith("-2")
+    def n(k):
+        return int(VERSIONS[k].rsplit("-", 1)[1])
+    assert n("top_holders") >= 2 and n("segments") >= 2 and n("control") >= 2   # v2.1 raises top-10 to 3
 
 
 # --- D. segments and control (findings 83, 78, 89) ----------------------------------------------------------------

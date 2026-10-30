@@ -235,19 +235,73 @@ def parse_top10_tradable_pages(pages: list[str]) -> list[dict]:
     return out
 
 
+TOP10_SECTIONS = ["top10", "top10_tradable"]
+
+
+def merge_top10(primary: list[dict], extra: list[dict]) -> tuple[list[dict], int]:
+    """v2.1 (finding 98): add the rows only the other reading of the table found.
+
+    The two readings are matched by **share count**, not by name or rank: rank is the parser's own row counter, so
+    a reading that misses one row numbers every later row differently (review round 2). A row of the other reading
+    whose share count matches no kept row is added. The merged table must pass the checks of v2.0.7 (no more than
+    ten rows, each percentage between 0 and 100, the percentages adding up to no more than 100); otherwise the kept
+    reading alone is used. Ranks are then given by share count. Returns the rows and the number added."""
+    held = {r.get("shares") for r in primary if r.get("shares") is not None}
+    names = {re.sub(r"\s+", "", r.get("shareholder_name") or "") for r in primary}
+    added = []
+    for r in extra:
+        sh, pct = r.get("shares"), r.get("ownership_pct")
+        name = re.sub(r"\s+", "", r.get("shareholder_name") or "")
+        if sh is None or pct is None or not name or sh in held or name in names:
+            continue
+        added.append(dict(r, _added=True))
+        held.add(sh)
+        names.add(name)
+    if not added:
+        return primary, 0
+    merged = primary + added
+    pcts = [r.get("ownership_pct") for r in merged if r.get("ownership_pct") is not None]
+    if len(merged) > 10 or any(not 0 <= p <= 100 for p in pcts) or sum(pcts) > 100.5:
+        return primary, 0
+    merged.sort(key=lambda r: -(r.get("shares") or 0))
+    for k, r in enumerate(merged, 1):
+        r["rank"] = k
+    return merged, len(added)
+
+
+def parse_top_holders_job(job: dict, reader) -> dict:
+    """The reading half of :func:`extract_top_holders`, for :mod:`ashare.parallel` (no database)."""
+    from .parsers import dual_run
+    path = Path(job["path"])
+    rows, info = dual_run("top10", path, {"title": job["title"]}, reader=reader, sections=TOP10_SECTIONS)
+    rows, n_added = merge_top10(rows, info.pop("secondary_rows", []))
+    tradable, tinfo = dual_run("top10_tradable", path, {"title": job["title"]}, reader=reader,
+                               sections=TOP10_SECTIONS)
+    tinfo.pop("secondary_rows", None)
+    info["single_added"] = n_added
+    return {"rows": rows, "tradable": tradable, "info": info}
+
+
+def _tradable_for(r: dict, tmap: dict, tradable: list[dict]):
+    """The tradable-holder row for a top-10 row: by name, else (review round 2) by the unrestricted share count."""
+    t = tmap.get(r["shareholder_name"])
+    if t is None and r.get("shares") is not None:
+        free = r["shares"] - (r.get("restricted_shares") or 0)
+        t = next((x for x in tradable if x.get("tradable_shares") == free), None)
+    return t
+
+
 def extract_top_holders(security_code: str | None = None, again: bool = False, progress=None) -> dict:
     """Top-10 and top-10 tradable holders from downloaded periodic reports.
 
-    v2.0.8 (findings 76, 77 and 79): each report is opened once, and only the pages of the two shareholder tables
-    are read (:mod:`ashare.reportreader`); progress is shown in documents, and a stopped run continues with the
-    next report (:mod:`ashare.extractstate`). The extractor's version is new, so the first run re-reads every
-    report and completes the re-extraction that v2.0.7's layout fix needs."""
-    from .parsers import dual_run, record_confidence, extraction_note, tally_dual, PARSERS
+    v2.0.8 (findings 76, 77 and 79): only the pages of the two shareholder tables are read, with progress and resume.
+    v2.1: rows only one reading found are kept when the table still passes its checks (finding 98), and reports
+    are read in worker processes (:mod:`ashare.parallel`)."""
+    from .parsers import record_confidence, extraction_note, tally_dual, PARSERS
     from .extractstate import run
     init_db()
     s = SessionLocal()
-    totals = {"reports": 0, "holders": 0, "inserted": 0, "updated": 0, "errors": []}
-    sections = ["top10", "top10_tradable"]
+    totals = {"reports": 0, "holders": 0, "inserted": 0, "updated": 0, "single_added": 0, "errors": []}
     try:
         q = s.query(Disclosure, Company).join(Company, Disclosure.company_id == Company.id).filter(
             Disclosure.kind.in_(("annual_report", "interim_report", "quarterly_report")),
@@ -256,14 +310,13 @@ def extract_top_holders(security_code: str | None = None, again: bool = False, p
             q = q.filter(Company.security_code == str(security_code).zfill(6))
         from .financials import infer_period
 
-        def handle(d, c, reader):
-            path = Path(d.local_path)
+        def handle(d, c, res):
             period, _ = infer_period(d.title_cn or "", "", d.announcement_date)
             if not period:
                 return None
-            rows, info = dual_run("top10", path, {"title": d.title_cn}, reader=reader, sections=sections)
-            tradable, _ = dual_run("top10_tradable", path, {"title": d.title_cn}, reader=reader, sections=sections)
+            rows, tradable, info = res["rows"], res["tradable"], res["info"]
             tally_dual(totals, info, d.id)
+            totals["single_added"] += info.get("single_added", 0)
             # v2.0.7 (finding 68): rows an earlier parser read from this document, and that the current one
             # does not, are removed (with their review items), so a misread table does not linger.
             keep = {r["shareholder_name"] for r in rows}
@@ -294,19 +347,21 @@ def extract_top_holders(security_code: str | None = None, again: bool = False, p
                 for k in ("rank", "shares", "ownership_pct", "restricted_shares", "pledged_shares",
                           "change_shares", "shareholder_type", "shareholder_nature"):
                     setattr(row, k, r.get(k))
-                t = tmap.get(r["shareholder_name"])
+                t = _tradable_for(r, tmap, tradable)
                 row.tradable_shares = t["tradable_shares"] if t else None
                 row.disclosure_id, row.source_document = d.id, d.local_path or d.document_url
                 row.source_page, row.raw_text = r.get("page"), r.get("raw")
                 row.extraction_method = PARSERS[r["_variant"]].method
-                row.confidence = record_confidence(r, 0.55)
+                conf = record_confidence(r, 0.55)
+                row.confidence = min(conf, 0.45) if r.get("_added") else conf      # found by one reading only
                 row.extraction_note = extraction_note(r)
                 row.retrieved_at = utcnow()
                 totals["holders"] += 1
             return "READ"
 
         rows = q.order_by(Company.security_code, Disclosure.announcement_date, Disclosure.id).all()
-        return run("top_holders", rows, handle, totals, again, progress, s)
+        return run("top_holders", rows, handle, totals, again, progress, s,
+                   parse="ashare.control:parse_top_holders_job")
     finally:
         s.close()
 
@@ -570,6 +625,18 @@ def parse_control_text(pages: list[str]) -> dict:
     return out
 
 
+def _control_score(r):
+    return bool(r["actual_controller"]) + bool(r["controlling_shareholder"]) + bool(r["no_actual_controller"]) * 0.5
+
+
+def parse_control_job(job: dict, reader) -> dict | None:
+    """The reading half of :func:`extract_control`: both readings of the control pages, the one naming more
+    parties kept (the layout reading wins a tie)."""
+    readings = [parse_control_text(p) for p in (reader.pages("layout", ["control"]),
+                                                 reader.pages("text", ["control"])) if p]
+    return max(readings, key=_control_score) if readings else None
+
+
 def extract_control(security_code: str | None = None, again: bool = False, progress=None) -> dict:
     """Controlling shareholder, actual controller and ownership type from annual and interim reports.
 
@@ -586,19 +653,12 @@ def extract_control(security_code: str | None = None, again: bool = False, progr
         if security_code:
             q = q.filter(Company.security_code == str(security_code).zfill(6))
 
-        def score(r):
-            return (bool(r["actual_controller"]) + bool(r["controlling_shareholder"])
-                    + bool(r["no_actual_controller"]) * 0.5)
-
-        def handle(d, c, reader):
+        def handle(d, c, r):
             period, _ = infer_period(d.title_cn or "", "", d.announcement_date)
             if not period:
                 return None
-            readings = [parse_control_text(p) for p in (reader.pages("layout", ["control"]),
-                                                         reader.pages("text", ["control"])) if p]
-            if not readings:
+            if r is None:
                 return "EMPTY"
-            r = max(readings, key=score)          # stable: the layout reading wins a tie
             if not any(r[k] for k in ("controlling_shareholder", "actual_controller", "no_actual_controller")):
                 return "EMPTY"
             totals["reports"] += 1
@@ -623,7 +683,7 @@ def extract_control(security_code: str | None = None, again: bool = False, progr
             return "READ"
 
         rows = q.order_by(Company.security_code, Disclosure.announcement_date, Disclosure.id).all()
-        run("control", rows, handle, totals, again, progress, s)
+        run("control", rows, handle, totals, again, progress, s, parse="ashare.control:parse_control_job")
         totals["types"] = dict(totals["types"])
         return totals
     finally:

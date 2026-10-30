@@ -188,6 +188,14 @@ def _period(d: Disclosure) -> str | None:
     return f"{m.group(1)}-06-30" if "半年" in (d.title_cn or "") else f"{m.group(1)}-12-31"
 
 
+def parse_human_capital_job(job: dict, reader):
+    """The reading half of :func:`extract_human_capital` (v2.1: run in worker processes)."""
+    vals, info = dual_run("human_capital", Path(job["path"]), {"title": job["title"]}, reader=reader,
+                          sections=["human_capital"])
+    info.pop("secondary_rows", None)
+    return vals, info
+
+
 def extract_human_capital(security_code: str | None = None, again: bool = False, progress=None) -> dict:
     """R&D, workforce and patents from annual and interim reports (v2.0.8: targeted pages, progress, resume)."""
     from .extractstate import run
@@ -200,12 +208,11 @@ def extract_human_capital(security_code: str | None = None, again: bool = False,
         if security_code:
             q = q.filter(Company.security_code == str(security_code).zfill(6))
 
-        def handle(d, c, reader):
-            path, period = Path(d.local_path), _period(d)
+        def handle(d, c, res):
+            period = _period(d)
             if not period:
                 return None
-            vals, info = dual_run("human_capital", path, {"title": d.title_cn}, reader=reader,
-                                  sections=["human_capital"])
+            vals, info = res
             tally_dual(totals, info, d.id)
             totals["reports"] += 1
             for v in vals:
@@ -217,7 +224,8 @@ def extract_human_capital(security_code: str | None = None, again: bool = False,
             return "READ" if vals else "EMPTY"
 
         rows = q.order_by(Company.security_code, Disclosure.announcement_date, Disclosure.id).all()
-        return run("human_capital", rows, handle, totals, again, progress, session)
+        return run("human_capital", rows, handle, totals, again, progress, session,
+                   parse="ashare.human_capital:parse_human_capital_job")
     finally:
         session.close()
 

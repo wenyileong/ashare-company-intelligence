@@ -148,6 +148,14 @@ _FIELDS = ("relationship", "principal_place", "registered_place", "jurisdiction_
            "total_assets", "net_assets", "revenue", "net_profit")
 
 
+def parse_subsidiaries_job(job: dict, reader):
+    """The reading half of :func:`extract_subsidiaries` (v2.1: run in worker processes)."""
+    rows, info = dual_run("subsidiaries", Path(job["path"]), {"title": job["title"]}, reader=reader,
+                          sections=["subsidiaries"])
+    info.pop("secondary_rows", None)
+    return rows, info
+
+
 def extract_subsidiaries(security_code: str | None = None, again: bool = False, progress=None) -> dict:
     """Subsidiaries and associates from annual and interim reports (v2.0.8: targeted pages, progress, resume)."""
     from .extractstate import run
@@ -160,14 +168,12 @@ def extract_subsidiaries(security_code: str | None = None, again: bool = False, 
         if security_code:
             q = q.filter(Company.security_code == str(security_code).zfill(6))
 
-        def handle(d, c, reader):
-            path = Path(d.local_path)
+        def handle(d, c, res):
             m = re.search(r"(20\d{2})\s*年", d.title_cn or "")
             if not m:
                 return None
             obs_date = f"{m.group(1)}-06-30" if "半年" in (d.title_cn or "") else f"{m.group(1)}-12-31"
-            rows, info = dual_run("subsidiaries", path, {"title": d.title_cn}, reader=reader,
-                                  sections=["subsidiaries"])
+            rows, info = res
             tally_dual(totals, info, d.id)
             totals["reports"] += 1
             for r in rows:
@@ -194,7 +200,8 @@ def extract_subsidiaries(security_code: str | None = None, again: bool = False, 
             return "READ" if rows else "EMPTY"
 
         rows = q.order_by(Company.security_code, Disclosure.announcement_date, Disclosure.id).all()
-        return run("subsidiaries", rows, handle, totals, again, progress, session)
+        return run("subsidiaries", rows, handle, totals, again, progress, session,
+                   parse="ashare.group:parse_subsidiaries_job")
     finally:
         session.close()
 

@@ -206,8 +206,15 @@ def parse_statement_items(pages: list[str], unit_mult: float | None = None) -> l
     from .units import first_declared, last_declared
     found: dict[str, dict] = {}
     for st, pieces in statement_pages(pages).items():
-        for pno, text in pieces:
-            declared = last_declared(text) or first_declared(pages[pno - 1])
+        carried = None
+        for k, (pno, text) in enumerate(pieces):
+            # v2.1: a statement continued on the next page keeps the unit declared on its first page (banks state
+            # 百万元 once, under the heading); before its first piece, a declaration at the foot of the page
+            # before the heading applies, as in the unit rule of v2.0.8
+            declared = last_declared(text) or carried or first_declared(pages[pno - 1])
+            if declared is None and k == 0 and pno >= 2:
+                declared = last_declared(pages[pno - 2])
+            carried = declared or carried
             mult = unit_mult or (declared[1] if declared else 1.0)
             for raw in text.splitlines():
                 line = raw.replace("　", " ").strip()

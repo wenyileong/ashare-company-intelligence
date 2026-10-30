@@ -432,17 +432,44 @@ def reconcile_readings(facts: list[dict]) -> list[dict]:
     return facts
 
 
-def extract_document(company: Company, disclosure: Disclosure) -> list[dict]:
+SHORT_DOCUMENT_PAGES = 30
+
+
+def extract_document(company: Company, disclosure: Disclosure, reader=None) -> list[dict]:
     if not disclosure.local_path:
         return []
     path = Path(disclosure.local_path)
     if not path.exists():
         return []
+    return extract_path(path, disclosure.title_cn or "", disclosure.announcement_date, reader)
+
+
+def parse_financials_job(job: dict, reader) -> dict:
+    """The reading half of :func:`extract_financials`, for :mod:`ashare.parallel` (no database)."""
+    path = Path(job["path"])
+    facts = extract_path(path, job.get("title") or "", job.get("announcement_date"), reader)
+    by_section = (path.suffix.lower() == ".pdf" and getattr(reader, "n", 0) > SHORT_DOCUMENT_PAGES
+                  and not getattr(reader, "fallback_full", True))
+    return {"facts": facts, "by_section": by_section}
+
+
+def extract_path(path: Path, title: str, ann: str | None, reader=None) -> list[dict]:
+    """Facts from one document.
+
+    v2.1 (findings 101 and 107): with a ``reader`` (:class:`ashare.reportreader.ReportReader`), a long PDF is read
+    only on its key-figure and statement pages, with the cover, the employee and R&D pages, and the page before each
+    heading (``FINANCIAL_SECTIONS``). A document of 30 pages or fewer is read whole: announcements, flash reports
+    and forecasts carry their figures under other headings, and are quick to read whole (review round 1); so is a
+    long document in which none of the headings is found."""
     data = path.read_bytes()
     suffix = path.suffix.lower()
-    title = disclosure.title_cn or ""
-    ann = disclosure.announcement_date
     period, ptype = infer_period(title, "", ann)
+    sections = None
+    if reader is not None and suffix == ".pdf" and getattr(reader, "n", 0) > SHORT_DOCUMENT_PAGES:
+        from .reportreader import FINANCIAL_SECTIONS
+        sections = list(FINANCIAL_SECTIONS)
+    else:
+        reader = None
 
     facts = _xbrl_facts(data, suffix) if suffix in {".xml", ".xbrl", ".html", ".htm"} else []
     if facts:
@@ -473,7 +500,7 @@ def extract_document(company: Company, disclosure: Disclosure) -> list[dict]:
         # the variant and agreement are kept in extraction_note.
         from .parsers import dual_run, extraction_note
         facts, info = dual_run("financials", path, {"title": title, "announcement_date": ann,
-                                                    "fallback_period": period})
+                                                    "fallback_period": period}, reader=reader, sections=sections)
         for f in facts:
             conf = f.get("confidence") or 0.4
             if f.get("_agreement") == "AGREE":
@@ -488,7 +515,8 @@ def extract_document(company: Company, disclosure: Disclosure) -> list[dict]:
         from .parsers import record_confidence
         if facts:
             period, ptype = facts[0]["period"], facts[0]["period_type"]
-        items, _ = dual_run("statements", path, {"title": title, "announcement_date": ann})
+        items, _ = dual_run("statements", path, {"title": title, "announcement_date": ann}, reader=reader,
+                            sections=sections)
         for it in items:
             facts.append({
                 "metric": it["metric"], "metric_cn": CHART[it["metric"]]["labels"][0], "value": it["value"],
@@ -552,7 +580,7 @@ def persist_facts(company: Company, disclosure: Disclosure, facts: Iterable[dict
 
 
 # v2.0.6: raise when the extraction logic changes, so that documents are read again by the new version.
-EXTRACTOR_VERSION = "financials-2"   # v2.0.8: units, amounts, notices (findings 84 and 85)
+EXTRACTOR_VERSION = "financials-3"   # v2.0.8: units, amounts, notices (84, 85); v2.1: read by section (101)
 
 
 def _duration(seconds: float) -> str:
@@ -615,42 +643,55 @@ def extract_financials(security_code: str | None = None, kind: str = "reports", 
         say(f"{n:,} document(s) to read from {totals['companies']:,} companies"
             + (f"; {totals['already_read']:,} already read by this version are skipped (--again reads them too)"
                if totals["already_read"] else ""))
-        t0 = last = time.monotonic()
+        from .extractstate import Progress
+        from .http import check_cancel
+        from .parallel import imap
+        prog = Progress(n, say)
+        jobs, by_id = [], {}
+        for disclosure, company in todo:
+            if not Path(disclosure.local_path).exists():
+                totals["missing_files"] += 1
+                prog.step()
+                continue
+            jobs.append({"id": disclosure.id, "path": disclosure.local_path, "title": disclosure.title_cn,
+                         "announcement_date": disclosure.announcement_date})
+            by_id[disclosure.id] = (disclosure, company)
         with quiet_heartbeat():
-            for i, (disclosure, company) in enumerate(todo, 1):
-                if not Path(disclosure.local_path).exists():
-                    totals["missing_files"] += 1
-                else:
-                    try:
-                        facts = extract_document(company, disclosure)
-                        if Path(disclosure.local_path).suffix.lower() == ".pdf":
-                            # v2.0.8: a figure the current readers no longer produce from this document (one
-                            # misread before) is removed, so it does not linger beside the corrected one.
-                            keep = {(f.get("period"), f.get("period_type"), f["metric"], f.get("method"))
-                                    for f in facts}
-                            totals["stale_facts_removed"] = totals.get("stale_facts_removed", 0) + _remove_facts(
-                                session, [disclosure.id], keep)
-                            session.commit()
-                        if facts:
-                            result = persist_facts(company, disclosure, facts)
-                            totals["documents"] += 1
-                            totals["facts_inserted"] += result["inserted"]
-                            totals["facts_updated"] += result["updated"]
-                        else:
-                            totals["skipped"] += 1
-                        disclosure.extracted_version = EXTRACTOR_VERSION
-                        disclosure.extracted_at = utcnow()
+            # v2.1 (plan B3): documents are read in worker processes; this process writes and marks each result
+            for res in imap("ashare.financials:parse_financials_job", jobs, check=check_cancel):
+                disclosure, company = by_id[res["id"]]
+                if res.get("error"):
+                    totals["errors"].append({"code": company.security_code, "disclosure_id": disclosure.id,
+                                             "error": res["error"]})
+                    prog.step()
+                    continue
+                try:
+                    facts = res["result"]["facts"]
+                    if res["result"]["by_section"]:
+                        totals["read_by_section"] = totals.get("read_by_section", 0) + 1
+                    if Path(disclosure.local_path).suffix.lower() == ".pdf":
+                        # v2.0.8: a figure the current readers no longer produce from this document (one
+                        # misread before) is removed, so it does not linger beside the corrected one.
+                        keep = {(f.get("period"), f.get("period_type"), f["metric"], f.get("method"))
+                                for f in facts}
+                        totals["stale_facts_removed"] = totals.get("stale_facts_removed", 0) + _remove_facts(
+                            session, [disclosure.id], keep)
                         session.commit()
-                    except Exception as exc:
-                        session.rollback()
-                        totals["errors"].append({"code": company.security_code, "disclosure_id": disclosure.id,
-                                                 "error": repr(exc)})
-                now = time.monotonic()
-                if i % 25 == 0 or now - last >= 60 or i == n:
-                    each = (now - t0) / i
-                    left = f"; about {_duration(each * (n - i))} left" if i < n else ""
-                    say(f"  {i:,} of {n:,} documents; {each:.1f} s each{left}")
-                    last = now
+                    if facts:
+                        result = persist_facts(company, disclosure, facts)
+                        totals["documents"] += 1
+                        totals["facts_inserted"] += result["inserted"]
+                        totals["facts_updated"] += result["updated"]
+                    else:
+                        totals["skipped"] += 1
+                    disclosure.extracted_version = EXTRACTOR_VERSION
+                    disclosure.extracted_at = utcnow()
+                    session.commit()
+                except Exception as exc:
+                    session.rollback()
+                    totals["errors"].append({"code": company.security_code, "disclosure_id": disclosure.id,
+                                             "error": repr(exc)})
+                prog.step()
         return totals
     finally:
         session.close()

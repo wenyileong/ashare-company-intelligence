@@ -22,10 +22,10 @@ import json
 import re
 from pathlib import Path
 
-INDEX_VERSION = 1          # bump when SECTIONS changes, so cached indexes are rebuilt
+INDEX_VERSION = 2          # bump when SECTIONS changes, so cached indexes are rebuilt (v2.1: financial sections)
 
-# section -> (heading patterns, pages after the heading page that belong to it)
-SECTIONS: dict[str, tuple[tuple[str, ...], int]] = {
+# section -> (heading patterns, pages after the heading page that belong to it[, pages before it])
+SECTIONS: dict[str, tuple] = {
     "top10": (("前十名股东持股情况", "前10名股东持股情况", "前十名股东", "前10名股东"), 2),
     "top10_tradable": (("前十名无限售条件股东", "前10名无限售条件股东", "前十名流通股东", "前10名流通股东",
                         "前十名无限售流通股", "前10名无限售流通股"), 2),
@@ -36,7 +36,15 @@ SECTIONS: dict[str, tuple[tuple[str, ...], int]] = {
     "human_capital": (("研发投入", "研发人员", "员工情况", "员工数量", "专业构成", "教育程度", "专利"), 1),
     "subsidiaries": (("在子公司中的权益", "企业集团的构成", "主要控股参股公司", "主要子公司"), 2),
     "roster": (("董事、监事和高级管理人员", "董事、监事、高级管理人员", "董事和高级管理人员", "董事、高级管理人员"), 3),
+    # v2.1 (findings 101 and 107): financial extraction. The page before each heading is read too, because the unit
+    # rule of v2.0.8 looks at the figure's page and the page before (review round 1).
+    "fin_key": (("主要会计数据和财务指标", "主要财务数据", "主要会计数据"), 2, 1),
+    "fin_bs": (("合并资产负债表",), 3, 1),
+    "fin_is": (("合并利润表",), 3, 1),
+    "fin_cf": (("合并现金流量表",), 3, 1),
 }
+# Financial extraction reads these, the R&D and workforce pages (headline employees and R&D) and the cover (period).
+FINANCIAL_SECTIONS = ("cover", "fin_key", "fin_bs", "fin_is", "fin_cf", "human_capital")
 _WS = re.compile(r"\s+")
 
 
@@ -104,7 +112,8 @@ class ReportReader:
         found: dict[str, list[int]] = {name: [] for name in SECTIONS}
         for i in range(self.n):
             flat = _WS.sub("", self.fast_text(i))
-            for name, (pats, _) in SECTIONS.items():
+            for name, spec in SECTIONS.items():
+                pats = spec[0]
                 if any(p in flat for p in pats):
                     found[name].append(i)
         self._index = found
@@ -126,8 +135,11 @@ class ReportReader:
             if name not in SECTIONS:
                 continue
             after = SECTIONS[name][1]
+            before = SECTIONS[name][2] if len(SECTIONS[name]) > 2 else 0
             for i in idx.get(name, []):
-                hits.update(range(i, min(self.n, i + after + 1)))
+                hits.update(range(max(0, i - before), min(self.n, i + after + 1)))
+        if hits and "cover" in sections and self.n:
+            hits.add(0)                          # the cover, for the period when the title does not settle it
         return sorted(hits)
 
     # --- reading ------------------------------------------------------------------------------------------------

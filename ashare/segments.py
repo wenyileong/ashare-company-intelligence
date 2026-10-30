@@ -169,6 +169,13 @@ def _period_of(d: Disclosure) -> str | None:
     return f"{m.group(1)}-06-30" if "半年" in (d.title_cn or "") else f"{m.group(1)}-12-31"
 
 
+def parse_segments_job(job: dict, reader):
+    """The reading half of :func:`extract_segments` (v2.1: run in worker processes)."""
+    rows, info = dual_run("segments", Path(job["path"]), {"title": job["title"]}, reader=reader, sections=["segments"])
+    info.pop("secondary_rows", None)
+    return rows, info
+
+
 def extract_segments(security_code: str | None = None, again: bool = False, progress=None) -> dict:
     """Segments from annual and interim reports.
 
@@ -185,12 +192,11 @@ def extract_segments(security_code: str | None = None, again: bool = False, prog
         if security_code:
             q = q.filter(Company.security_code == str(security_code).zfill(6))
 
-        def handle(d, c, reader):
-            path = Path(d.local_path)
+        def handle(d, c, res):
             period = _period_of(d)
             if not period:
                 return None
-            rows, info = dual_run("segments", path, {"title": d.title_cn}, reader=reader, sections=["segments"])
+            rows, info = res
             tally_dual(totals, info, d.id)
             keep = {(r["dimension"], r["segment_name"]) for r in rows}
             for old in session.query(SegmentObservation).filter_by(company_id=c.id, disclosure_id=d.id):
@@ -225,7 +231,8 @@ def extract_segments(security_code: str | None = None, again: bool = False, prog
             return "READ"
 
         rows = q.order_by(Company.security_code, Disclosure.announcement_date, Disclosure.id).all()
-        return run("segments", rows, handle, totals, again, progress, session)
+        return run("segments", rows, handle, totals, again, progress, session,
+                   parse="ashare.segments:parse_segments_job")
     finally:
         session.close()
 

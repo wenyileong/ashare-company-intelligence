@@ -14,7 +14,7 @@ from pathlib import Path
 
 # Bump a version when its parser changes what it reads, so that a normal run re-reads every document.
 VERSIONS = {
-    "top_holders": "top10-2",            # v2.0.7 layouts; v2.0.8 targeted reading (finding 77: finish the re-read)
+    "top_holders": "top10-3",            # v2.1: rows found by one reading only, matched by share count (finding 98)
     "control": "control-2",              # v2.0.8: both exchanges' layouts (findings 78 and 89)
     "segments": "segments-2",            # v2.0.8: page breaks, subtotals, table kind (finding 83)
     "human_capital": "human_capital-1",
@@ -62,13 +62,19 @@ def mark(session, disclosure_id: int, extractor: str, outcome: str = "READ") -> 
     row.version, row.outcome, row.extracted_at = VERSIONS[extractor], outcome, utcnow()
 
 
-def run(extractor: str, rows, handle, totals: dict, again: bool = False, progress=None, session=None) -> dict:
-    """Run ``handle(disclosure, company, reader)`` over ``rows`` (disclosure, company) with resume and progress.
+def run(extractor: str, rows, handle, totals: dict, again: bool = False, progress=None, session=None,
+        parse: str | None = None) -> dict:
+    """Run an extractor over ``rows`` (disclosure, company) with resume and progress.
 
-    ``handle`` returns an outcome ('READ' or 'EMPTY'), or None when the document was not applicable (no file, no
-    period), which is not recorded so that it is tried again once it is. Errors are recorded in ``totals`` and not
-    marked, so a rerun tries the document again; ``again`` reads every document."""
-    from .http import quiet_heartbeat
+    Without ``parse``, ``handle(disclosure, company, reader)`` reads and writes each document in turn. With
+    ``parse`` (v2.1, "module:function"), the reading is done by ``parse(job, reader)``, in worker processes when
+    there are enough documents (:mod:`ashare.parallel`), and ``handle(disclosure, company, result)`` writes the
+    result in this process; only this process writes or marks anything.
+
+    ``handle`` returns an outcome ('READ' or 'EMPTY'), or None when the document was not applicable (no period),
+    which is not recorded so that it is tried again. Errors are recorded in ``totals`` and not marked, so a rerun
+    tries the document again; ``again`` reads every document."""
+    from .http import quiet_heartbeat, check_cancel
     from .reportreader import ReportReader
     say = progress or (lambda m: None)
     done = read_versions(session, extractor)
@@ -80,7 +86,41 @@ def run(extractor: str, rows, handle, totals: dict, again: bool = False, progres
         + (f"; {totals['already_read']:,} already read by this version are skipped (--again reads them too)"
            if totals["already_read"] else ""))
     prog = Progress(n, say)
+
+    def failed(d, exc):
+        session.rollback()
+        totals.setdefault("errors", []).append({"disclosure_id": d.id, "error": exc if isinstance(exc, str)
+                                                else repr(exc)})
+
     with quiet_heartbeat():
+        if parse is not None:
+            jobs, by_id = [], {}
+            for d, c in todo:
+                path = Path(d.local_path) if d.local_path else None
+                if path is None or not path.exists():
+                    totals["missing_files"] = totals.get("missing_files", 0) + 1
+                    prog.step()
+                    continue
+                jobs.append({"id": d.id, "path": str(path), "title": d.title_cn, "kind": d.kind,
+                             "announcement_date": d.announcement_date})
+                by_id[d.id] = (d, c)
+            from .parallel import imap
+            for res in imap(parse, jobs, check=check_cancel):
+                d, c = by_id[res["id"]]
+                if res.get("error"):
+                    failed(d, res["error"])
+                else:
+                    try:
+                        outcome = handle(d, c, res["result"])
+                        if outcome:
+                            mark(session, d.id, extractor, outcome)
+                        session.commit()
+                        if res.get("read_whole"):
+                            totals["read_whole"] = totals.get("read_whole", 0) + 1
+                    except Exception as exc:
+                        failed(d, exc)
+                prog.step()
+            return totals
         for d, c in todo:
             reader = None
             try:
@@ -96,11 +136,7 @@ def run(extractor: str, rows, handle, totals: dict, again: bool = False, progres
                     if reader.fallback_full:
                         totals["read_whole"] = totals.get("read_whole", 0) + 1
             except Exception as exc:
-                from .http import Cancelled
-                if isinstance(exc, Cancelled):
-                    raise
-                session.rollback()
-                totals.setdefault("errors", []).append({"disclosure_id": d.id, "error": repr(exc)})
+                failed(d, exc)
             finally:
                 if reader is not None:
                     reader.close()

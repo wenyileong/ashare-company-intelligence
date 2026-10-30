@@ -1,5 +1,7 @@
 """v2.0.6: listing dates in full, extraction with progress and resume, the last catalogue gaps
 (findings 35 to 57)."""
+from pathlib import Path
+
 import httpx
 import pytest
 
@@ -153,19 +155,23 @@ def test_extraction_reports_progress_and_continues_after_stop(company, tmp_path,
     from ashare import financials
     from ashare.http import Cancelled
     _three_reports(company, tmp_path)
-    real, calls = financials.extract_document, []
+    real, calls = financials.extract_path, []      # v2.1: the reading half, called once a document
 
-    def stop_on_second(c, d):
-        calls.append(d.announcement_id)
+    def rid(path):
+        return "R" + Path(path).stem[1:]
+
+    def stop_on_second(path, title, ann, reader=None):
+        calls.append(rid(path))
         if len(calls) == 2:
             raise Cancelled("stopped by the user; everything saved so far is kept")
-        return real(c, d)
-    monkeypatch.setattr(financials, "extract_document", stop_on_second)
+        return real(path, title, ann, reader)
+    monkeypatch.setattr(financials, "extract_path", stop_on_second)
     lines = []
     with pytest.raises(Cancelled):
         financials.extract_financials("600519", progress=lines.append)
     assert lines[0].startswith("3 document(s) to read")
-    monkeypatch.setattr(financials, "extract_document", lambda c, d: (calls.append(d.announcement_id), real(c, d))[1])
+    monkeypatch.setattr(financials, "extract_path",
+                        lambda path, title, ann, reader=None: (calls.append(rid(path)), real(path, title, ann, reader))[1])
     calls.clear()
     lines.clear()
     r = financials.extract_financials("600519", progress=lines.append)
