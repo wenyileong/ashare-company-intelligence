@@ -80,6 +80,7 @@ def cross_validate(security_code: str | None = None) -> dict:
     init_db()
     session = SessionLocal()
     counts: dict[str, int] = defaultdict(int)
+    checked: dict[str, int] = defaultdict(int)       # v2.1 (finding 108): what each check examined
     seen: set = set()
     try:
         cq = session.query(Company)
@@ -98,6 +99,7 @@ def cross_validate(security_code: str | None = None) -> dict:
             facts = session.query(FinancialFact).filter(FinancialFact.company_id == c.id).all()
 
             # Stage 1: provenance
+            checked["facts"] += len(facts)
             for f in facts:
                 if not f.source_document:
                     _flag(session, "MISSING_PROVENANCE", "ERROR", "financials", c.id, "financial_facts",
@@ -121,6 +123,7 @@ def cross_validate(security_code: str | None = None) -> dict:
                     continue
                 ordered = sorted(by_doc.values(), key=lambda r: (dates.get(r.disclosure_id) or "", r.id))
                 for a, b in zip(ordered, ordered[1:]):
+                    checked["document_pairs"] += 1
                     if _close(a.value, b.value):
                         continue
                     da, db = dates.get(a.disclosure_id) or "", dates.get(b.disclosure_id) or ""
@@ -153,6 +156,8 @@ def cross_validate(security_code: str | None = None) -> dict:
                 y = period[:4]
                 for p in (f"{y}-06-30", f"{y}-09-30"):
                     it = best.get((p, metric))
+                    if it and fy.value is not None and it.value is not None:
+                        checked["interim_annual_pairs"] += 1
                     if it and fy.value is not None and it.value is not None and fy.value > 0 \
                             and it.value > fy.value * 1.005:
                         _flag(session, "INTERIM_EXCEEDS_ANNUAL", "WARN", "financials", c.id, "financial_facts",
@@ -168,6 +173,7 @@ def cross_validate(security_code: str | None = None) -> dict:
             for o in session.query(OwnershipObservation).filter(OwnershipObservation.company_id == c.id):
                 cap = totals.get(o.observation_date)
                 if cap and o.shares and o.ownership_pct is not None:
+                    checked["ownership_rows"] += 1
                     implied = o.shares / cap.total_shares * 100
                     if abs(implied - o.ownership_pct) > 0.05:
                         _flag(session, "OWNERSHIP_PCT_INCONSISTENT", "WARN", "ownership", c.id,
@@ -283,6 +289,7 @@ def cross_validate(security_code: str | None = None) -> dict:
                     if not parts or not total:
                         continue
                     ssum = sum(x.revenue for x in parts)
+                    checked["segment_tables"] += 1
                     if abs(ssum - total) > max(abs(total) * 0.01, 1000.0):
                         _flag(session, "SEGMENT_SUM_MISMATCH", "WARN", "segments", c.id, "segment_observations",
                               [x.id for x in parts], {"period": period, "dimension": dim, "segment_sum": ssum,
@@ -405,6 +412,7 @@ def cross_validate(security_code: str | None = None) -> dict:
                                                                 OwnershipObservation.rank.isnot(None)):
                 by_date[(o.observation_date, o.source)].append(o)
             for (d, src), rows in by_date.items():
+                checked["top10_tables"] += 1
                 tot = sum(r.ownership_pct or 0 for r in rows)
                 if tot > 100.5:
                     _flag(session, "TOP_HOLDERS_EXCEED_100PCT", "ERROR", "ownership", c.id, "ownership_observations",
@@ -450,7 +458,8 @@ def cross_validate(security_code: str | None = None) -> dict:
                            "alternative": note.get("alternative")}, seen)
                     counts["PARSER_DISAGREEMENT"] += 1
         session.commit()
-        return {"companies": len(companies), "flags": dict(counts), "total_flags": sum(counts.values())}
+        return {"companies": len(companies), "flags": dict(counts), "total_flags": sum(counts.values()),
+                "checked": dict(checked)}
     finally:
         session.close()
 
@@ -471,6 +480,9 @@ def validate_all(security_code: str | None = None) -> dict:
     links = link_all(security_code)
     rec = reconcile_capital(security_code)
     cross = cross_validate(security_code)
+    checked = dict(cross.get("checked", {}))
+    checked["balance_sheets"] = fin.get("groups_checked", 0)
+    save_validation_summary(security_code, cross["companies"], checked, cross["flags"])
     return {
         "stage1_universe_problems": len(universe),
         "event_linking": links,
@@ -480,6 +492,57 @@ def validate_all(security_code: str | None = None) -> dict:
                                          | {"tradable": rec.get("tradable", {})},
         "stage3_4_cross_validation": cross,
     }
+
+
+# --- v2.1 (finding 108): findings as rates ----------------------------------------------------------------------
+
+SUMMARY_FILE = "validation_summary.json"
+
+# rule -> what it is a rate of (a key of the saved "checked" counts)
+RULE_BASIS = {
+    "EXTRACTION_DISCREPANCY": "document_pairs", "RESTATEMENT_OR_DISCREPANCY": "document_pairs",
+    "RESTATEMENT_EXPLAINED": "document_pairs", "CORRECTED_REPORT": "document_pairs",
+    "INTERIM_EXCEEDS_ANNUAL": "interim_annual_pairs", "OWNERSHIP_PCT_INCONSISTENT": "ownership_rows",
+    "SEGMENT_SUM_MISMATCH": "segment_tables", "TOP_HOLDERS_EXCEED_100PCT": "top10_tables",
+    "MISSING_PROVENANCE": "facts",
+}
+BASIS_LABELS = {"document_pairs": "document pairs compared", "interim_annual_pairs": "interim and annual pairs",
+                "ownership_rows": "holder rows checked", "segment_tables": "segment tables compared",
+                "top10_tables": "top-10 tables checked", "facts": "figures checked",
+                "balance_sheets": "balance sheets checked"}
+DISCREPANCY_RULES = ("EXTRACTION_DISCREPANCY", "RESTATEMENT_OR_DISCREPANCY", "RESTATEMENT_EXPLAINED", "CORRECTED_REPORT")
+
+
+def _scope_key(security_code: str | None) -> str:
+    return str(security_code).zfill(6) if security_code else "ALL"
+
+
+def save_validation_summary(security_code, companies: int, checked: dict, flags: dict, path=None) -> None:
+    """What 'Run all checks' examined, kept per scope (the whole database, or one company, kept apart; review
+    round 3), in ``validation_summary.json`` in the data folder."""
+    import json
+    from pathlib import Path
+    p = Path(path or SUMMARY_FILE)
+    try:
+        data = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+    except (OSError, ValueError):
+        data = {}
+    data.setdefault("scopes", {})[_scope_key(security_code)] = {
+        "run_at": str(utcnow())[:19], "companies": companies, "checked": checked, "flags": flags}
+    try:
+        p.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    except OSError:
+        pass                                     # the rates are a convenience; the findings are in the database
+
+
+def load_validation_summary(security_code=None, path=None) -> dict | None:
+    import json
+    from pathlib import Path
+    p = Path(path or SUMMARY_FILE)
+    try:
+        return json.loads(p.read_text(encoding="utf-8")).get("scopes", {}).get(_scope_key(security_code))
+    except (OSError, ValueError, AttributeError):
+        return None
 
 
 def show_flags(security_code: str | None = None, severity: str | None = None, rule: str | None = None):
@@ -516,10 +579,35 @@ def flag_summary(security_code: str | None = None, top: int = 20) -> dict:
     by_rule = Counter((f.rule, f.severity) for f in rows)
     by_company = Counter(codes.get(f.company_id, "") for f in rows if f.company_id)
     order = {"ERROR": 0, "WARN": 1, "INFO": 2}
-    return {"total": len(rows),
-            "by_rule": [{"rule": r, "severity": sv, "count": n}
-                        for (r, sv), n in sorted(by_rule.items(), key=lambda x: (order.get(x[0][1], 3), -x[1], x[0][0]))],
-            "by_company": [{"code": c, "count": n} for c, n in by_company.most_common(top)]}
+    saved = load_validation_summary(security_code)
+    checked = (saved or {}).get("checked", {})
+    out_rules = []
+    for (r, sv), n in sorted(by_rule.items(), key=lambda x: (order.get(x[0][1], 3), -x[1], x[0][0])):
+        row = {"rule": r, "severity": sv, "count": n, "of": None, "rate": None}
+        basis = RULE_BASIS.get(r)
+        if basis and checked.get(basis):
+            row["of"] = f"{checked[basis]:,} {BASIS_LABELS[basis]}"
+            row["rate"] = f"{n / checked[basis]:.1%}"
+        out_rules.append(row)
+    # v2.1 (finding 108): segment mismatches by size, discrepancies by pattern
+    bands = Counter()
+    patterns = Counter()
+    for f in rows:
+        try:
+            d = json.loads(f.details) if isinstance(f.details, str) else (f.details or {})
+        except ValueError:
+            d = {}
+        if f.rule == "SEGMENT_SUM_MISMATCH" and d.get("difference_pct") is not None:
+            x = abs(d["difference_pct"])
+            bands["within 10%" if x <= 10 else "within 50%" if x <= 50 else "beyond 50%"] += 1
+        elif f.rule in DISCREPANCY_RULES:
+            patterns[d.get("pattern") or "OTHER"] += 1
+    return {"total": len(rows), "by_rule": out_rules,
+            "by_company": [{"code": c, "count": n} for c, n in by_company.most_common(top)],
+            "checked": checked, "summary_saved": saved is not None, "summary_run_at": (saved or {}).get("run_at"),
+            "segment_bands": [{"size": k, "count": bands[k]} for k in ("within 10%", "within 50%", "beyond 50%")
+                              if bands[k]],
+            "discrepancy_patterns": [{"pattern": k, "count": n} for k, n in patterns.most_common()]}
 
 
 def flag_rows(security_code: str | None = None, severity: str | None = None, rule: str | None = None) -> list[dict]:

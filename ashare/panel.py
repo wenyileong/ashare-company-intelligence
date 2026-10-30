@@ -740,7 +740,34 @@ def build_panel(variables_: list[str] | None = None, unit: str = "year", start: 
     no_fin = sum(1 for r in rows if fin and all(r.get(n) is None for n in fin))
     return {"rows": rows, "params": params, "max_published": max_pub or None, "dropped": dict(dropped),
             "companies": len(companies), "periods": len(spec), "fiscal_years_not_ended": not_ended,
-            "rows_without_financials": no_fin}
+            "rows_without_financials": no_fin, "coverage": _coverage(rows, fin) if no_fin else None}
+
+
+def coverage_line(cov: dict) -> str:
+    line = (f"Financial figures exist for {cov['with_figures']:,} of {cov['companies']:,} companies; periodic reports "
+            f"are downloaded for {cov['with_reports']:,}.")
+    if cov["with_reports"] < cov["companies"]:
+        line += (" Download periodic reports ('Download documents', kind reports), then 'Extract figures from "
+                 "reports', to cover more.")
+    elif cov["with_figures"] < cov["with_reports"]:
+        line += " Run 'Extract figures from reports' to read the downloaded reports."
+    return line
+
+
+def _coverage(rows: list[dict], fin: list[str]) -> dict:
+    """v2.1 (finding 109): why rows have no figures. How many of the panel's companies have any financial figure in
+    it, and how many have downloaded periodic reports at all (figures come only from those)."""
+    from .disclosures import REPORT_KINDS
+    from .models import SessionLocal, Company, Disclosure
+    codes = {r["code"] for r in rows}
+    with_figures = {r["code"] for r in rows if any(r.get(n) is not None for n in fin)}
+    s = SessionLocal()
+    try:
+        with_reports = {c for (c,) in s.query(Company.security_code).join(Disclosure, Disclosure.company_id == Company.id)
+                        .filter(Disclosure.local_path.isnot(None), Disclosure.kind.in_(REPORT_KINDS)).distinct()}
+    finally:
+        s.close()
+    return {"companies": len(codes), "with_figures": len(with_figures), "with_reports": len(codes & with_reports)}
 
 
 _YEAR_RE = None
@@ -969,6 +996,7 @@ def write_panel(result: dict, out_dir: str, name: str = "panel", formats: tuple[
                 "max_published_date": result["max_published"], "dropped": result["dropped"],
                 "fiscal_years_not_ended": result.get("fiscal_years_not_ended", []),
                 "rows_without_financials": result.get("rows_without_financials", 0),
+                "coverage": result.get("coverage"),
                 "database_fingerprint": database_fingerprint(),
                 "files": {p.name: _sha(p) for p in files}}
     (out / f"{name}_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")

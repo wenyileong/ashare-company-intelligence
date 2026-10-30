@@ -557,7 +557,8 @@ def test_findings_summary_and_export(company, tmp_path):
         s.close()
     summ = flag_summary()
     assert summ["total"] == 4
-    assert summ["by_rule"][0] == {"rule": "SEGMENT_SUM_MISMATCH", "severity": "WARN", "count": 3}
+    assert {k: summ["by_rule"][0][k] for k in ("rule", "severity", "count")} == \
+        {"rule": "SEGMENT_SUM_MISMATCH", "severity": "WARN", "count": 3}
     assert summ["by_company"][0]["code"] == "600519"
     out = export_flags(str(tmp_path / "f.csv"))
     text = Path(out).read_text(encoding="utf-8-sig")

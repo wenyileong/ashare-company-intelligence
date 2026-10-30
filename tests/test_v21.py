@@ -563,3 +563,93 @@ def test_top10_row_with_its_name_above_the_figures_is_read():
     assert [(r["shareholder_name"], r["shares"]) for r in rows] == [("四川省示例投资集团有限公司", 756_330_000),
                                                                     ("黄军磊", 21_080_000)]
     assert rows[0]["shareholder_nature"] == "国有法人"
+
+
+# --- A4. Findings as rates (finding 108) ---------------------------------------------------------------------------
+
+def _two_reports_disagreeing(company):
+    from helpers import add_disclosure
+    from ashare.models import SessionLocal, Disclosure, FinancialFact, SegmentObservation
+    add_disclosure(company, "2025年年度报告", "2026-03-30", ann_id="A")
+    add_disclosure(company, "2026年第一季度报告", "2026-04-29", ann_id="B")
+    s = SessionLocal()
+    try:
+        a = s.query(Disclosure).filter_by(announcement_id="A").one().id
+        b = s.query(Disclosure).filter_by(announcement_id="B").one().id
+        for did, rev, assets in ((a, 1_000_000.0, 5_000.0), (b, 10_000_000_000.0, 5_000.0)):
+            for metric, v in (("revenue", rev), ("total_assets", assets)):
+                s.add(FinancialFact(company_id=company.id, disclosure_id=did, reporting_period="2025-12-31",
+                                    period_type="FY", metric=metric, value=v, extraction_method="PDF_TEXT_HEURISTIC",
+                                    source_document="x"))
+        for name, rev in (("甲", 600_000.0), ("乙", 300_000.0), ("合计", 1_000_000.0)):
+            s.add(SegmentObservation(company_id=company.id, disclosure_id=a, reporting_period="2025-12-31",
+                                     dimension="PRODUCT", segment_name=name, revenue=rev, is_total=name == "合计",
+                                     source="CNINFO", extraction_method="PDF_TEXT_HEURISTIC"))
+        s.commit()
+    finally:
+        s.close()
+
+
+def test_findings_are_given_as_rates_after_the_checks_are_run(company, tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+    from ashare.cli import app
+    from ashare.crossvalidation import flag_summary, load_validation_summary
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("COLUMNS", "200")
+    _two_reports_disagreeing(company)
+    from ashare.crossvalidation import cross_validate
+    cross_validate()                                   # findings recorded the v2.0.9 way: no saved summary
+    summ = flag_summary()
+    assert not summ["summary_saved"] and all(r["rate"] is None for r in summ["by_rule"])
+    r = CliRunner().invoke(app, ["show-flags"])
+    assert "Counts only: rates appear after" in r.output
+    r = CliRunner().invoke(app, ["validate-all"])
+    assert r.exit_code == 0, r.output
+    assert "document pairs compared" in r.output and "segment tables compared" in r.output
+    saved = load_validation_summary()
+    assert saved["checked"]["document_pairs"] == 2 and saved["checked"]["segment_tables"] == 1
+    summ = flag_summary()
+    rate = {x["rule"]: x for x in summ["by_rule"]}
+    assert rate["EXTRACTION_DISCREPANCY"]["rate"] == "50.0%" and "2 document pairs" in rate["EXTRACTION_DISCREPANCY"]["of"]
+    assert rate["SEGMENT_SUM_MISMATCH"]["rate"] == "100.0%"
+    assert summ["segment_bands"] == [{"size": "within 10%", "count": 1}]
+    assert summ["discrepancy_patterns"] == [{"pattern": "POWER_OF_TEN", "count": 1}]
+    r = CliRunner().invoke(app, ["show-flags"])
+    assert "rate" in r.output and "Segment mismatches by size" in r.output and "POWER_OF_TEN" in r.output
+
+
+def test_a_company_run_keeps_its_own_counts(company, tmp_path, monkeypatch):
+    """Review round 3: rates for the whole database are not taken from a one-company run."""
+    from ashare.crossvalidation import validate_all, load_validation_summary
+    monkeypatch.chdir(tmp_path)
+    _two_reports_disagreeing(company)
+    validate_all("600519")
+    assert load_validation_summary() is None and load_validation_summary("600519")["checked"]["document_pairs"] == 2
+    validate_all()
+    assert load_validation_summary()["companies"] == 1 and load_validation_summary("600519")
+
+
+# --- A5. Panel coverage (finding 109) ------------------------------------------------------------------------------
+
+def test_panel_names_how_many_companies_have_figures_and_reports(boards, tmp_path, monkeypatch):
+    from helpers import add_disclosure
+    from ashare.models import SessionLocal, Company
+    from ashare.panel import build_panel, coverage_line
+    s = SessionLocal()
+    try:
+        for c in s.query(Company):
+            c.status, c.listing_date = "LISTED", "2001-01-01"
+        s.commit()
+        c = s.query(Company).filter_by(security_code="600519").one()
+    finally:
+        s.close()
+    pdf = tmp_path / "r.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+    add_disclosure(c, "2025年年度报告", "2026-03-30", pdf, ann_id="R")
+    r = build_panel(["revenue"], "year", "2025-01-01", "2025-12-31", "fiscal")
+    cov = r["coverage"]
+    assert cov == {"companies": len({x["code"] for x in r["rows"]}), "with_figures": 0, "with_reports": 1}
+    line = coverage_line(cov)
+    assert line.startswith(f"Financial figures exist for 0 of {cov['companies']:,} companies; periodic reports are "
+                           "downloaded for 1.") and "Download periodic reports" in line
+    assert "Run 'Extract figures" in coverage_line({"companies": 1, "with_figures": 0, "with_reports": 1})

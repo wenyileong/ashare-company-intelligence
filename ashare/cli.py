@@ -731,7 +731,11 @@ def validate_all_cmd(security_code: str = typer.Option(None)):
          "result": f"{cross['total_flags']} flag(s) " + (_fmt(cross["flags"]) if cross["flags"] else "")},
     ]
     _table(rows, ["stage", "check", "result"], title="Validation summary")
-    print("Details: show-flags (findings never change the data).")
+    from .crossvalidation import BASIS_LABELS
+    checked = cross.get("checked", {})
+    if checked:
+        print("Checked: " + "; ".join(f"{n:,} {BASIS_LABELS.get(k, k)}" for k, n in sorted(checked.items()) if n))
+    print("Details: show-flags (findings never change the data; it gives each rule as a rate of what was checked).")
 
 
 @app.command("inspect-tables")
@@ -774,7 +778,17 @@ def show_flags_cmd(security_code: str = typer.Option(None), severity: str = type
     if not summ["total"]:
         print("No findings recorded. 'Run all checks' (validate-all) records them; they never change the data.")
         return
-    _table(summ["by_rule"], ["rule", "severity", "count"], title=f"Findings by rule ({summ['total']:,} in all)")
+    if summ["summary_saved"]:
+        _table(summ["by_rule"], ["rule", "severity", "count", "rate", "of"],
+               title=f"Findings by rule ({summ['total']:,} in all; rates from the checks run {summ['summary_run_at']} UTC)")
+    else:
+        _table(summ["by_rule"], ["rule", "severity", "count"], title=f"Findings by rule ({summ['total']:,} in all)")
+        print("[dim]Counts only: rates appear after 'Run all checks' (validate-all) is run again under v2.1"
+              + (" for this company" if security_code else "") + ".[/dim]")
+    if summ["segment_bands"]:
+        _table(summ["segment_bands"], ["size", "count"], title="Segment mismatches by size (sum against total)")
+    if summ["discrepancy_patterns"]:
+        _table(summ["discrepancy_patterns"], ["pattern", "count"], title="Differences between documents by pattern")
     _table(summ["by_company"], ["code", "count"], title="Companies with most findings")
     print("For the rows: --details, or --rule NAME, or --security-code CODE; --export file.csv writes them all.")
 
@@ -1711,7 +1725,7 @@ def build_panel_cmd(variables: str = typer.Option(None, help="Comma-separated (d
     """Build a research panel with a codebook and manifest.
 
     A panel with no rows is not written: the command says why and what to do, and exits with an error."""
-    from .panel import build_panel, write_panel, EmptyPanel
+    from .panel import build_panel, write_panel, EmptyPanel, coverage_line
     init_db()
     r = build_panel([v.strip() for v in variables.split(",")] if variables else None, unit, start, end, align,
                     pit_day, lag_days, as_of, [c.strip().zfill(6) for c in codes.split(",")] if codes else None,
@@ -1734,6 +1748,9 @@ def build_panel_cmd(variables: str = typer.Option(None, help="Comma-separated (d
     if r.get("rows_without_financials"):
         print(f"[yellow]{r['rows_without_financials']:,} of {len(r['rows']):,} rows have no financial figure at "
               "all.[/yellow]")
+        cov = r.get("coverage")                                           # v2.1, finding 109
+        if cov:
+            print(f"[yellow]{coverage_line(cov)}[/yellow]")
     ev = sum(1 for row in r["rows"] if row.get("universe_basis") == "REPORT_EVIDENCE")
     if ev:
         print(f"[yellow]{ev:,} of {len(r['rows']):,} rows include a company by report evidence (it published a "
