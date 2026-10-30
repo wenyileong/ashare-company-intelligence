@@ -7,7 +7,17 @@
 - "Read top-10 shareholders from reports" (complete, then rerun);
 - "Extract segments from reports" (complete).
 
-**Status:** findings only; no code has been changed since v2.0.9. Numbering continues from `docs/live_run_findings_v2.0.7.md` (findings 70 to 95).
+**Second log (findings 103 to 111), 30 October 2026, under v2.0.9.** It covers:
+- "Update the company list";
+- "Check the company list";
+- "Diagnose the quote list";
+- the catalogue to 30 October;
+- six stopped runs of "Extract figures from reports" (`--kind all`);
+- the live self-test;
+- "Run all checks";
+- a panel for fiscal year 2025.
+
+**Status:** findings only; no code has been changed since v2.0.9. The fixes are planned in `docs/plan_v2.0.10.md`. Numbering continues from `docs/live_run_findings_v2.0.7.md` (findings 70 to 95).
 
 ## Summary
 
@@ -19,6 +29,15 @@
 | 99 | The actual controller is now named in 257 of 292 reports (6 of 293 under v2.0.7) | Information (findings 78 and 89 answered) | Confirmed |
 | 100 | Segments: 600 reports in 10 minutes, 1.0 second each (51 seconds under v2.0.7); 561 with segments; 72 old rows removed | Information (finding 82 answered) | Confirmed; the sums to check with "Run all checks" |
 | 101 | Financial extraction still takes about 36 seconds a document, and `--kind all` gives it 1,511 documents, most of them announcements: about 14 hours | Medium (a long run, mostly for nothing) | Confirmed |
+| 103 | "Update the company list" works under v2.0.9; the listing history was rebuilt for 5,230 companies, and the 2025 panel now takes 5,162 of 5,181 rows from the listing record | Information (findings 92 and 96 closed) | Confirmed |
+| 104 | The Beijing Stock Exchange and B shares, enabled under Optional boards, are marked "in neither exchange's list" and have no listing dates | **High** (684 listed companies treated as delisted and left out of panels) | Confirmed from counts and the code |
+| 105 | Eastmoney answers again: the quote list (over HTTPS) and price histories | Information (finding 73: Eastmoney usable for now) | Confirmed |
+| 106 | The self-test showed only the last variant's error for the quote list, an HTTP address, although it tried all of them | Low (misleading) | Confirmed from the code |
+| 107 | Financial extraction ran six times with "all" for about 8.5 hours in all: 859 of 1,514 documents read, about 35 seconds each | Medium (finding 101 again) | Confirmed |
+| 108 | After the re-reads: balance sheets fail in 7.7% (11% before); discrepancies 260 and segment mismatches 345, both up, with many documents still unread | Medium (cannot be judged until extraction finishes) | Confirmed counts |
+| 109 | 5,011 of the 5,181 panel rows have no financial figure: reports are downloaded for 295 companies only | Information (coverage, not a fault) | Confirmed |
+| 110 | Corporate actions are now grouped (34,871) | Information (finding 90 closed) | Confirmed |
+| 111 | The ownership check covers 166 companies, with two failures | Information | Confirmed |
 | 102 | Resume works for the table extractors: the second control run skipped the 14 reports read before the stop, and the second top-10 run skipped all 905 | Information (finding 79 answered) | Confirmed |
 
 ## 96. "Update the company list" failed
@@ -79,14 +98,78 @@
 
 **Assessment.** As designed. The progress lines at uneven counts ("71 of 905", "4 of 600", "355 of 600") are the once-a-minute lines between every 25th document.
 
+## 103. The company list under v2.0.9
+
+**Evidence.** "Listing history rebuilt for 5,230 companies whose dates or status changed. Done after 307.3s". The 2025 panel: `'dropped': {'included_by_report_evidence': 19, 'excluded_no_listing_date': 1029, 'excluded_delisting_date_unknown': 6}`.
+
+**Assessment.** The fix of v2.0.9 works on the author's database. The panel now takes 5,162 of its 5,181 rows from the listing record, against 2 of 5,225 in finding 92. Status DELISTED rose from 165 to 386, because the delisting events now reach the companies' history.
+
+## 104. The Beijing Stock Exchange and B shares
+
+**Evidence.**
+- **Counts.** "Count by board": 608 BSE, 41 SSE B and 35 SZSE B companies. The author enabled both optional boards before this update.
+- **Status.** "872 in neither exchange's list (probably delisted …)".
+- **Listing dates.** "1029 companies have no listing date".
+
+**Assessment (from the code).**
+- **Which lists exist.** The exchanges' lists read since v2.0.7 cover the Shanghai main board and STAR, and Shenzhen's A shares. They do not cover the Beijing Stock Exchange or B shares.
+- **The fault.** v2.0.8 marks NOT_IN_EXCHANGE_LIST any company absent from the lists, whatever its board. So 684 listed BSE and B-share companies were marked so, and treated as delisted on an unknown date. 872 − 684 = 188 is the number of companies on the covered boards absent from the lists, as estimated in finding 71.
+- **No dates for them.** The quote list was not asked, because every company on the covered boards had a date. Its board filters do not include them either. They therefore have no listing dates, and make up about 684 of the 1,029 without one.
+- **The remedy.**
+  - The status applies only to the boards the lists cover.
+  - Listing dates for the optional boards come from the exchanges' B-share lists, and for the Beijing Stock Exchange from the quote list's BSE filter.
+
+## 105. Eastmoney answers again
+
+**Evidence.**
+- **Quote list.** "Diagnose the quote list": five of six variants answered with 5,563 securities, and page 11 answered; only the plain-HTTP variant was refused.
+- **Price histories.** The self-test's `eastmoney_daily_bars` passed (24 bars, latest 30 October).
+- **Later the same day.** The self-test's quote-list check failed (finding 106).
+
+**Assessment.** The refusal of finding 66 has lifted, at least at times. Price histories, which the backfill and "Download daily prices" use, answer. "Test price sources" will show whether Tencent answers too, so that a fallback can be chosen.
+
+## 106. The self-test's quote-list message
+
+**Evidence.** In the screenshot: "eastmoney_market_list FAIL HTTP 502 from http://push2.eastmoney.com/…".
+
+**Assessment (from `selftest.check_eastmoney_list`).**
+- **The fault.** When the variants fail in mixed ways (some refused, some disconnected), the check raises the last variant's error. That is the plain-HTTP one, so the message names an address the program does not normally use.
+- **What happened.** All six variants failed at 15:45 UTC: Eastmoney refused requests again for a time.
+- **The remedy.** The check should report every variant's result, as "Diagnose the quote list" does.
+
+## 107. Financial extraction, six runs
+
+**Evidence.** Six runs of `extract-financials --kind all`, each stopped by the author. They lasted 7,109, 3,708, 8,826, 7,508, 2,141 and 551 seconds, and read 859 of the 1,514 documents in all, at 30 to 98 seconds each.
+
+**Assessment.** Finding 101 again. Resume works: each run continued with the rest. Each run took hours, because every page is read, and announcements are read as well. Targeted reading for financial extraction is now the most useful single change (plan, workstream B).
+
+## 108. The checks after the re-reads
+
+**Evidence.**
+- **Balance sheets:** "groups_checked: 803, passed: 741, failed: 62".
+- **Findings:** "2415 flag(s) EXTRACTION_DISCREPANCY: 260, PARSER_DISAGREEMENT: 1790, SEGMENT_SUM_MISMATCH: 345, OWNERSHIP_TYPE_UNKNOWN: 10, CORRECTED_REPORT: 7, ACTUAL_CONTROLLER_CHANGED: 3".
+
+**Assessment.**
+- **Balance sheets.** Failures fell from 11% (finding 87) to 7.7%, on more balance sheets.
+- **Rising counts.** Discrepancies (174 to 260) and segment mismatches (248 to 345) rose, but so did what is checked: 655 documents have not yet been read by the new financial readers, and keep figures read by the old ones. A difference between an old and a new reading is counted until both are read again. Segments rose from 3,859 to 5,841 rows.
+- **Read as rates.** The counts can be judged only once extraction finishes, and as rates. The findings CSV (`show-flags --export`) gives the patterns (DIGITS_GLUED, POWER_OF_TEN) and the size of each segment difference.
+- **Corrected reports.** CORRECTED_REPORT (7) shows the same-day rule of finding 86 at work.
+
+## 109. Panel rows without financial figures
+
+**Evidence.** "5,011 of 5,181 rows have no financial figure at all", with `max_published_date: 2026-06-13`.
+
+**Assessment.** Financial figures come from downloaded reports, and reports are downloaded for 295 companies, so 170 rows have figures. This is coverage, not a fault. A whole-market panel with figures needs the periodic reports of every company downloaded: about 5,200 companies, three or four reports a year. That is a large download (tens of gigabytes a year) and, at today's pace, weeks of extraction. Targeted reading brings the extraction to days. The panel's warning should say how many companies have figures and how many have downloaded reports.
+
+## 110 and 111. Corporate actions and ownership
+
+"corporate_actions_grouped: 34871": the actions read after the checks in finding 90 are now grouped. "ownership_checked: 166, ownership_failed: 2": the top-10 tables of 166 companies pass the ownership check, with two exceptions. These are not findings but lines in the output of `validate-ownership` (for example "pledged > shares"), which names the company and date.
+
 ## What to do now
 
-1. If not done, install v2.0.9, then "Update the company list". If it fails, run `ashare-cli update-universe` in a command prompt and send the full error.
-2. Stop "Extract figures from reports" if it is still running with "all", and run it with "Reports: reports". Documents already read stay read.
-3. "Run all checks", then "Show findings", and send the summary.
-4. Run the query in finding 98 and attach two or three of the PDFs it lists.
+1. "Test price sources", and choose a source under Settings.
+2. Let "Extract figures from reports" wait for v2.0.10, which reads only the key-figure and statement pages. Or run it with "Reports: reports" now: documents already read stay read either way.
+3. Run the query in finding 98 and attach two or three of the PDFs it lists. Or, after v2.0.10, run `inspect-tables` on them (plan, workstream C).
+4. `show-flags --export exports/findings.csv` and attach the file, so that the differences can be measured by pattern and size.
 
-**For the next patch (proposed, v2.0.10):**
-1. Targeted reading for financial extraction (finding 101).
-2. The top-10 parser for the layouts the attached reports show; secondary-only rows to be kept when they pass the table checks (finding 98).
-3. The full error written to the run log for every failed action, so that a failure like finding 96 can be diagnosed from the log alone.
+The fixes for findings 96 to 111, with those still open from earlier, are planned in `docs/plan_v2.0.10.md`.
