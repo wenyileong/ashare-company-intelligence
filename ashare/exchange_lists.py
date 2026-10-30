@@ -38,6 +38,13 @@ SZSE_REFERER = "https://www.szse.cn/market/product/stock/list/index.html"
 # (key, name, minimum rows for the list to count as whole)
 LISTS = (("sse_main", "Shanghai main board", 1000), ("sse_star", "STAR Market", 300),
          ("szse_a", "Shenzhen A shares (main board and ChiNext)", 2000))
+# v2.1 (finding 104): the B-share lists, read when B shares are enabled (Settings > Optional boards). The parameters
+# are those of the exchanges' own list pages; "Update the company list" reports what each returned.
+B_LISTS = (("sse_b", "Shanghai B shares", 20), ("szse_b", "Shenzhen B shares", 20))
+# Which boards a list read whole covers: a company on one of them and absent from the list is not listed there.
+COVERS = {"sse_main": ("SSE_MAIN",), "sse_star": ("STAR",), "szse_a": ("SZSE_MAIN", "CHINEXT"),
+          "sse_b": ("SSE_B",), "szse_b": ("SZSE_B",)}
+LISTED_BOARDS = {b for v in COVERS.values() for b in v}     # boards that have an exchange list at all
 _NS = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
 
 
@@ -106,13 +113,16 @@ def _code(v) -> str | None:
     return t.zfill(6) if t.isdigit() and len(t) <= 6 else None
 
 
-def parse_sse(payload: dict) -> list[dict]:
+def parse_sse(payload: dict, b_share: bool = False) -> list[dict]:
     out = []
+    keys = (("B_STOCK_CODE", "SECURITY_CODE_B", "B_SHARE_CODE") if b_share else
+            ("A_STOCK_CODE", "SECURITY_CODE_A", "COMPANY_CODE"))
     for r in (payload or {}).get("result") or []:
-        code = _code(r.get("A_STOCK_CODE") or r.get("SECURITY_CODE_A") or r.get("COMPANY_CODE"))
+        code = _code(next((r.get(k) for k in keys if r.get(k) and str(r.get(k)).strip() not in ("-", "")), None))
         if code:
             out.append({"code": code, "name": r.get("COMPANY_ABBR") or r.get("SEC_NAME_CN"),
-                        "listing_date": normalise_listing_date(r.get("LIST_DATE"))})
+                        "listing_date": normalise_listing_date(r.get("LIST_DATE_B") if b_share and r.get("LIST_DATE_B")
+                                                               else r.get("LIST_DATE"))})
     return out
 
 
@@ -127,7 +137,8 @@ def parse_szse(content: bytes) -> list[dict]:
             if n in head:
                 return head.index(n)
         return None
-    ci, ni, di = col("A股代码", "证券代码"), col("A股简称", "证券简称"), col("A股上市日期", "上市日期")
+    ci, ni, di = (col("A股代码", "B股代码", "证券代码"), col("A股简称", "B股简称", "证券简称"),
+                  col("A股上市日期", "B股上市日期", "上市日期"))
     if ci is None or di is None:
         raise ValueError(f"unexpected columns in the Shenzhen list: {head[:8]}")
     out = []
@@ -144,9 +155,19 @@ class ExchangeListing(dict):
     lists: dict = {}
     complete = False
 
+    @property
+    def covered(self) -> set:
+        """Boards whose list was read whole in this run (v2.1)."""
+        return {b for k, v in (self.lists or {}).items() if v.get("whole") for b in COVERS.get(k, ())}
 
-def exchange_listing_info(client: RateLimitedClient | None = None, store: bool = True) -> ExchangeListing:
-    """Listing dates from the exchanges' stock lists (three requests). A list that fails is reported, not raised."""
+
+def exchange_listing_info(client: RateLimitedClient | None = None, store: bool = True,
+                          b_shares: bool | None = None) -> ExchangeListing:
+    """Listing dates from the exchanges' stock lists (three requests; five with B shares enabled). A list that fails
+    is reported, not raised."""
+    if b_shares is None:
+        from .universe import enabled_optional_boards
+        b_shares = "B_SHARE" in enabled_optional_boards()
     from .storage import store_raw
     own = client is None
     client = client or RateLimitedClient(USER_AGENT, REQUESTS_PER_SECOND, retries=2)
@@ -162,10 +183,11 @@ def exchange_listing_info(client: RateLimitedClient | None = None, store: bool =
                 out[r["code"]] = {"name": r["name"], "listing_date": r["listing_date"], "source": key}
 
     try:
-        for key, name, minimum in LISTS:
+        for key, name, minimum in LISTS + (B_LISTS if b_shares else ()):
             try:
                 if key.startswith("sse"):
-                    params = {"STOCK_TYPE": "1" if key == "sse_main" else "8", "REG_PROVINCE": "", "CSRC_CODE": "",
+                    params = {"STOCK_TYPE": {"sse_main": "1", "sse_star": "8", "sse_b": "2"}[key],
+                              "REG_PROVINCE": "", "CSRC_CODE": "",
                               "STOCK_CODE": "", "sqlId": "COMMON_SSE_CP_GPJCTPZ_GPLB_GP_L",
                               "COMPANY_STATUS": "2,4,5,7,8", "type": "inParams", "isPagination": "true",
                               "pageHelp.cacheSize": "1", "pageHelp.beginPage": "1", "pageHelp.pageSize": "10000",
@@ -173,9 +195,9 @@ def exchange_listing_info(client: RateLimitedClient | None = None, store: bool =
                     r = client.get(SSE_URL, params=params, headers={"Referer": SSE_REFERER})
                     if store:
                         store_raw("SSE", str(r.url), r.content, {"content_type": "application/json", "list": key})
-                    rows = parse_sse(r.json())
+                    rows = parse_sse(r.json(), b_share=key == "sse_b")
                 else:
-                    params = {"SHOWTYPE": "xlsx", "CATALOGID": "1110", "TABKEY": "tab1"}
+                    params = {"SHOWTYPE": "xlsx", "CATALOGID": "1110", "TABKEY": "tab2" if key == "szse_b" else "tab1"}
                     r = client.get(SZSE_URL, params=params, headers={"Referer": SZSE_REFERER})
                     if store:
                         store_raw("SZSE", str(r.url), r.content, {"content_type": "application/vnd.openxmlformats-"

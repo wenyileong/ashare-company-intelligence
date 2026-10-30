@@ -764,6 +764,12 @@ def run_command(argv: list[str], stream=None) -> tuple[int, str]:
             else:
                 from .errors import friendly_error
                 print(friendly_error(exc))
+            if not callable(msg):
+                # v2.1 (finding 96): the full error goes to a file named in the output and so in the run log
+                from .errors import write_error_file
+                path = write_error_file(exc, argv)
+                if path:
+                    print(f"Full error: {path}")
     buf.flush_pending()
     return code, buf.getvalue()
 

@@ -43,16 +43,49 @@ def enrich_listing_status(info: dict | None = None) -> dict:
             except Exception as exc:   # the universe itself is still usable
                 info, note = {}, f"listing dates not fetched: {type(exc).__name__}: {exc}"
     complete = getattr(info, "complete", len(info) > 3000)
+    # v2.1 (finding 104): the optional boards. The exchanges' A-share lists do not cover the Beijing Stock Exchange
+    # (and the B shares only when their lists are read), and the companies there were never in "missing" above, so
+    # the quote list was never asked for them. It is now asked for each enabled optional board that has undated
+    # companies, that board alone.
+    from .exchange_lists import LISTED_BOARDS
+    from .universe import enabled_optional_boards
+    optional_boards = {"BSE": {"BSE"}, "B_SHARE": {"SSE_B", "SZSE_B"}}
+    extra: dict = {}
+    extra_complete: set = set()
+    extra_notes: list[str] = []
+    if exchanges is not None or info:
+        s = SessionLocal()
+        try:
+            undated = [(c.board, c.security_code) for c in s.query(Company.board, Company.security_code,
+                                                                   Company.listing_date) if not c.listing_date]
+        finally:
+            s.close()
+        for name in sorted(enabled_optional_boards()):
+            need = [code for b, code in undated if b in optional_boards[name]
+                    and not ((exchanges or {}).get(code) or {}).get("listing_date")]
+            if not need:
+                continue
+            try:
+                from .quotelist import listing_info
+                got = listing_info(board=name)
+                extra.update(got)
+                if got.complete:
+                    extra_complete |= optional_boards[name]
+                if getattr(got, "note", None):
+                    extra_notes.append(f"{name}: {got.note}")
+            except Exception as exc:      # never stops the update
+                extra_notes.append(f"{name}: quote list not read ({type(exc).__name__}: {exc})")
+    covered = exchanges.covered if exchanges is not None else set()
     s = SessionLocal()
     counts = {"LISTED": 0, "DELISTED": 0, "NOT_IN_QUOTE_LIST": 0, "NOT_IN_EXCHANGE_LIST": 0,
               "listing_dates_added": 0, "listing_dates_by_source": {"exchanges": 0, "quote_list": 0}}
-    lists_whole = exchanges is not None and bool(exchanges.complete)
+    a_boards = {"SSE_MAIN", "STAR", "SZSE_MAIN", "CHINEXT"}
     changed: list[str] = []
     try:
         for c in s.query(Company):
             before = (c.listing_date, c.status)
             ex = (exchanges or {}).get(c.security_code)
-            row = info.get(c.security_code)
+            row = info.get(c.security_code) or extra.get(c.security_code)
             if ex and ex.get("listing_date") and not c.listing_date:
                 c.listing_date = ex["listing_date"]
                 counts["listing_dates_added"] += 1
@@ -66,11 +99,17 @@ def enrich_listing_status(info: dict | None = None) -> dict:
                     c.status = "LISTED"
             elif looks_delisted(c.short_name_cn):
                 c.status = "DELISTED"
-            elif lists_whole:
-                # v2.0.8 (finding 71): in neither exchange's whole list, and not named as delisted. Since v2.0.7 the
-                # quote list is skipped when the exchange lists are whole, so NOT_IN_QUOTE_LIST was never set.
+            elif c.board in covered:
+                # v2.0.8 (finding 71): absent from its own board's list, read whole in this run, and not named as
+                # delisted. v2.1 (finding 104): only on the evidence of the company's own board's list.
                 c.status = "NOT_IN_EXCHANGE_LIST"
-            elif complete:
+            elif c.status == "NOT_IN_EXCHANGE_LIST" and c.board not in LISTED_BOARDS:
+                # v2.1 (finding 104): v2.0.8 and v2.0.9 marked companies on boards with no exchange list (the
+                # Beijing Stock Exchange); the mark is undone. A board whose list failed this run is left alone.
+                c.status = "LISTED"
+            elif complete and c.board in a_boards:
+                c.status = "NOT_IN_QUOTE_LIST"
+            elif c.board in extra_complete:
                 c.status = "NOT_IN_QUOTE_LIST"
             if c.status in counts:
                 counts[c.status] += 1
@@ -104,6 +143,17 @@ def enrich_listing_status(info: dict | None = None) -> dict:
                                       "listing history' (rebuild-security-history)")
     else:
         counts["history_rebuilt"] = 0
+    if extra_notes:
+        counts["optional_board_notes"] = extra_notes
+    s = SessionLocal()
+    try:
+        by_board: dict = {}
+        for c in s.query(Company.board, Company.listing_date, Company.status):
+            if not c.listing_date and c.status in ("LISTED", None):
+                by_board[c.board or "?"] = by_board.get(c.board or "?", 0) + 1
+        counts["undated_listed_by_board"] = by_board
+    finally:
+        s.close()
     if exchanges is not None:
         from .exchange_lists import summary
         counts["exchange_lists"] = summary(exchanges)
@@ -116,6 +166,9 @@ def enrich_listing_status(info: dict | None = None) -> dict:
         counts["note"] = f"quote list incomplete ({len(info)} rows); 'not in the quote list' not set"
     counts["quote_list_complete"] = bool(complete)
     counts["quote_list_used"] = info is not None and (bool(info) or getattr(info, "note", None) is not None)
+    if extra:
+        counts["quote_list_used"] = True
+        counts["optional_board_dates"] = len(extra)
     return counts
 
 

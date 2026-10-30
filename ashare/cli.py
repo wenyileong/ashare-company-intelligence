@@ -162,6 +162,12 @@ def update_universe_cmd(
           + (f" Note: {st['note']}" if st.get("note") else ""))
     if st.get("history_note"):
         print(f"[yellow]Note: {st['history_note']}.[/yellow]")
+    for n in st.get("optional_board_notes") or []:              # v2.1 (finding 104)
+        print(f"[yellow]Optional board: {n}[/yellow]")
+    und = st.get("undated_listed_by_board") or {}
+    if und:
+        print("Listed companies still without a listing date, by board: "
+              + ", ".join(f"{b} {n:,}" for b, n in sorted(und.items())))
 
 
 @app.command("validate-universe")

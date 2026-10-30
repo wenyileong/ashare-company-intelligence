@@ -30,3 +30,24 @@ def friendly_error(exc: BaseException) -> str:
     if httpx is not None and isinstance(exc, httpx.TimeoutException):
         return f"{base}\nThe source did not answer in time. Try again later."
     return base
+
+
+def write_error_file(exc: BaseException, argv: list[str] | None = None) -> str | None:
+    """v2.1 (finding 96): the full error, with its traceback, in ``logs/error_<time>.txt``; returns the path.
+    A failure can then be diagnosed from the file, where the screen shows only a one-line message."""
+    import os
+    import traceback
+    from datetime import datetime
+    from pathlib import Path
+    try:
+        folder = Path(os.getenv("ASHARE_LOG_DIR", "logs"))
+        folder.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+        path = folder / f"error_{stamp}.txt"
+        from . import __version__
+        head = f"ashare {__version__}\ncommand: {' '.join(argv or [])}\n\n"
+        path.write_text(head + "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)),
+                        encoding="utf-8")
+        return str(path)
+    except Exception:
+        return None

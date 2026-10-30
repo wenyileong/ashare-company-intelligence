@@ -214,12 +214,12 @@ def check_eastmoney_list(client) -> dict:
             total = data.get("total") or len(rows)
             note = f" (variant '{name}'; refused: {'; '.join(failures)})" if failures else ""
             return _result(check, "PASS" if total > 3000 else "WARN", f"{total} securities listed{note}")
-        if all("HTTP" in f for f in failures):
-            return _result(check, "FAIL", "every request variant was refused: " + "; ".join(failures)
-                           + ". Panels by date need listing dates; see 'Diagnose the quote list'.")
-        if last is not None:
-            raise last
-        return _result(check, "FAIL", "; ".join(failures))
+        # v2.1 (finding 106): every variant's result, not only the last one's (which named the plain-HTTP address)
+        if all("HTTP" in f for f in failures) or (last is not None and not _unreachable(last)) or last is None:
+            return _result(check, "FAIL", "no request variant answered: " + "; ".join(failures)
+                           + ". Eastmoney may be refusing requests from this network for a while; 'Diagnose the "
+                             "quote list' tries again and says which variant answers.")
+        raise last
     return _call(check, run)
 
 

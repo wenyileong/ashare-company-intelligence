@@ -31,9 +31,10 @@ def main():
         except Exception as exc:  # concise message instead of a traceback
             if os.getenv("ASHARE_DEBUG"):
                 raise
-            from .errors import friendly_error
+            from .errors import friendly_error, write_error_file
             print(friendly_error(exc), file=sys.stderr)
-            print("Set ASHARE_DEBUG=1 for the full traceback.", file=sys.stderr)
+            path = write_error_file(exc, sys.argv[1:])
+            print(f"Full error: {path}" if path else "Set ASHARE_DEBUG=1 for the full traceback.", file=sys.stderr)
             sys.exit(1)
     else:
         from .gui import run

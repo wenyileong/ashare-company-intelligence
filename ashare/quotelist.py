@@ -366,7 +366,7 @@ def _part_complete(part: dict) -> bool:
 
 
 def fetch_pages(fields: str, kind: str, progress=None, max_pages: int = 400, use_cache: bool = True,
-                min_rows: int = COMPLETE_MIN) -> dict:
+                min_rows: int = COMPLETE_MIN, fs: str | None = None, boards=None) -> dict:
     """Every page of the quote list for ``fields``, resuming from today's cache.
 
     Returns ``{"rows": [...], "total": n, "complete": bool, "pages": k, "expected_pages": m,
@@ -374,7 +374,12 @@ def fetch_pages(fields: str, kind: str, progress=None, max_pages: int = 400, use
     today are not fetched again; a failure stops that query but keeps what was fetched.
 
     v2.0.6: when the whole list stops part-way, it is read one board at a time in both code orders
-    (see the module notes), and the rows are merged by code."""
+    (see the module notes), and the rows are merged by code.
+
+    v2.1 (finding 104): ``fs`` and ``boards`` read another set of boards, for example the Beijing Stock Exchange
+    alone, which the exchanges' lists do not cover."""
+    fs = fs or FS
+    boards = BOARD_FS if boards is None else boards
     path = _cache_path(kind)
     cache = {"pages": {}, "total": None, "page_size": None, "parts": {}, "row_cap": None}
     if use_cache:
@@ -402,7 +407,7 @@ def fetch_pages(fields: str, kind: str, progress=None, max_pages: int = 400, use
     try:
         cap = cache.get("row_cap")
         # A limit confirmed earlier today is tried once more: if the page beyond it now answers, it is dropped.
-        error = _read_query(pager, cache, FS, 1, save, ref, progress, "", max_pages,
+        error = _read_query(pager, cache, fs, 1, save, ref, progress, "", max_pages,
                             late_tries=1 if cap is not None else 2)
         size = cache.get("page_size")
         if cap is not None and size and _contiguous(cache) * size > cap:
@@ -420,7 +425,7 @@ def fetch_pages(fields: str, kind: str, progress=None, max_pages: int = 400, use
             size = cache.get("page_size")
             candidate = _contiguous(cache) * size if size else None
             parts_used = True
-            for code, fs, name in BOARD_FS:
+            for code, bfs, name in boards:
                 codes: set = set()
                 btotal = None
                 for po in ORDERS:
@@ -429,7 +434,7 @@ def fetch_pages(fields: str, kind: str, progress=None, max_pages: int = 400, use
                     part = cache["parts"].setdefault(f"{code}:{po}", {"pages": {}, "total": None,
                                                                        "page_size": None, "error": None})
                     label = f" ({name}, {'descending' if po else 'ascending'})"
-                    err = _read_query(pager, part, fs, po, save, ref, progress, label, max_pages,
+                    err = _read_query(pager, part, bfs, po, save, ref, progress, label, max_pages,
                                       row_cap=cache.get("row_cap"), late_tries=1)
                     if err and part.get("failed_page"):
                         before = (part["failed_page"] - 1) * (part.get("page_size") or 0)
@@ -439,7 +444,7 @@ def fetch_pages(fields: str, kind: str, progress=None, max_pages: int = 400, use
                             ref.ok()                                # explained by the limit, not a refusal
                             save()
                         else:                                       # a different stop: try that page again
-                            _read_query(pager, part, fs, po, save, ref, progress, label, max_pages,
+                            _read_query(pager, part, bfs, po, save, ref, progress, label, max_pages,
                                         row_cap=cache.get("row_cap"), late_tries=MAX_REFUSALS)
                     btotal = part.get("total") if part.get("total") is not None else btotal
                     codes |= {str(r.get("f12")) for r in _rows(part)}
@@ -452,7 +457,7 @@ def fetch_pages(fields: str, kind: str, progress=None, max_pages: int = 400, use
     for r in _rows(cache):
         merged[str(r.get("f12"))] = r
     board_info = {}
-    for code, fs, name in BOARD_FS:
+    for code, bfs, name in boards:
         codes, btotal, berr = set(), None, None
         for po in ORDERS:
             part = cache["parts"].get(f"{code}:{po}")
@@ -473,7 +478,7 @@ def fetch_pages(fields: str, kind: str, progress=None, max_pages: int = 400, use
     size = cache["page_size"] or 100
     expected_pages = math.ceil(total / size) if total else None
     whole_complete = _part_complete(cache) and bool(expected_pages)
-    boards_complete = len(board_info) == len(BOARD_FS) and all(b["complete"] for b in board_info.values())
+    boards_complete = len(board_info) == len(boards) and all(b["complete"] for b in board_info.values())
     complete = (whole_complete or boards_complete) and len({str(r.get("f12")) for r in rows}) >= min_rows
     return {"rows": rows, "total": total, "complete": complete, "pages": len(cache["pages"]),
             "expected_pages": expected_pages, "variant": pager.variant[0] if pager.variant else None,
@@ -491,8 +496,20 @@ class ListingInfo(dict):
     refused = None
 
 
-def listing_info(progress=None) -> ListingInfo:
-    r = fetch_pages("f12,f14,f26", "listing", progress=progress)
+# v2.1 (finding 104): the optional boards, which the exchanges' A-share lists do not cover. Eastmoney's filters.
+OPTIONAL_FS = {"BSE": ("m:0+t:81+s:2048", (("bj", "m:0+t:81+s:2048", "Beijing Stock Exchange"),)),
+               "B_SHARE": ("m:1+t:3,m:0+t:7", (("shb", "m:1+t:3", "Shanghai B shares"),
+                                               ("szb", "m:0+t:7", "Shenzhen B shares")))}
+
+
+def listing_info(progress=None, board: str | None = None) -> ListingInfo:
+    """Listing dates from the quote list: the four A-share boards, or (v2.1) one optional board ("BSE", "B_SHARE")."""
+    if board:
+        fs, boards = OPTIONAL_FS[board]
+        r = fetch_pages("f12,f14,f26", f"listing_{board.lower()}", progress=progress, fs=fs, boards=boards,
+                        min_rows=0)
+    else:
+        r = fetch_pages("f12,f14,f26", "listing", progress=progress)
     out = ListingInfo()
     for row in r["rows"]:
         code = str(row.get("f12") or "").zfill(6)
