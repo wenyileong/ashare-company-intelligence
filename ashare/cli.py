@@ -734,6 +734,29 @@ def validate_all_cmd(security_code: str = typer.Option(None)):
     print("Details: show-flags (findings never change the data).")
 
 
+@app.command("inspect-tables")
+def inspect_tables_cmd(disclosure_id: int = typer.Argument(None, help="Document ID (or give --code)"),
+                       code: str = typer.Option(None, help="Security code: the latest downloaded periodic report"),
+                       year: int = typer.Option(None, help="With --code: the report for this fiscal year"),
+                       table: str = typer.Option("top10", help="top10, segments or control"),
+                       out: str = typer.Option(None, help="Output file (default: exports/inspect_<ID>_<table>.txt)")):
+    """Write what the parsers made of one table in one report, line by line, to a text file (v2.1).
+
+    The file holds the table's lines as the report prints them, in both readings, with the parser's decision on
+    each: send it instead of the report when a table is read wrongly or not at all."""
+    from .inspect_tables import inspect_table, find_report
+    try:
+        if disclosure_id is None:
+            if not code:
+                raise ValueError("give a document ID, or --code (and --year)")
+            disclosure_id = find_report(code, year)
+        path = inspect_table(disclosure_id, table, out)
+    except ValueError as exc:
+        print(f"[red]{exc}[/red]")
+        raise typer.Exit(1)
+    print(f"Written: {path}")
+
+
 @app.command("show-flags")
 def show_flags_cmd(security_code: str = typer.Option(None), severity: str = typer.Option(None),
                    rule: str = typer.Option(None),

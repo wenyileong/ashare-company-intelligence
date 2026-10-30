@@ -145,6 +145,9 @@ class ReportReader:
     # --- reading ------------------------------------------------------------------------------------------------
 
     def _text_page(self, i: int) -> str:
+        if i not in self._text and self._text_layer() == "pdfium":
+            self._text[i] = self.fast_text(i)          # the same text pdfium gives for the index (plan B2)
+            self.text_pages_read += 1
         if i not in self._text:
             if self._pypdf is None:
                 from pypdf import PdfReader
@@ -159,6 +162,11 @@ class ReportReader:
                 self._text[i] = ""
             self.text_pages_read += 1
         return self._text[i]
+
+    @staticmethod
+    def _text_layer() -> str:
+        from .financials import text_layer
+        return text_layer()
 
     def _layout_page(self, i: int) -> str:
         if i not in self._layout:

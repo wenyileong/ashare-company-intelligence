@@ -74,7 +74,7 @@ def _close(a: float | None, b: float | None) -> bool:
     return a is not None and b is not None and abs(a - b) <= max(1.0, abs(b) * 1e-6)
 
 
-def parse_top10_pages(pages: list[str]) -> list[dict]:
+def parse_top10_pages(pages: list[str], trace: list | None = None) -> list[dict]:
     """Rows of 前十名股东持股情况 (rank order).
 
     v2.0.7 (finding 68): two column orders are read.
@@ -85,26 +85,38 @@ def parse_top10_pages(pages: list[str]) -> list[dict]:
     The layout is taken from the header when it names the columns, otherwise from where the nature stands. The
     columns after the shares in layout B are placed by checking that restricted and unrestricted shares add up
     to the shares held. A row whose figures fail the checks (percentage outside 0 to 100, no shares) is left out.
+
+    v2.1 (finding 98): with ``trace``, each line's outcome is appended as (page, line, decision), for
+    ``inspect-tables``.
     """
     from .units import first_declared  # noqa: F401 (share counts carry no currency unit)
     out, seen = [], set()
     mode = None
     header_layout, header_change = None, None
     pending = ""                     # the first line of a name wrapped onto two lines
+
+    def note(decision):
+        if trace is not None and line:
+            trace.append((pno, line, decision))
     for pno, page in enumerate(pages, start=1):
         for raw in page.splitlines():
             line = raw.replace("　", " ").strip()
             if re.search(r"前十名股东持股情况|前10名股东持股情况", line) and "无限售" not in line:
                 mode = "top10"
                 header_layout, header_change, pending = None, None, ""
+                note("table heading: reading starts")
                 continue
             if re.search(r"前十名无限售条件股东持股情况|前10名无限售条件股东持股情况|前十名流通股东", line):
+                if mode:
+                    note("next table: reading stops")
                 mode = None
                 continue
             if mode and re.search(r"上述股东关联关系|一致行动|表决权恢复的优先股", line):
                 mode = None
+                note("note after the table: reading stops")
                 continue
             if mode != "top10":
+                note("outside the table")
                 continue
             if "股东名称" in line or ("股东性质" in line and not re.search(_NUM, line)):
                 # A header: which column comes first, the nature or the figures?
@@ -116,6 +128,7 @@ def parse_top10_pages(pages: list[str]) -> list[dict]:
                     header_change = True
                 elif header_layout == "B" and pos_pct >= 0:
                     header_change = False
+                note(f"header (layout {header_layout or 'not settled'})")
                 continue
             toks = line.split()
             k = 0
@@ -124,15 +137,19 @@ def parse_top10_pages(pages: list[str]) -> list[dict]:
             if k >= len(toks):
                 # no figure: the first part of a wrapped name (kept for the next line), unless it is a note
                 pending = "" if re.search(r"单位|说明|注|股东名称", line) else (pending + line)[-60:]
+                note("no figure: kept as the first part of a wrapped name" if pending else "no figure: a note")
                 continue
-            if k == 0:
-                pending = ""
+            if k == 0 and not pending:
+                note("rejected: the line starts with a figure (no name)")
                 continue
-            head = " ".join(toks[:k]) if re.search(r"[A-Za-z]", "".join(toks[:k])) else "".join(toks[:k])
+            # v2.1 (finding 98): a name printed above its figures (the whole name wrapped, the figures on the next
+            # line) is read with them; v2.0.9 dropped such rows in the plain-text reading
+            head = (" ".join(toks[:k]) if re.search(r"[A-Za-z]", "".join(toks[:k])) else "".join(toks[:k])) if k else ""
             if pending:
                 head = pending + ("" if not re.search(r"[A-Za-z]$", pending) else " ") + head
                 pending = ""
             if re.search(r"股东名称|报告期|期末持股|比例|数量|单位", head):
+                note("header continued")
                 continue
             name, lead_nature = split_nature(head)
             rest = toks[k:]
@@ -143,8 +160,10 @@ def parse_top10_pages(pages: list[str]) -> list[dict]:
                 i += 1
             tail = rest[i:]
             if any(not _WELL_FORMED.fullmatch(x) for x in nums[:5]):
+                note("rejected: two cells run together (a malformed figure)")
                 continue                     # two cells run together: not read rather than misread
             if len(nums) < 3 and not (lead_nature and len(nums) >= 2):
+                note(f"rejected: too few figures ({len(nums)})")
                 continue
             layout = header_layout or ("B" if lead_nature else "A")
             vals = [_f(x) for x in nums]
@@ -170,6 +189,7 @@ def parse_top10_pages(pages: list[str]) -> list[dict]:
                 change, shares, pct = vals[0], vals[1], vals[2]
                 restricted = vals[3] if len(vals) > 3 else None
             if pct is None or not (0 <= pct <= 100) or shares is None or shares <= 0:
+                note(f"rejected: percentage {pct} or shares {shares} out of range (layout {layout})")
                 continue
             if restricted is not None and (restricted < 0 or restricted > shares + 1):
                 restricted = None
@@ -185,6 +205,7 @@ def parse_top10_pages(pages: list[str]) -> list[dict]:
             if nature is None:
                 nature = next((n for n in NATURES if n in rest_text), rest_text or None)
             if name in seen:
+                note(f"rejected: {name} already read")
                 continue
             seen.add(name)
             out.append({"shareholder_name": name, "rank": len(out) + 1, "change_shares": change, "shares": shares,
@@ -192,10 +213,13 @@ def parse_top10_pages(pages: list[str]) -> list[dict]:
                         "pledged_shares": pledged if state and ("质押" in state or "冻结" in state or "标记" in state) else None,
                         "shareholder_nature": nature, "shareholder_type": NATURE_TYPES.get(nature or ""),
                         "page": pno, "raw": line, "layout": layout})
+            note(f"row {len(out)} read: {name}, {shares:,.0f} shares, {pct}% (layout {layout})")
             if len(out) >= 10:
                 mode = None
     total = sum(r["ownership_pct"] for r in out)
     if total > 100.5:          # the figures cannot all be percentages: do not keep a misread table
+        if trace is not None:
+            trace.append((None, "", f"table rejected: the percentages add up to {total:.2f}"))
         return []
     return out
 

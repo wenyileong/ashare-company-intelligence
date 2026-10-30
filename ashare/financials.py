@@ -302,11 +302,41 @@ def select_xbrl_facts(facts: list[dict], period: str | None) -> list[dict]:
     return out
 
 
+def text_layer() -> str:
+    """The plain-text layer: pypdf (the default), or pdfium (``ASHARE_TEXT_LAYER=pdfium``).
+
+    v2.1 (plan B2): pdfium is the faster layer, and is kept as an option for the comparison
+    (``docs/text_layer_comparison_v2.1.md``). Changing the default would change every text variant's output, so it
+    would need every extractor version raised and the calibration rebuilt (review round 2)."""
+    import os
+    return "pdfium" if os.environ.get("ASHARE_TEXT_LAYER", "").strip().lower() == "pdfium" else "pypdf"
+
+
+def _pdfium_text_pages(path: Path) -> list[str]:
+    import pypdfium2 as pdfium
+    pdf = pdfium.PdfDocument(str(path))
+    try:
+        pages = []
+        for i in range(len(pdf)):
+            page = pdf[i]
+            tp = page.get_textpage()
+            try:
+                pages.append(tp.get_text_range() or "")
+            finally:
+                tp.close()
+                page.close()
+        return pages
+    finally:
+        pdf.close()
+
+
 def _pdf_text_pages(path: Path) -> list[str]:
     from .http import document_heartbeat
     from .pdfwarnings import set_document
     document_heartbeat(path)
     set_document(path)
+    if text_layer() == "pdfium":
+        return _pdfium_text_pages(path)
     reader = PdfReader(str(path))
     pages = []
     for page in reader.pages:

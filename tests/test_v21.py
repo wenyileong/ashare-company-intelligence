@@ -362,8 +362,11 @@ def test_a_long_report_is_read_in_a_fraction_of_the_whole_reading_time(tmp_path)
         t = time.perf_counter()
         extract_path(pdf, title, None, rr)
         part = time.perf_counter() - t
-        assert rr.layout_pages_read <= 20
-    assert part < whole / 5                       # the plan's tenth is measured on real reports (B4); here a margin
+        assert rr.layout_pages_read <= 20 and rr.text_pages_read <= 20    # of 253 pages; the rest only indexed
+    # On these generated pages the layout pass is cheap, so the index pass (every page's plain text, once) weighs
+    # more than on real reports, where laying out a page is the slow step (finding 101); the plan's tenth is
+    # measured on the author's reports (B4).
+    assert part < whole / 2
 
 
 # --- B3. Parallel extraction ---------------------------------------------------------------------------------------
@@ -462,3 +465,101 @@ def test_worker_count_from_the_setting(monkeypatch):
     assert workers() == 8
     monkeypatch.setenv("ASHARE_WORKERS", "x")
     assert 1 <= workers() <= 8
+
+
+def test_table_extractors_give_the_same_rows_in_parallel_and_serial(company, tmp_path, monkeypatch):
+    from helpers import add_disclosure
+    from ashare.control import extract_top_holders
+    from ashare.segments import extract_segments
+    from ashare.models import SessionLocal, OwnershipObservation, SegmentObservation
+    for i in range(5):
+        pdf = tmp_path / f"t{i}.pdf"
+        title = _long_corpus_report(pdf, 40 + i)
+        add_disclosure(company, title, f"{2021 + i}-03-30", pdf, ann_id=f"T{i}")
+
+    def rows():
+        s = SessionLocal()
+        try:
+            return (sorted((r.disclosure_id, r.rank, r.shareholder_name, str(r.shares), str(r.tradable_shares))
+                           for r in s.query(OwnershipObservation)),
+                    sorted((r.disclosure_id, r.dimension, r.segment_name, str(r.revenue))
+                           for r in s.query(SegmentObservation)))
+        finally:
+            s.close()
+    monkeypatch.setenv("ASHARE_WORKERS", "1")
+    extract_top_holders("600519")
+    extract_segments("600519")
+    serial = rows()
+    monkeypatch.setenv("ASHARE_WORKERS", "2")
+    extract_top_holders("600519", again=True)
+    extract_segments("600519", again=True)
+    assert rows() == serial and serial[0] and serial[1]
+
+
+# --- B2. The text layer (decision recorded in docs/text_layer_comparison_v2.1.md) ---------------------------------
+
+def test_pdfium_text_layer_is_an_option_and_pypdf_the_default(tmp_path, monkeypatch):
+    pytest.importorskip("pypdfium2")
+    from helpers import make_pdf
+    from ashare.financials import text_layer, _pdf_text_pages
+    from ashare.reportreader import ReportReader
+    pdf = make_pdf(tmp_path / "x.pdf", ["前十名股东持股情况", "<PAGE>", "第二页"])
+    monkeypatch.delenv("ASHARE_TEXT_LAYER", raising=False)
+    assert text_layer() == "pypdf"
+    monkeypatch.setenv("ASHARE_TEXT_LAYER", "pdfium")
+    assert text_layer() == "pdfium"
+    assert "第二页" in _pdf_text_pages(pdf)[1]
+    with ReportReader(pdf) as rr:
+        assert "前十名股东" in rr.pages("text", ["top10"])[0] and rr._pypdf is None
+
+
+def test_inspect_tables_writes_both_readings_with_a_decision_on_each_line(company, tmp_path, monkeypatch):
+    pytest.importorskip("pypdfium2")
+    from helpers import add_disclosure
+    from ashare.cli import app
+    from typer.testing import CliRunner
+    monkeypatch.chdir(tmp_path)
+    pdf = tmp_path / "i.pdf"
+    title = _long_corpus_report(pdf, 3)
+    add_disclosure(company, title, "2023-03-30", pdf, ann_id="I1")
+    r = CliRunner().invoke(app, ["inspect-tables", "--code", "600519", "--table", "top10"])
+    assert r.exit_code == 0, r.output
+    text = Path(r.output.split("Written:")[1].strip()).read_text(encoding="utf-8")
+    assert "=== text reading:" in text and "=== layout reading:" in text and "=== Decision ===" in text
+    assert "-> table heading: reading starts" in text and "-> row 1 read:" in text
+    assert "section pages found:" in text and "none" not in text.split("section pages found:")[1].splitlines()[0]
+    for table in ("segments", "control"):
+        r = CliRunner().invoke(app, ["inspect-tables", "--code", "600519", "--table", table])
+        assert r.exit_code == 0, r.output
+        body = Path(r.output.split("Written:")[1].strip()).read_text(encoding="utf-8")
+        assert "-> read:" in body
+    r = CliRunner().invoke(app, ["inspect-tables", "--code", "000001"])
+    assert r.exit_code == 1 and "no downloaded periodic report" in r.output
+
+
+def test_top10_trace_names_the_check_that_failed():
+    from ashare.control import parse_top10_pages
+    trace = []
+    pages = ["前十名股东持股情况\n股东名称 报告期内增减 期末持股数量 比例(%) 股东性质\n"
+             "甲集团有限公司 0 5,000,000 150.00 国有法人\n乙基金 0 2,000,000 20.00 境内非国有法人\n"
+             "丙投资 0 1,0002,000,000 10.00 境内非国有法人"]
+    rows = parse_top10_pages(pages, trace)
+    assert [r["shareholder_name"] for r in rows] == ["乙基金"]
+    decisions = [d for _, _, d in trace]
+    assert any(d.startswith("rejected: percentage 150.0") for d in decisions)
+    assert any(d.startswith("rejected: two cells run together") for d in decisions)
+    assert any(d.startswith("header") for d in decisions)
+
+
+def test_top10_row_with_its_name_above_the_figures_is_read():
+    """Found with inspect-tables on the synthetic corpus: the plain-text reading puts a wrapped name on lines of its
+    own, above the figures; v2.0.9 rejected the figures as a line without a name."""
+    from ashare.control import parse_top10_pages
+    pages = ["前十名股东持股情况\n股东名称 股东性质 持股比例(%) 报告期末持股数量 报告期内增减变动情况 持有有限售条件的股份数量\n"
+             "四川省示例投资集团有\n限公司国有法人\n44.49 756,330,000 400,000 0\n"
+             "黄军磊境内自然人 1.24 21,080,000 100,000 0\n"
+             "单位：股\n1.00 1,000 0 0"]
+    rows = parse_top10_pages(pages)
+    assert [(r["shareholder_name"], r["shares"]) for r in rows] == [("四川省示例投资集团有限公司", 756_330_000),
+                                                                    ("黄军磊", 21_080_000)]
+    assert rows[0]["shareholder_nature"] == "国有法人"
