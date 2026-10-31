@@ -65,7 +65,13 @@ Until steps 1 to 3 are done, do not use or release financial or shareholder figu
 
 ### Tests
 
-TESTS_PLACEHOLDER
+About 80 new tests (`tests/test_v21.py`, `test_v21_viz.py`, `test_v21_i18n.py`), each reproducing a fault planned in `docs/plan_v2.1.md` or found while building (its section 15). They include the viewer drawn in a headless browser, with and without WebGL, and the language identity of datasets. Results:
+- 382 pass on Linux Python 3.12 (one skip);
+- 358 on Python 3.13 (23 skips: Tk and the browser are not installed there);
+- 379 against PostgreSQL 16 (four skips);
+- 377 on Windows CPython 3.12 under Wine (six skips).
+
+Parallel extraction was also run in the frozen Windows program under Wine: it gives the same figures as a serial run. The installer installs, runs and uninstalls under Wine.
 
 ## v2.0.9 (30 October 2026)
 
