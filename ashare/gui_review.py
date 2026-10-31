@@ -6,6 +6,8 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
+from .i18n import tr
+
 # command -> chart builder taking the card's form values
 def _financial(v):
     from .charts.builders import financial_chart
@@ -32,27 +34,36 @@ CHARTS = {"show-financials": _financial, "segments": _segments, "human-capital-h
           "show-flags": _flags}
 
 
+def COLUMN_LABELS() -> dict:
+    return {"kind": tr("ui.win.col.kind", "Kind"), "item": tr("ui.win.col.item", "Item"),
+            "field": tr("ui.win.col.field", "Field"), "value": tr("ui.win.col.value", "Value"),
+            "status": tr("ui.win.col.status", "Status"), "id": tr("ui.win.col.id", "Id"),
+            "done": tr("ui.win.col.done", "Done"), "failed": tr("ui.win.col.failed", "Failed"),
+            "total": tr("ui.win.col.total", "Total"), "created": tr("ui.win.col.created", "Created"),
+            "error": tr("ui.win.col.error", "Error")}
+
+
 class ChartWindow(tk.Toplevel):
     """One reusable window that shows the chart for the last chartable action."""
 
     def __init__(self, app):
         super().__init__(app)
         self.app = app
-        self.title("Chart")
+        self.title(tr("ui.win.chart", "Chart"))
         self.configure(bg="#ffffff")
         self.spec = None
         bar = ttk.Frame(self, padding=(12, 8))
         bar.pack(fill="x")
         self.heading = ttk.Label(bar, text="", font=app.f_bold)
         self.heading.pack(side="left")
-        ttk.Button(bar, text="Close", style="Small.TButton", command=self.withdraw).pack(side="right", padx=(6, 0))
+        ttk.Button(bar, text=tr("ui.win.close", "Close"), style="Small.TButton", command=self.withdraw).pack(side="right", padx=(6, 0))
         from .charts import mpl
         if mpl.available():
-            ttk.Button(bar, text="Save PNG…", style="Small.TButton", command=self._png).pack(side="right", padx=(6, 0))
-        ttk.Button(bar, text="Save data (CSV)…", style="Small.TButton", command=self._csv).pack(side="right", padx=(6, 0))
-        ttk.Button(bar, text="Save SVG…", style="Small.TButton", command=self._svg).pack(side="right", padx=(6, 0))
-        ttk.Label(self, text="Hover over a point or bar to see its source; click it to show the full trace in "
-                             "the output panel.", style="Muted.TLabel").pack(side="bottom", anchor="w", padx=12,
+            ttk.Button(bar, text=tr("ui.win.save_png", "Save PNG…"), style="Small.TButton", command=self._png).pack(side="right", padx=(6, 0))
+        ttk.Button(bar, text=tr("ui.win.save_data_csv", "Save data (CSV)…"), style="Small.TButton", command=self._csv).pack(side="right", padx=(6, 0))
+        ttk.Button(bar, text=tr("ui.win.save_svg", "Save SVG…"), style="Small.TButton", command=self._svg).pack(side="right", padx=(6, 0))
+        ttk.Label(self, text=tr("ui.win.chart_hint", "Hover over a point or bar to see its source; click it to "
+                                                     "show the full trace in the output panel."), style="Muted.TLabel").pack(side="bottom", anchor="w", padx=12,
                                                                              pady=(4, 10))
         # v2.1: a chart taller than the screen (the layered view of many companies) scrolls
         self.scroll = ttk.Scrollbar(self, orient="vertical")
@@ -91,7 +102,7 @@ class ChartWindow(tk.Toplevel):
             try:
                 writer(p)
             except Exception as exc:
-                messagebox.showwarning("Chart", str(exc))
+                messagebox.showwarning(tr("ui.win.chart", "Chart"), str(exc))
                 return
             self.app._log(f"Chart saved: {p}\n", "muted")
 
@@ -126,25 +137,26 @@ class ReviewPage:
         P = app_palette()
         top = ttk.Frame(parent, padding=(28, 22, 28, 8))
         top.pack(fill="x")
-        ttk.Label(top, text="Review", style="Title.TLabel").pack(anchor="w")
-        ttk.Label(top, text="Values that need a person's check: validation findings, disagreements between the two "
-                            "text extractors, and low-confidence values, most material first. Decisions are stored "
-                            "separately; the original values are never changed.",
+        ttk.Label(top, text=tr("ui.win.review", "Review"), style="Title.TLabel").pack(anchor="w")
+        ttk.Label(top, text=tr("ui.win.review_intro",
+                               "Values that need a person's check: validation findings, disagreements between the "
+                               "two text extractors, and low-confidence values, most material first. Decisions are "
+                               "stored separately; the original values are never changed."),
                   style="Muted.TLabel", wraplength=860, justify="left").pack(anchor="w", pady=(4, 8))
         bar = ttk.Frame(top)
         bar.pack(fill="x")
-        ttk.Label(bar, text="Security code").pack(side="left")
+        ttk.Label(bar, text=tr("ui.win.security_code", "Security code")).pack(side="left")
         self.code = tk.StringVar()
         ttk.Entry(bar, textvariable=self.code, width=10).pack(side="left", padx=(6, 14))
-        ttk.Label(bar, text="Show").pack(side="left")
+        ttk.Label(bar, text=tr("ui.win.show", "Show")).pack(side="left")
         self.status = tk.StringVar(value="OPEN")
         ttk.Combobox(bar, textvariable=self.status, state="readonly", width=11,
                      values=["OPEN", "DEFERRED", "CORRECTED", "ACCEPTED", "REJECTED", "ALL"]).pack(side="left", padx=6)
-        ttk.Label(bar, text="Confidence below").pack(side="left", padx=(14, 0))
+        ttk.Label(bar, text=tr("ui.win.confidence_below", "Confidence below")).pack(side="left", padx=(14, 0))
         self.below = tk.StringVar(value="0.6")
         ttk.Entry(bar, textvariable=self.below, width=5).pack(side="left", padx=6)
-        ttk.Button(bar, text="Update queue", style="Accent.TButton", command=self.rebuild).pack(side="left", padx=(14, 6))
-        ttk.Button(bar, text="Refresh list", style="Small.TButton", command=self.reload).pack(side="left")
+        ttk.Button(bar, text=tr("ui.win.update_queue", "Update queue"), style="Accent.TButton", command=self.rebuild).pack(side="left", padx=(14, 6))
+        ttk.Button(bar, text=tr("ui.win.refresh_list", "Refresh list"), style="Small.TButton", command=self.reload).pack(side="left")
         self.count = ttk.Label(bar, text="", style="Muted.TLabel")
         self.count.pack(side="left", padx=12)
 
@@ -154,7 +166,7 @@ class ReviewPage:
         cols = ("kind", "item", "field", "value", "status")
         self.tree = ttk.Treeview(left, columns=cols, show="headings", height=14, selectmode="browse")
         for c, w in zip(cols, (105, 170, 60, 90, 70)):
-            self.tree.heading(c, text=c.capitalize())
+            self.tree.heading(c, text=COLUMN_LABELS().get(c, c.capitalize()))
             self.tree.column(c, width=w, stretch=c == "item")
         sb = ttk.Scrollbar(left, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=sb.set)
@@ -170,10 +182,10 @@ class ReviewPage:
         self.summary.pack(fill="x")
         act = ttk.Frame(right, padding=(0, 8, 0, 0))
         act.pack(fill="x")
-        ttk.Label(act, text="Correct value").grid(row=0, column=0, sticky="w")
+        ttk.Label(act, text=tr("ui.win.correct_value", "Correct value")).grid(row=0, column=0, sticky="w")
         self.value = tk.StringVar()
         ttk.Entry(act, textvariable=self.value, width=18).grid(row=1, column=0, sticky="w", padx=(0, 10))
-        ttk.Label(act, text="Reason (needed to correct or reject)").grid(row=0, column=1, sticky="w")
+        ttk.Label(act, text=tr("ui.win.reason_needed_to_correct", "Reason (needed to correct or reject)")).grid(row=0, column=1, sticky="w")
         self.reason = tk.StringVar()
         ttk.Entry(act, textvariable=self.reason, width=30).grid(row=1, column=1, sticky="we", padx=(0, 10))
         act.columnconfigure(1, weight=1)
@@ -182,15 +194,16 @@ class ReviewPage:
         for text, a, style in (("Accept", "accept", "Accent.TButton"), ("Correct", "correct", "Small.TButton"),
                                ("Not disclosed", "reject", "Small.TButton"), ("Defer", "defer", "Small.TButton")):
             ttk.Button(buttons, text=text, style=style, command=lambda a=a: self.decide(a)).pack(side="left", padx=(0, 6))
-        ttk.Label(right, text="Accept = the value is right. Correct = enter the right value. Not disclosed = the "
-                              "report does not give this value. Defer = decide later.",
+        ttk.Label(right, text=tr("ui.win.review_buttons",
+                                 "Accept = the value is right. Correct = enter the right value. Not disclosed = the "
+                                 "report does not give this value. Defer = decide later."),
                   style="Muted.TLabel", wraplength=400, justify="left").pack(anchor="w", pady=(4, 2))
         nav = ttk.Frame(right)
         nav.pack(fill="x", pady=(6, 2))
-        self.page_label = ttk.Label(nav, text="Source page", style="Muted.TLabel")
+        self.page_label = ttk.Label(nav, text=tr("ui.win.source_page", "Source page"), style="Muted.TLabel")
         self.page_label.pack(side="left")
-        ttk.Button(nav, text="Next page", style="Small.TButton", command=lambda: self.turn(1)).pack(side="right")
-        ttk.Button(nav, text="Previous page", style="Small.TButton", command=lambda: self.turn(-1)).pack(side="right",
+        ttk.Button(nav, text=tr("ui.win.next_page", "Next page"), style="Small.TButton", command=lambda: self.turn(1)).pack(side="right")
+        ttk.Button(nav, text=tr("ui.win.previous_page", "Previous page"), style="Small.TButton", command=lambda: self.turn(-1)).pack(side="right",
                                                                                                         padx=4)
         holder = ttk.Frame(right)
         holder.pack(fill="both", expand=True)
@@ -217,7 +230,7 @@ class ReviewPage:
             r = build_review_queue(self.code.get().strip() or None, below)
             self.app._log(f"Review queue updated: {r}\n", "muted")
         except Exception as exc:
-            messagebox.showerror("Review", str(exc))
+            messagebox.showerror(tr("ui.win.review", "Review"), str(exc))
         self.reload()
 
     def reload(self):
@@ -227,7 +240,7 @@ class ReviewPage:
         try:
             rows = review_queue(self.code.get().strip() or None, self.status.get(), limit=500)
         except Exception as exc:
-            messagebox.showerror("Review", str(exc))
+            messagebox.showerror(tr("ui.win.review", "Review"), str(exc))
             return
         for r in rows:
             kind = r["rule"] or {"LOW_CONFIDENCE": "Low confidence", "DISAGREEMENT": "Disagreement"}.get(
@@ -235,7 +248,7 @@ class ReviewPage:
             iid = self.tree.insert("", "end", values=(kind, f"{r['code']} {r['item']}", r["field"] or "",
                                                       r["value"] or "", r["status"]))
             self.items[iid] = r
-        self.count.configure(text=f"{len(rows)} item(s)")
+        self.count.configure(text=tr("ui.win.items", "{n} item(s)").format(n=len(rows)))
 
     def select(self):
         from .review import review_item
@@ -246,7 +259,7 @@ class ReviewPage:
         try:
             detail = review_item(r["id"])
         except Exception as exc:
-            messagebox.showerror("Review", str(exc))
+            messagebox.showerror(tr("ui.win.review", "Review"), str(exc))
             return
         self.current = detail
         tr = detail.get("trace") or {}
@@ -279,15 +292,16 @@ class ReviewPage:
         from .pagerender import available, render_page, png_base64
         self.page.delete("all")
         if not self.doc_path or not Path(self.doc_path).exists():
-            self.page_label.configure(text="Source page: document not downloaded")
+            self.page_label.configure(text=tr("ui.win.source_page_document_not", "Source page: document not downloaded"))
             return
         if not str(self.doc_path).lower().endswith(".pdf") or not available():
-            self.page_label.configure(text="Source page: preview needs a PDF and the pypdfium2 package")
+            self.page_label.configure(text=tr("ui.win.source_page_preview_needs", "Source page: preview needs a PDF and the pypdfium2 package"))
             return
         try:
             r = render_page(self.doc_path, self.page_no, self.highlight)
         except Exception as exc:
-            self.page_label.configure(text=f"Source page: cannot render ({exc})")
+            self.page_label.configure(text=tr("ui.win.cannot_render", "Source page: cannot render ({error})").format(
+                error=exc))
             return
         self.page_no = r["page"]
         self.photo = tk.PhotoImage(data=png_base64(r["png"]))
@@ -298,8 +312,10 @@ class ReviewPage:
         if r["boxes"]:
             frac = max(0.0, (r["boxes"][0][1] - 40) / r["height"])
             self.page.after(60, lambda: self.page.yview_moveto(frac))
-        found = f", match highlighted" if r["boxes"] else ", match not found on this page"
-        self.page_label.configure(text=f"Source page {r['page']} of {r['pages']}{found}")
+        found = tr("ui.win.match", ", match highlighted") if r["boxes"] else tr("ui.win.no_match",
+                                                                                 ", match not found on this page")
+        self.page_label.configure(text=tr("ui.win.page_of", "Source page {page} of {pages}").format(
+            page=r["page"], pages=r["pages"]) + found)
 
     def turn(self, step):
         if self.page_no:
@@ -314,7 +330,7 @@ class ReviewPage:
             value = self.value.get().strip() if action == "correct" else None
             resolve(self.current["id"], action, value, self.reason.get().strip() or None)
         except Exception as exc:
-            messagebox.showwarning("Review", str(exc))
+            messagebox.showwarning(tr("ui.win.review", "Review"), str(exc))
             return
         self.app._log(f"Review item {self.current['id']}: {action}\n", "muted")
         self.reload()
@@ -395,21 +411,21 @@ class ExplorerWindow(tk.Toplevel):
     def __init__(self, app, path=None):
         super().__init__(app)
         self.app = app
-        self.title("Dataset explorer")
+        self.title(tr("ui.win.dataset_explorer", "Dataset explorer"))
         self.configure(bg="#ffffff")
         self.rows = []
         bar = ttk.Frame(self, padding=(12, 8))
         bar.pack(fill="x")
-        ttk.Button(bar, text="Open panel…", style="Small.TButton", command=self.choose).pack(side="left")
-        self.file_label = ttk.Label(bar, text="No panel loaded", style="Muted.TLabel")
+        ttk.Button(bar, text=tr("ui.win.open_panel", "Open panel…"), style="Small.TButton", command=self.choose).pack(side="left")
+        self.file_label = ttk.Label(bar, text=tr("ui.win.no_panel_loaded", "No panel loaded"), style="Muted.TLabel")
         self.file_label.pack(side="left", padx=10)
         ctl = ttk.Frame(self, padding=(12, 0))
         ctl.pack(fill="x")
-        ttk.Label(ctl, text="Variable").pack(side="left")
+        ttk.Label(ctl, text=tr("ui.win.variable", "Variable")).pack(side="left")
         self.x = tk.StringVar()
         self.xbox = ttk.Combobox(ctl, textvariable=self.x, state="readonly", width=24)
         self.xbox.pack(side="left", padx=(6, 14))
-        ttk.Label(ctl, text="Second variable (scatter)").pack(side="left")
+        ttk.Label(ctl, text=tr("ui.win.second_variable_scatter", "Second variable (scatter)")).pack(side="left")
         self.y = tk.StringVar()
         self.ybox = ttk.Combobox(ctl, textvariable=self.y, state="readonly", width=24)
         self.ybox.pack(side="left", padx=6)
@@ -419,7 +435,7 @@ class ExplorerWindow(tk.Toplevel):
                             ("Scatter with fit", "scatter"), ("Coverage", "coverage"), ("Correlations", "corr")):
             ttk.Button(btns, text=label, style="Small.TButton", command=lambda k=kind: self.show(k)).pack(
                 side="left", padx=(0, 6))
-        ttk.Button(btns, text="Save chart (SVG)…", style="Small.TButton", command=self.save).pack(side="right")
+        ttk.Button(btns, text=tr("ui.win.save_chart_svg", "Save chart (SVG)…"), style="Small.TButton", command=self.save).pack(side="right")
         self.canvas = tk.Canvas(self, bg="#ffffff", highlightthickness=0, width=780, height=420)
         self.canvas.pack(fill="both", expand=True, padx=12, pady=(0, 12))
         self.spec = None
@@ -437,14 +453,15 @@ class ExplorerWindow(tk.Toplevel):
         try:
             self.rows = load_panel(path)
         except Exception as exc:
-            messagebox.showerror("Dataset explorer", str(exc))
+            messagebox.showerror(tr("ui.win.dataset_explorer", "Dataset explorer"), str(exc))
             return
         if not self.rows:                                   # v2.1 (finding 17): say why, not a blank view
             reason = empty_panel_reason(path)
-            self.file_label.configure(text=f"{Path(path).name}: no rows")
+            self.file_label.configure(text=f"{Path(path).name}: " + tr("ui.win.no_rows", "no rows"))
             self.canvas.delete("all")
             self.canvas.create_text(20, 20, anchor="nw", width=820, fill="#57606a", font=("Segoe UI", 11),
-                                    text="The panel has no rows, so there is nothing to explore.\n\n" + reason)
+                                    text=tr("ui.win.empty_panel", "The panel has no rows, so there is nothing "
+                                                                  "to explore.") + "\n\n" + reason)
             self.app._log(f"\n› Dataset explorer: {Path(path).name} has no rows. {reason}\n", "cmd")
             return
         cols = numeric_columns(self.rows)
@@ -453,7 +470,8 @@ class ExplorerWindow(tk.Toplevel):
         if cols:
             self.x.set(cols[0])
             self.y.set(cols[1] if len(cols) > 1 else cols[0])
-        self.file_label.configure(text=f"{Path(path).name}: {len(self.rows)} rows, {len(cols)} numeric variables")
+        self.file_label.configure(text=f"{Path(path).name}: " + tr(
+            "ui.win.rows_vars", "{rows} rows, {cols} numeric variables").format(rows=len(self.rows), cols=len(cols)))
         self.show("coverage")
 
     def show(self, kind):
@@ -476,7 +494,7 @@ class ExplorerWindow(tk.Toplevel):
         try:
             self.spec = chart_for(self.rows, kind, self.x.get(), self.y.get())
         except Exception as exc:
-            messagebox.showwarning("Dataset explorer", str(exc))
+            messagebox.showwarning(tr("ui.win.dataset_explorer", "Dataset explorer"), str(exc))
             return
         render_tk(self.canvas, self.spec)
 
@@ -500,42 +518,43 @@ class OperationsPage:
         P = app_palette()
         top = ttk.Frame(parent, padding=(28, 22, 28, 8))
         top.pack(fill="x")
-        ttk.Label(top, text="Operations", style="Title.TLabel").pack(anchor="w")
-        ttk.Label(top, text="Keep the database up to date. The daily update fetches only what is new: announcements "
-                            "since the last run (market-wide, one query per exchange and day), today's prices for all "
-                            "companies, and extraction for companies with new documents. Jobs can be cancelled and "
-                            "resumed; nothing is duplicated.", style="Muted.TLabel", wraplength=860,
+        ttk.Label(top, text=tr("ui.win.operations", "Operations"), style="Title.TLabel").pack(anchor="w")
+        ttk.Label(top, text=tr("ui.win.ops_intro",
+                               "Keep the database up to date. The daily update fetches only what is new: "
+                               "announcements since the last run (market-wide, one query per exchange and day), "
+                               "today's prices for all companies, and extraction for companies with new documents. "
+                               "Jobs can be cancelled and resumed; nothing is duplicated."), style="Muted.TLabel", wraplength=860,
                   justify="left").pack(anchor="w", pady=(4, 10))
         bar = ttk.Frame(top)
         bar.pack(fill="x")
-        ttk.Button(bar, text="Run daily update", style="Accent.TButton", command=self.daily).pack(side="left")
-        ttk.Button(bar, text="Resume selected job", style="Small.TButton", command=self.resume).pack(side="left", padx=8)
-        self.cancel_btn = ttk.Button(bar, text="Cancel", style="Small.TButton", command=self.cancel, state="disabled")
+        ttk.Button(bar, text=tr("ui.win.run_daily_update", "Run daily update"), style="Accent.TButton", command=self.daily).pack(side="left")
+        ttk.Button(bar, text=tr("ui.win.resume_selected_job", "Resume selected job"), style="Small.TButton", command=self.resume).pack(side="left", padx=8)
+        self.cancel_btn = ttk.Button(bar, text=tr("ui.win.cancel", "Cancel"), style="Small.TButton", command=self.cancel, state="disabled")
         self.cancel_btn.pack(side="left")
-        ttk.Button(bar, text="Refresh", style="Small.TButton", command=self.refresh).pack(side="left", padx=8)
+        ttk.Button(bar, text=tr("ui.win.refresh", "Refresh"), style="Small.TButton", command=self.refresh).pack(side="left", padx=8)
         prog = ttk.Frame(top)
         prog.pack(fill="x", pady=(10, 0))
         self.pvar = tk.DoubleVar(value=0)
         ttk.Progressbar(prog, variable=self.pvar, maximum=100, length=420).pack(side="left")
-        self.plabel = ttk.Label(prog, text="Idle", style="Muted.TLabel")
+        self.plabel = ttk.Label(prog, text=tr("ui.win.idle", "Idle"), style="Muted.TLabel")
         self.plabel.pack(side="left", padx=10)
         body = ttk.Frame(parent, padding=(28, 4, 28, 8))
         body.pack(fill="both", expand=True)
         cols = ("id", "kind", "status", "done", "failed", "total", "created", "error")
         self.tree = ttk.Treeview(body, columns=cols, show="headings", height=8, selectmode="browse")
         for c, w in zip(cols, (50, 110, 90, 60, 60, 60, 130, 260)):
-            self.tree.heading(c, text=c.capitalize())
+            self.tree.heading(c, text=COLUMN_LABELS().get(c, c.capitalize()))
             self.tree.column(c, width=w, stretch=c == "error")
         self.tree.pack(fill="both", expand=True)
         low = ttk.Frame(parent, padding=(28, 0, 28, 16))
         low.pack(fill="x")
-        ttk.Label(low, text="Run automatically on weekdays at").pack(side="left")
+        ttk.Label(low, text=tr("ui.win.run_automatically_on_weekdays", "Run automatically on weekdays at")).pack(side="left")
         self.at = tk.StringVar(value="18:30")
         ttk.Entry(low, textvariable=self.at, width=6).pack(side="left", padx=6)
-        ttk.Button(low, text="Schedule", style="Small.TButton", command=lambda: self.schedule(True)).pack(side="left")
-        ttk.Button(low, text="Remove schedule", style="Small.TButton",
+        ttk.Button(low, text=tr("ui.win.schedule", "Schedule"), style="Small.TButton", command=lambda: self.schedule(True)).pack(side="left")
+        ttk.Button(low, text=tr("ui.win.remove_schedule", "Remove schedule"), style="Small.TButton",
                    command=lambda: self.schedule(False)).pack(side="left", padx=6)
-        ttk.Button(low, text="Storage", style="Small.TButton", command=self.storage).pack(side="right")
+        ttk.Button(low, text=tr("ui.win.storage", "Storage"), style="Small.TButton", command=self.storage).pack(side="right")
         self.refresh()
 
     def refresh(self):
@@ -568,7 +587,7 @@ class OperationsPage:
                 self.app._log(f"\n› {label} failed: {exc}\n")
             finally:
                 self.running = None
-                self.app.after(0, lambda: (self.cancel_btn.state(["disabled"]), self.plabel.configure(text="Idle"),
+                self.app.after(0, lambda: (self.cancel_btn.state(["disabled"]), self.plabel.configure(text=tr("ui.win.idle", "Idle")),
                                            self.refresh()))
         self.running = self.threading.Thread(target=work, daemon=True)
         self.running.start()
@@ -582,7 +601,7 @@ class OperationsPage:
         from .ops import run_job
         sel = self.tree.selection()
         if not sel:
-            messagebox.showinfo("Operations", "Select a job in the list first.")
+            messagebox.showinfo(tr("ui.win.operations", "Operations"), tr("ui.win.select_job", "Select a job in the list first."))
             return
         jid = int(sel[0])
         self._start(lambda: run_job(jid, self._progress), f"Job {jid}")
@@ -592,14 +611,14 @@ class OperationsPage:
         for j in list_jobs(30):
             if j["status"] == "RUNNING":
                 request_cancel(j["id"])
-        self.plabel.configure(text="Cancelling after the current item…")
+        self.plabel.configure(text=tr("ui.win.cancelling_after_the_current", "Cancelling after the current item…"))
 
     def schedule(self, enable):
         from .ops import schedule
         try:
             r = schedule(enable, self.at.get().strip() or "18:30")
         except Exception as exc:
-            messagebox.showerror("Schedule", str(exc))
+            messagebox.showerror(tr("ui.win.schedule", "Schedule"), str(exc))
             return
         self.app._log(f"\n› Schedule\n{json.dumps(r, ensure_ascii=False)}\n")
 

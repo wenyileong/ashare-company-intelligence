@@ -1,0 +1,3158 @@
+{
+ "action.accuracy.calibration.label": {
+  "en_hash": "1e80e7339b",
+  "zh": "显示校准结果"
+ },
+ "action.accuracy.corpus-template.field.corpus.label": {
+  "en_hash": "6949ceb7e5",
+  "zh": "语料库文件夹"
+ },
+ "action.accuracy.corpus-template.field.date.label": {
+  "en_hash": "ce20dba8eb",
+  "zh": "公告日期"
+ },
+ "action.accuracy.corpus-template.field.document.hint": {
+  "en_hash": "aa481de613",
+  "zh": "已下载的 PDF 文件，或公告编号。"
+ },
+ "action.accuracy.corpus-template.field.document.label": {
+  "en_hash": "ee45c30326",
+  "zh": "报告"
+ },
+ "action.accuracy.corpus-template.field.title.hint": {
+  "en_hash": "d487b452e7",
+  "zh": "例如 2025年年度报告（决定适用的解析器）"
+ },
+ "action.accuracy.corpus-template.field.title.label": {
+  "en_hash": "768e0c1c69",
+  "zh": "标题"
+ },
+ "action.accuracy.corpus-template.label": {
+  "en_hash": "5cf5186654",
+  "zh": "将报告加入标准语料库"
+ },
+ "action.accuracy.corpus-template.note": {
+  "en_hash": "9fed72041b",
+  "zh": "将报告复制到语料库，并写出解析器读取数值的草稿。打开草稿（expected/<id>.json），对照报告更正，然后设置 \"verified\": true。"
+ },
+ "action.accuracy.evaluate-parsers.field.calibrate.label": {
+  "en_hash": "7d1f6a878a",
+  "zh": "以评估结果校准置信度"
+ },
+ "action.accuracy.evaluate-parsers.field.corpus.label": {
+  "en_hash": "6949ceb7e5",
+  "zh": "语料库文件夹"
+ },
+ "action.accuracy.evaluate-parsers.field.report.hint": {
+  "en_hash": "cb3bd260f9",
+  "zh": "可选，例如 evaluation.json"
+ },
+ "action.accuracy.evaluate-parsers.field.report.label": {
+  "en_hash": "89d8ff8d17",
+  "zh": "保存完整结果"
+ },
+ "action.accuracy.evaluate-parsers.label": {
+  "en_hash": "46a204c0f6",
+  "zh": "评估解析器"
+ },
+ "action.accuracy.evaluate-parsers.note": {
+  "en_hash": "230b48b93e",
+  "zh": "准确率 = 所读取数值中正确的比例；召回率 = 找到的真实数值所占比例；弃读 = 完全未读取的数值（优于读错）。校准要求每个解析器至少有30个经核对的数值。"
+ },
+ "action.accuracy.parsers.label": {
+  "en_hash": "7a2173be9e",
+  "zh": "列出解析器"
+ },
+ "action.accuracy.synthetic-corpus.field.out.label": {
+  "en_hash": "30baa24967",
+  "zh": "文件夹"
+ },
+ "action.accuracy.synthetic-corpus.label": {
+  "en_hash": "0a95bb5b74",
+  "zh": "生成合成测试语料库"
+ },
+ "action.accuracy.synthetic-corpus.note": {
+  "en_hash": "cfc1ff27a8",
+  "zh": "生成数值已知的文件，用于检查解析器是否仍正常工作。不用于置信度校准。"
+ },
+ "action.actions.extract-corporate-actions.field.docs.label": {
+  "en_hash": "573413d578",
+  "zh": "读取已下载的文件"
+ },
+ "action.actions.extract-corporate-actions.field.security_code.hint": {
+  "en_hash": "7bb1962600",
+  "zh": "留空则对全部公司运行。"
+ },
+ "action.actions.extract-corporate-actions.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.actions.extract-corporate-actions.label": {
+  "en_hash": "c1fe94c2cd",
+  "zh": "从公告中提取"
+ },
+ "action.actions.extract-transactions.field.security_code.hint": {
+  "en_hash": "7bb1962600",
+  "zh": "留空则对全部公司运行。"
+ },
+ "action.actions.extract-transactions.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.actions.extract-transactions.label": {
+  "en_hash": "859f24c69a",
+  "zh": "读取重大资产重组、关联交易、对外担保及股东会"
+ },
+ "action.actions.extract-transactions.note": {
+  "en_hash": "f5e5d0ce73",
+  "zh": "重大资产重组及其进展阶段、关联交易、对外担保（含逾期金额）及股东会表决结果。"
+ },
+ "action.actions.import-corporate-actions-csv.field.path.label": {
+  "en_hash": "9e18582273",
+  "zh": "CSV 文件"
+ },
+ "action.actions.import-corporate-actions-csv.field.source.hint": {
+  "en_hash": "cf423d5d13",
+  "zh": "数据集或供应商名称，作为来源记录保存。"
+ },
+ "action.actions.import-corporate-actions-csv.field.source.label": {
+  "en_hash": "492cc77196",
+  "zh": "来源标签"
+ },
+ "action.actions.import-corporate-actions-csv.label": {
+  "en_hash": "2e64c9510f",
+  "zh": "从 CSV 导入"
+ },
+ "action.actions.import-corporate-actions-csv.note": {
+  "en_hash": "c53e81fbcf",
+  "zh": "请填写 status 列（例如 COMPLETED），以便股本勾稽使用这些记录。"
+ },
+ "action.actions.reconcile-capital.field.security_code.hint": {
+  "en_hash": "7bb1962600",
+  "zh": "留空则对全部公司运行。"
+ },
+ "action.actions.reconcile-capital.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.actions.reconcile-capital.label": {
+  "en_hash": "f121fd25c7",
+  "zh": "股本勾稽"
+ },
+ "action.actions.reconcile-capital.note": {
+  "en_hash": "fc96362c03",
+  "zh": "检查某一日期的股本加上其后的股本变动是否等于下一日期的股本。"
+ },
+ "action.actions.show-actions.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.actions.show-actions.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.actions.show-actions.label": {
+  "en_hash": "d8de2427f9",
+  "zh": "显示公司行为"
+ },
+ "action.actions.transactions.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.actions.transactions.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.actions.transactions.field.event_type.label": {
+  "en_hash": "3deb745651",
+  "zh": "类型"
+ },
+ "action.actions.transactions.label": {
+  "en_hash": "d69eff0e0f",
+  "zh": "显示交易事项"
+ },
+ "action.board.common-controllers.field.as_of.hint": {
+  "en_hash": "67949cb276",
+  "zh": "可选，YYYY-MM-DD。"
+ },
+ "action.board.common-controllers.field.as_of.label": {
+  "en_hash": "a8770f2d4d",
+  "zh": "截至日期"
+ },
+ "action.board.common-controllers.label": {
+  "en_hash": "1a50898138",
+  "zh": "同一实际控制人下的公司"
+ },
+ "action.board.control.field.as_of.hint": {
+  "en_hash": "67949cb276",
+  "zh": "可选，YYYY-MM-DD。"
+ },
+ "action.board.control.field.as_of.label": {
+  "en_hash": "a8770f2d4d",
+  "zh": "截至日期"
+ },
+ "action.board.control.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.board.control.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.board.control.label": {
+  "en_hash": "ca8b454b48",
+  "zh": "控制关系与企业性质"
+ },
+ "action.board.control.note": {
+  "en_hash": "f1603d3b1a",
+  "zh": "控股股东、实际控制人、企业性质及其依据，以及控制链（以图示显示）。"
+ },
+ "action.board.entity.field.name.label": {
+  "en_hash": "e7ace95911",
+  "zh": "名称或编号"
+ },
+ "action.board.entity.label": {
+  "en_hash": "4c9f1ce987",
+  "zh": "查询机构"
+ },
+ "action.board.entity.note": {
+  "en_hash": "8b78c0411b",
+  "zh": "别名、持股、子公司及其控制的公司。"
+ },
+ "action.board.governance.field.as_of.hint": {
+  "en_hash": "67949cb276",
+  "zh": "可选，YYYY-MM-DD。"
+ },
+ "action.board.governance.field.as_of.label": {
+  "en_hash": "a8770f2d4d",
+  "zh": "截至日期"
+ },
+ "action.board.governance.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.board.governance.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.board.governance.label": {
+  "en_hash": "6d570f6740",
+  "zh": "董事会与公司治理"
+ },
+ "action.board.governance.note": {
+  "en_hash": "19b2108271",
+  "zh": "董事会规模与独立性、董事长与总经理两职合一、最近12个月的离任情况，以及对照证监会《上市公司独立董事管理办法》的筛查。"
+ },
+ "action.board.industry-stats.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.board.industry-stats.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.board.industry-stats.field.metric.label": {
+  "en_hash": "6df1689be2",
+  "zh": "指标或比率"
+ },
+ "action.board.industry-stats.field.min_class.hint": {
+  "en_hash": "1bd7f06492",
+  "zh": "剔除低于该置信度等级的可比公司数值。"
+ },
+ "action.board.industry-stats.field.min_class.label": {
+  "en_hash": "3d74464243",
+  "zh": "最低置信度"
+ },
+ "action.board.industry-stats.field.scheme.label": {
+  "en_hash": "990897a59f",
+  "zh": "分类标准"
+ },
+ "action.board.industry-stats.label": {
+  "en_hash": "eba0c4719a",
+  "zh": "行业内排名"
+ },
+ "action.board.industry-stats.note": {
+  "en_hash": "8304883955",
+  "zh": "可比公司的中位数、四分位数，以及该公司在其中的百分位。"
+ },
+ "action.board.interlocks.field.as_of.hint": {
+  "en_hash": "67949cb276",
+  "zh": "可选，YYYY-MM-DD。"
+ },
+ "action.board.interlocks.field.as_of.label": {
+  "en_hash": "a8770f2d4d",
+  "zh": "截至日期"
+ },
+ "action.board.interlocks.field.code.hint": {
+  "en_hash": "8e8acf50f2",
+  "zh": "留空 = 全部公司"
+ },
+ "action.board.interlocks.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.board.interlocks.label": {
+  "en_hash": "90a06389eb",
+  "zh": "董事兼任关系"
+ },
+ "action.board.interlocks.note": {
+  "en_hash": "411c03b20e",
+  "zh": "存在共同董事的公司，以网络图显示。"
+ },
+ "action.board.peers.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.board.peers.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.board.peers.field.level.label": {
+  "en_hash": "7c7f5d049f",
+  "zh": "级别"
+ },
+ "action.board.peers.field.scheme.label": {
+  "en_hash": "990897a59f",
+  "zh": "分类标准"
+ },
+ "action.board.peers.label": {
+  "en_hash": "b4a499b69e",
+  "zh": "同行业可比公司"
+ },
+ "action.board.resolve-persons.label": {
+  "en_hash": "b8f90244b4",
+  "zh": "跨公司识别董事"
+ },
+ "action.board.resolve-persons.note": {
+  "en_hash": "42851f2a76",
+  "zh": "按姓名、性别及出生年份归并董事和高级管理人员，以便发现兼任关系。"
+ },
+ "action.company.compare.field.codes.hint": {
+  "en_hash": "cad48a146a",
+  "zh": "以逗号分隔。"
+ },
+ "action.company.compare.field.codes.label": {
+  "en_hash": "199993be9f",
+  "zh": "代码"
+ },
+ "action.company.compare.field.metrics.label": {
+  "en_hash": "ddf6a1f0ce",
+  "zh": "指标"
+ },
+ "action.company.compare.label": {
+  "en_hash": "636b8eea9e",
+  "zh": "公司比较"
+ },
+ "action.company.financial-series.field.as_of.hint": {
+  "en_hash": "67949cb276",
+  "zh": "可选，YYYY-MM-DD。"
+ },
+ "action.company.financial-series.field.as_of.label": {
+  "en_hash": "a8770f2d4d",
+  "zh": "截至日期"
+ },
+ "action.company.financial-series.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.company.financial-series.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.company.financial-series.field.metric.label": {
+  "en_hash": "b2bb7604c8",
+  "zh": "指标"
+ },
+ "action.company.financial-series.field.vintage.hint": {
+  "en_hash": "35d5b1f297",
+  "zh": "original = 首次披露的数值；latest = 包括其后的更正或追溯调整。"
+ },
+ "action.company.financial-series.field.vintage.label": {
+  "en_hash": "eceabeee4d",
+  "zh": "版本"
+ },
+ "action.company.financial-series.label": {
+  "en_hash": "c41c2f7070",
+  "zh": "财务数据序列"
+ },
+ "action.company.market-stats.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.company.market-stats.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.company.market-stats.field.end.hint": {
+  "en_hash": "0c6c4102d4",
+  "zh": "可选"
+ },
+ "action.company.market-stats.field.end.label": {
+  "en_hash": "ae79ea1e9c",
+  "zh": "截止"
+ },
+ "action.company.market-stats.field.start.hint": {
+  "en_hash": "0c6c4102d4",
+  "zh": "可选"
+ },
+ "action.company.market-stats.field.start.label": {
+  "en_hash": "3f66052a10",
+  "zh": "起始"
+ },
+ "action.company.market-stats.label": {
+  "en_hash": "ae492e64cf",
+  "zh": "价格统计"
+ },
+ "action.company.report.field.as_of.hint": {
+  "en_hash": "67949cb276",
+  "zh": "可选，YYYY-MM-DD。"
+ },
+ "action.company.report.field.as_of.label": {
+  "en_hash": "a8770f2d4d",
+  "zh": "截至日期"
+ },
+ "action.company.report.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.company.report.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.company.report.label": {
+  "en_hash": "e56521ab1a",
+  "zh": "公司报告（在浏览器中打开）"
+ },
+ "action.company.report.note": {
+  "en_hash": "8bdd2c3196",
+  "zh": "单个 HTML 页面：基本信息、历年财务数据、股东、监管事项及时间线。"
+ },
+ "action.company.timeline.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.company.timeline.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.company.timeline.label": {
+  "en_hash": "018514a3d5",
+  "zh": "时间线"
+ },
+ "action.datasets.adjustment-factors.field.security_code.hint": {
+  "en_hash": "7bb1962600",
+  "zh": "留空则对全部公司运行。"
+ },
+ "action.datasets.adjustment-factors.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.datasets.adjustment-factors.label": {
+  "en_hash": "a9fa99a3f7",
+  "zh": "复权因子"
+ },
+ "action.datasets.adjustment-factors.note": {
+  "en_hash": "a1c27c6924",
+  "zh": "根据已记录的现金红利、送红股、资本公积金转增股本及配股计算，并与数据提供方的复权价格比对。"
+ },
+ "action.datasets.build-panel.field.align.hint": {
+  "en_hash": "1f0849d86f",
+  "zh": "fiscal = 各会计期间的数值；pit = 截至各日期已披露的数值（时点对齐）"
+ },
+ "action.datasets.build-panel.field.align.label": {
+  "en_hash": "7f8c5176c3",
+  "zh": "对齐方式"
+ },
+ "action.datasets.build-panel.field.as_of.hint": {
+  "en_hash": "7a8e6195f8",
+  "zh": "可选：仅使用该日期前已披露的信息"
+ },
+ "action.datasets.build-panel.field.as_of.label": {
+  "en_hash": "4e760eb0ed",
+  "zh": "截至日期"
+ },
+ "action.datasets.build-panel.field.end.hint": {
+  "en_hash": "a4ed21cbf2",
+  "zh": "按会计年度的行须为已结束的年度；本年度的中期数据请将“单位”设为 quarter。"
+ },
+ "action.datasets.build-panel.field.end.label": {
+  "en_hash": "ae79ea1e9c",
+  "zh": "截止"
+ },
+ "action.datasets.build-panel.field.exclude_financials.label": {
+  "en_hash": "3d6cfddb86",
+  "zh": "剔除金融业公司"
+ },
+ "action.datasets.build-panel.field.formats.hint": {
+  "en_hash": "5629ff5f53",
+  "zh": "dta = Stata。安装 pyarrow 组件时提供 Parquet 格式。"
+ },
+ "action.datasets.build-panel.field.formats.label": {
+  "en_hash": "2804d9f16a",
+  "zh": "格式"
+ },
+ "action.datasets.build-panel.field.index.hint": {
+  "en_hash": "cb0f6e0676",
+  "zh": "可选，例如 000300"
+ },
+ "action.datasets.build-panel.field.index.label": {
+  "en_hash": "c2df9b9326",
+  "zh": "指数"
+ },
+ "action.datasets.build-panel.field.min_class.label": {
+  "en_hash": "3d74464243",
+  "zh": "最低置信度"
+ },
+ "action.datasets.build-panel.field.name.label": {
+  "en_hash": "709a23220f",
+  "zh": "名称"
+ },
+ "action.datasets.build-panel.field.start.label": {
+  "en_hash": "3f66052a10",
+  "zh": "起始"
+ },
+ "action.datasets.build-panel.field.unit.label": {
+  "en_hash": "f6b935ab33",
+  "zh": "单位"
+ },
+ "action.datasets.build-panel.field.universe_basis.hint": {
+  "en_hash": "490e5a8cf1",
+  "zh": "auto = 依上市记录于该日期处于上市状态，或（按年度的行）已披露该年度报告；在 universe_basis 列中标明"
+ },
+ "action.datasets.build-panel.field.universe_basis.label": {
+  "en_hash": "96c785251b",
+  "zh": "每行的公司"
+ },
+ "action.datasets.build-panel.field.variables.hint": {
+  "en_hash": "0f171bfd3b",
+  "zh": "留空 = 默认变量组。参见“列出面板数据变量”。"
+ },
+ "action.datasets.build-panel.field.variables.label": {
+  "en_hash": "ac018db1f7",
+  "zh": "变量"
+ },
+ "action.datasets.build-panel.field.winsor.hint": {
+  "en_hash": "945eaf8810",
+  "zh": "可选，例如 1"
+ },
+ "action.datasets.build-panel.field.winsor.label": {
+  "en_hash": "90cb5d7254",
+  "zh": "缩尾处理（%）"
+ },
+ "action.datasets.build-panel.label": {
+  "en_hash": "db2aa9dcc5",
+  "zh": "生成面板数据"
+ },
+ "action.datasets.build-panel.note": {
+  "en_hash": "8eb539aef1",
+  "zh": "输出至 panels 文件夹：数据、变量说明手册（Markdown 及 HTML）、R 读取脚本及清单。完成后打开数据集浏览器。没有记录的面板数据不会写出；输出会说明原因及处理方法。"
+ },
+ "action.datasets.event-study.field.events.hint": {
+  "en_hash": "6dd20d9b33",
+  "zh": "table:TYPE（corporate_actions、regulatory、management、listing），或含 code、date 列的 CSV"
+ },
+ "action.datasets.event-study.field.events.label": {
+  "en_hash": "c5497bca58",
+  "zh": "事件"
+ },
+ "action.datasets.event-study.field.model.label": {
+  "en_hash": "68c2cc7f0c",
+  "zh": "模型"
+ },
+ "action.datasets.event-study.field.name.label": {
+  "en_hash": "709a23220f",
+  "zh": "名称"
+ },
+ "action.datasets.event-study.field.out.label": {
+  "en_hash": "30baa24967",
+  "zh": "文件夹"
+ },
+ "action.datasets.event-study.field.win_end.label": {
+  "en_hash": "ebe8c8c99c",
+  "zh": "窗口终点"
+ },
+ "action.datasets.event-study.field.win_start.label": {
+  "en_hash": "2aa72ea2b9",
+  "zh": "窗口起点"
+ },
+ "action.datasets.event-study.label": {
+  "en_hash": "c40cbe1eb5",
+  "zh": "事件研究"
+ },
+ "action.datasets.event-study.note": {
+  "en_hash": "c8660693b9",
+  "zh": "以等权基准、在第 −250 至 −31 个交易日估计市场模型（可在命令行更改）。输出每个事件的累计超额收益（CAR）、平均值及 t 统计量，并绘制图表。"
+ },
+ "action.datasets.market-snapshots.field.frequency.label": {
+  "en_hash": "89836a870e",
+  "zh": "频率"
+ },
+ "action.datasets.market-snapshots.field.security_code.hint": {
+  "en_hash": "7bb1962600",
+  "zh": "留空则对全部公司运行。"
+ },
+ "action.datasets.market-snapshots.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.datasets.market-snapshots.label": {
+  "en_hash": "edff0f3a68",
+  "zh": "市值与估值比率"
+ },
+ "action.datasets.market-snapshots.note": {
+  "en_hash": "5f546566b5",
+  "zh": "每月末的总市值、市盈率、市净率、市销率及企业价值，依据截至当时已披露的信息。"
+ },
+ "action.datasets.panel-variables.field.group.label": {
+  "en_hash": "171a0606f7",
+  "zh": "类别"
+ },
+ "action.datasets.panel-variables.label": {
+  "en_hash": "1e8cc8f51b",
+  "zh": "列出面板数据变量"
+ },
+ "action.datasets.price-chart.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.datasets.price-chart.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.datasets.price-chart.label": {
+  "en_hash": "eebaa33e5b",
+  "zh": "带事件标注的价格图"
+ },
+ "action.datasets.price-chart.note": {
+  "en_hash": "207a0da083",
+  "zh": "复权收盘价，并标注分红、监管、管理层变动及上市相关事件。"
+ },
+ "action.datasets.version.label": {
+  "en_hash": "29be9326ad",
+  "zh": "打开数据集浏览器"
+ },
+ "action.datasets.version.note": {
+  "en_hash": "37cdcdd963",
+  "zh": "任一面板数据的直方图、分年度分布、带拟合线的散点图、覆盖率及相关系数。"
+ },
+ "action.disclosures.catalogue-days.field.by_day.hint": {
+  "en_hash": "da941bbc05",
+  "zh": "通常，以单次检索读取的若干公告稀少日为一行，显示其总数与缺口。"
+ },
+ "action.disclosures.catalogue-days.field.by_day.label": {
+  "en_hash": "16025a30fe",
+  "zh": "每日一行"
+ },
+ "action.disclosures.catalogue-days.field.kind.label": {
+  "en_hash": "3deb745651",
+  "zh": "类型"
+ },
+ "action.disclosures.catalogue-days.field.problems.label": {
+  "en_hash": "892cebb09d",
+  "zh": "仅显示未完成的日期"
+ },
+ "action.disclosures.catalogue-days.label": {
+  "en_hash": "77df5a29a9",
+  "zh": "已编制目录的日期"
+ },
+ "action.disclosures.catalogue-days.note": {
+  "en_hash": "e154ce61ac",
+  "zh": "每日状态（DONE 已完成，SHORTFALL 数量缺口，FAILED 失败，OPEN 当日未结束），以及巨潮资讯网的总数与已保存数量。"
+ },
+ "action.disclosures.catalogue-disclosures.field.download.hint": {
+  "en_hash": "cc11f04a18",
+  "zh": "全市场需要数小时；可取消勾选先编制目录，再用“下载目录中的文件”下载所需类别。"
+ },
+ "action.disclosures.catalogue-disclosures.field.download.label": {
+  "en_hash": "6d48e56283",
+  "zh": "下载文件"
+ },
+ "action.disclosures.catalogue-disclosures.field.kind.hint": {
+  "en_hash": "78653738ce",
+  "zh": "reports = 定期报告。提取监管事项前请选择 all。"
+ },
+ "action.disclosures.catalogue-disclosures.field.kind.label": {
+  "en_hash": "3deb745651",
+  "zh": "类型"
+ },
+ "action.disclosures.catalogue-disclosures.field.refresh.hint": {
+  "en_hash": "e049d9ae84",
+  "zh": "全市场：默认跳过已完成的日期，再次运行将从上次中断处继续。勾选则重新获取。"
+ },
+ "action.disclosures.catalogue-disclosures.field.refresh.label": {
+  "en_hash": "51b5aa0882",
+  "zh": "重新获取已完成的日期"
+ },
+ "action.disclosures.catalogue-disclosures.field.security_code.hint": {
+  "en_hash": "91884edb67",
+  "zh": "留空 = 全市场：每个期间进行一次全市场检索，公告密集日分段检索，避免遗漏。"
+ },
+ "action.disclosures.catalogue-disclosures.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.disclosures.catalogue-disclosures.field.since.label": {
+  "en_hash": "3f66052a10",
+  "zh": "起始"
+ },
+ "action.disclosures.catalogue-disclosures.field.until.label": {
+  "en_hash": "ae79ea1e9c",
+  "zh": "截止"
+ },
+ "action.disclosures.catalogue-disclosures.label": {
+  "en_hash": "40415c2510",
+  "zh": "编制公告目录"
+ },
+ "action.disclosures.catalogue-disclosures.note": {
+  "en_hash": "afbe533c4d",
+  "zh": "请先以一家公司检查连接，再扩大范围。运行进度显示于下方，按“停止”可安全结束；再次运行将从第一个未完成的日期继续。每日数量均与巨潮资讯网的总数核对，存在数量缺口或失败的日期将在结尾列出。"
+ },
+ "action.disclosures.download-documents.field.kinds.label": {
+  "en_hash": "1f207bb143",
+  "zh": "类别"
+ },
+ "action.disclosures.download-documents.field.security_code.hint": {
+  "en_hash": "0c414bade9",
+  "zh": "留空 = 全部公司。"
+ },
+ "action.disclosures.download-documents.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.disclosures.download-documents.label": {
+  "en_hash": "30ff663671",
+  "zh": "下载目录中的文件"
+ },
+ "action.disclosures.download-documents.note": {
+  "en_hash": "1e005139b8",
+  "zh": "下载目录中尚未保存到本地的文件，按日期从新到旧。可续传：已下载的文件会跳过。"
+ },
+ "action.disclosures.probe-cninfo-filters.field.day.label": {
+  "en_hash": "043e4bcf71",
+  "zh": "公告密集日（特别密集）"
+ },
+ "action.disclosures.probe-cninfo-filters.label": {
+  "en_hash": "66e69cf6cd",
+  "zh": "检查巨潮资讯网的检索条件"
+ },
+ "action.disclosures.probe-cninfo-filters.note": {
+  "en_hash": "c8e5cf8676",
+  "zh": "约 70 至 120 次请求：检查全市场检索时哪些板块代码、行业与公司筛选条件及排序方式有效，以及部分记录为何重复。编制目录时程序会同样检查；请保留输出以备查。"
+ },
+ "action.disclosures.probe-cninfo-paging.field.day.label": {
+  "en_hash": "22ce02da2c",
+  "zh": "公告密集日"
+ },
+ "action.disclosures.probe-cninfo-paging.label": {
+  "en_hash": "479dc8c1cb",
+  "zh": "检查巨潮资讯网的分页上限"
+ },
+ "action.disclosures.probe-cninfo-paging.note": {
+  "en_hash": "020106812f",
+  "zh": "四次请求：读取某一公告密集日的第1、100、101及150页，查看单次检索是否止于3,000条结果。请保留输出以备查。"
+ },
+ "action.disclosures.recatalogue-busy-days.field.kind.label": {
+  "en_hash": "3deb745651",
+  "zh": "类型"
+ },
+ "action.disclosures.recatalogue-busy-days.field.since.hint": {
+  "en_hash": "0c6c4102d4",
+  "zh": "可选"
+ },
+ "action.disclosures.recatalogue-busy-days.field.since.label": {
+  "en_hash": "3f66052a10",
+  "zh": "起始"
+ },
+ "action.disclosures.recatalogue-busy-days.field.until.hint": {
+  "en_hash": "0c6c4102d4",
+  "zh": "可选"
+ },
+ "action.disclosures.recatalogue-busy-days.field.until.label": {
+  "en_hash": "ae79ea1e9c",
+  "zh": "截止"
+ },
+ "action.disclosures.recatalogue-busy-days.label": {
+  "en_hash": "80709a13cb",
+  "zh": "重新编制公告密集日目录"
+ },
+ "action.disclosures.recatalogue-busy-days.note": {
+  "en_hash": "e89bfde5c8",
+  "zh": "重新获取失败的日期、在早期版本下存在数量缺口的日期，以及早期版本在3,000条公告处截断的日期。在当前方法下缺口仍然出现的日期不再重复获取，因为同样的检索无法补齐。"
+ },
+ "action.disclosures.scan-documents.field.security_code.hint": {
+  "en_hash": "7bb1962600",
+  "zh": "留空则对全部公司运行。"
+ },
+ "action.disclosures.scan-documents.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.disclosures.scan-documents.label": {
+  "en_hash": "1d576135c2",
+  "zh": "检查文件中的扫描页"
+ },
+ "action.disclosures.scan-documents.note": {
+  "en_hash": "f74762949e",
+  "zh": "列出无文本层的已下载 PDF。解析器无法读取此类文件；请手工录入或导入其数值。"
+ },
+ "action.disclosures.search-disclosures.field.query.hint": {
+  "en_hash": "30ce3e805e",
+  "zh": "例如 权益分派 或 行政处罚"
+ },
+ "action.disclosures.search-disclosures.field.query.label": {
+  "en_hash": "43a741bfce",
+  "zh": "标题关键词"
+ },
+ "action.disclosures.search-disclosures.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.disclosures.search-disclosures.field.since.hint": {
+  "en_hash": "4ed3474b7a",
+  "zh": "可选，YYYY-MM-DD"
+ },
+ "action.disclosures.search-disclosures.field.since.label": {
+  "en_hash": "3f66052a10",
+  "zh": "起始"
+ },
+ "action.disclosures.search-disclosures.label": {
+  "en_hash": "3a0a093b66",
+  "zh": "按标题查找公告"
+ },
+ "action.financials.extract-financials.field.again.hint": {
+  "en_hash": "02a847293c",
+  "zh": "通常会跳过已读取的文件，停止后再次运行将从中断处继续。"
+ },
+ "action.financials.extract-financials.field.again.label": {
+  "en_hash": "cd28fa3d60",
+  "zh": "重新读取文件"
+ },
+ "action.financials.extract-financials.field.kind.hint": {
+  "en_hash": "248ac885f7",
+  "zh": "reports 只读取定期报告；all 读取所有已下载文件，其中多数不含财务报表。"
+ },
+ "action.financials.extract-financials.field.kind.label": {
+  "en_hash": "88bc3fe3da",
+  "zh": "报告"
+ },
+ "action.financials.extract-financials.field.security_code.hint": {
+  "en_hash": "7bb1962600",
+  "zh": "留空则对全部公司运行。"
+ },
+ "action.financials.extract-financials.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.financials.extract-financials.label": {
+  "en_hash": "c1134a4c19",
+  "zh": "从报告中提取数据"
+ },
+ "action.financials.show-financials.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.financials.show-financials.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.financials.show-financials.field.metric.hint": {
+  "en_hash": "133e74641f",
+  "zh": "例如 revenue、net_profit、total_assets"
+ },
+ "action.financials.show-financials.field.metric.label": {
+  "en_hash": "b2bb7604c8",
+  "zh": "指标"
+ },
+ "action.financials.show-financials.label": {
+  "en_hash": "1532668164",
+  "zh": "显示公司的财务数据"
+ },
+ "action.financials.validate-financials.field.security_code.hint": {
+  "en_hash": "7bb1962600",
+  "zh": "留空则对全部公司运行。"
+ },
+ "action.financials.validate-financials.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.financials.validate-financials.label": {
+  "en_hash": "873343b258",
+  "zh": "校验资产负债表"
+ },
+ "action.financials.validate-financials.note": {
+  "en_hash": "b6f2e13f0b",
+  "zh": "检查每份报告的资产 = 负债 + 所有者权益；不符者予以标记，从不改动。"
+ },
+ "action.indices.build-calendar.label": {
+  "en_hash": "71e30d8c90",
+  "zh": "生成交易日历"
+ },
+ "action.indices.build-calendar.note": {
+  "en_hash": "6d53c3a2bb",
+  "zh": "根据已下载的价格推断交易日。也可改为导入官方交易日历。"
+ },
+ "action.indices.company-indices.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.indices.company-indices.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.indices.company-indices.field.on.hint": {
+  "en_hash": "89d3838f29",
+  "zh": "留空 = 今日"
+ },
+ "action.indices.company-indices.field.on.label": {
+  "en_hash": "eb9a4bc1c0",
+  "zh": "日期"
+ },
+ "action.indices.company-indices.label": {
+  "en_hash": "31dfff57b0",
+  "zh": "公司所属指数"
+ },
+ "action.indices.company-indices.note": {
+  "en_hash": "fb0e6ff15e",
+  "zh": "同时显示是否须披露可持续发展报告（上证180、科创50、深证100及创业板指的样本公司，自2025会计年度起）。"
+ },
+ "action.indices.import-calendar-csv.field.exchange.label": {
+  "en_hash": "5b13eac7ed",
+  "zh": "证券交易所"
+ },
+ "action.indices.import-calendar-csv.field.path.label": {
+  "en_hash": "9e18582273",
+  "zh": "CSV 文件"
+ },
+ "action.indices.import-calendar-csv.label": {
+  "en_hash": "ca71898270",
+  "zh": "导入交易日历"
+ },
+ "action.indices.import-calendar-csv.note": {
+  "en_hash": "816e7e99c6",
+  "zh": "列：trade_date、is_open。"
+ },
+ "action.indices.import-index-csv.field.path.label": {
+  "en_hash": "9e18582273",
+  "zh": "CSV 文件"
+ },
+ "action.indices.import-index-csv.field.source.hint": {
+  "en_hash": "cf423d5d13",
+  "zh": "数据集或供应商名称，作为来源记录保存。"
+ },
+ "action.indices.import-index-csv.field.source.label": {
+  "en_hash": "492cc77196",
+  "zh": "来源标签"
+ },
+ "action.indices.import-index-csv.label": {
+  "en_hash": "2da0f2fed3",
+  "zh": "导入指数样本"
+ },
+ "action.indices.import-index-csv.note": {
+  "en_hash": "b8faaab19e",
+  "zh": "可为期间格式（index_code、security_code、valid_from、valid_to），或调整格式（index_code、security_code、effective_date、action 为 ADD/REMOVE 或 调入/调出）。"
+ },
+ "action.indices.index-members.field.index.hint": {
+  "en_hash": "e19fde3561",
+  "zh": "000300 沪深300，000905 中证500，000010 上证180，000688 科创50，399330 深证100，399006 创业板指"
+ },
+ "action.indices.index-members.field.index.label": {
+  "en_hash": "a1abffe740",
+  "zh": "指数代码"
+ },
+ "action.indices.index-members.field.on.label": {
+  "en_hash": "eb9a4bc1c0",
+  "zh": "日期"
+ },
+ "action.indices.index-members.label": {
+  "en_hash": "f8886a44e5",
+  "zh": "某一日期的指数样本"
+ },
+ "action.indices.suspensions.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.indices.suspensions.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.indices.suspensions.field.end.label": {
+  "en_hash": "ae79ea1e9c",
+  "zh": "截止"
+ },
+ "action.indices.suspensions.field.start.label": {
+  "en_hash": "3f66052a10",
+  "zh": "起始"
+ },
+ "action.indices.suspensions.label": {
+  "en_hash": "5430a91879",
+  "zh": "停牌日"
+ },
+ "action.indices.suspensions.note": {
+  "en_hash": "ad0c3b6f6b",
+  "zh": "无价格的开市交易日，按连续区间归组，并与停牌公告对照。"
+ },
+ "action.industry.import-industry-csv.field.effective_date.hint": {
+  "en_hash": "8f5f35abf0",
+  "zh": "文件无日期列时必填，例如 2026-06-30。"
+ },
+ "action.industry.import-industry-csv.field.effective_date.label": {
+  "en_hash": "153c9b2157",
+  "zh": "生效日期"
+ },
+ "action.industry.import-industry-csv.field.path.label": {
+  "en_hash": "9e18582273",
+  "zh": "CSV 文件"
+ },
+ "action.industry.import-industry-csv.field.scheme.hint": {
+  "en_hash": "edb0fffd90",
+  "zh": "证监会行业分类由证监会公布；申万行业分类为许可数据。"
+ },
+ "action.industry.import-industry-csv.field.scheme.label": {
+  "en_hash": "990897a59f",
+  "zh": "分类标准"
+ },
+ "action.industry.import-industry-csv.field.source.hint": {
+  "en_hash": "cf423d5d13",
+  "zh": "数据集或供应商名称，作为来源记录保存。"
+ },
+ "action.industry.import-industry-csv.field.source.label": {
+  "en_hash": "492cc77196",
+  "zh": "来源标签"
+ },
+ "action.industry.import-industry-csv.label": {
+  "en_hash": "6ffee8a9b6",
+  "zh": "导入行业分类表"
+ },
+ "action.industry.import-industry-csv.note": {
+  "en_hash": "0a3020666b",
+  "zh": "接受英文或中文表头（证券代码、门类代码、大类代码、行业名称……）。代码将按分类标准校验。"
+ },
+ "action.industry.industry-summary.field.level.label": {
+  "en_hash": "7c7f5d049f",
+  "zh": "级别"
+ },
+ "action.industry.industry-summary.field.scheme.label": {
+  "en_hash": "990897a59f",
+  "zh": "分类标准"
+ },
+ "action.industry.industry-summary.label": {
+  "en_hash": "fb9d8f2755",
+  "zh": "各行业公司数"
+ },
+ "action.industry.show-industry.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.industry.show-industry.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.industry.show-industry.label": {
+  "en_hash": "3cefb78b65",
+  "zh": "显示公司的行业分类"
+ },
+ "action.management.extract-management.field.again.hint": {
+  "en_hash": "93e93f4859",
+  "zh": "通常会跳过本版本已读取的报告，停止后再次运行将从中断处继续。"
+ },
+ "action.management.extract-management.field.again.label": {
+  "en_hash": "d1257059f1",
+  "zh": "重新读取报告"
+ },
+ "action.management.extract-management.field.docs.label": {
+  "en_hash": "573413d578",
+  "zh": "读取已下载的文件"
+ },
+ "action.management.extract-management.field.security_code.hint": {
+  "en_hash": "7bb1962600",
+  "zh": "留空则对全部公司运行。"
+ },
+ "action.management.extract-management.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.management.extract-management.label": {
+  "en_hash": "005dba3ade",
+  "zh": "从公告及年度报告中提取"
+ },
+ "action.management.extract-management.note": {
+  "en_hash": "9970894fa1",
+  "zh": "请先以类型 all（公告）及 annual（年度报告）编制公告目录。"
+ },
+ "action.management.import-management-csv.field.path.label": {
+  "en_hash": "9e18582273",
+  "zh": "CSV 文件"
+ },
+ "action.management.import-management-csv.field.source.hint": {
+  "en_hash": "cf423d5d13",
+  "zh": "数据集或供应商名称，作为来源记录保存。"
+ },
+ "action.management.import-management-csv.field.source.label": {
+  "en_hash": "492cc77196",
+  "zh": "来源标签"
+ },
+ "action.management.import-management-csv.label": {
+  "en_hash": "3b30ef0cef",
+  "zh": "导入人员名单"
+ },
+ "action.management.import-management-csv.note": {
+  "en_hash": "0467bcf142",
+  "zh": "列：security_code、observation_date、person_name、role、gender、age、tenure_start、tenure_end、remuneration。"
+ },
+ "action.management.roster.field.as_of.hint": {
+  "en_hash": "67949cb276",
+  "zh": "可选，YYYY-MM-DD。"
+ },
+ "action.management.roster.field.as_of.label": {
+  "en_hash": "a8770f2d4d",
+  "zh": "截至日期"
+ },
+ "action.management.roster.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.management.roster.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.management.roster.label": {
+  "en_hash": "72c76064f2",
+  "zh": "某一日期的人员名单"
+ },
+ "action.management.show-management-events.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.management.show-management-events.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.management.show-management-events.label": {
+  "en_hash": "619dc4c46e",
+  "zh": "显示聘任（选举）与辞职"
+ },
+ "action.market.acquire-market.field.adjust.hint": {
+  "en_hash": "a74fcbf9f7",
+  "zh": "每项分析只使用一种复权方式。"
+ },
+ "action.market.acquire-market.field.adjust.label": {
+  "en_hash": "7f0496ac26",
+  "zh": "复权方式"
+ },
+ "action.market.acquire-market.field.end.label": {
+  "en_hash": "ae79ea1e9c",
+  "zh": "截止"
+ },
+ "action.market.acquire-market.field.provider.hint": {
+  "en_hash": "6ed9d8e5cf",
+  "zh": "留空 = 使用“设置”中选择的数据源。"
+ },
+ "action.market.acquire-market.field.provider.label": {
+  "en_hash": "6da13addb0",
+  "zh": "来源"
+ },
+ "action.market.acquire-market.field.security_code.hint": {
+  "en_hash": "7bb1962600",
+  "zh": "留空则对全部公司运行。"
+ },
+ "action.market.acquire-market.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.market.acquire-market.field.start.label": {
+  "en_hash": "3f66052a10",
+  "zh": "起始"
+ },
+ "action.market.acquire-market.label": {
+  "en_hash": "43188b6fb0",
+  "zh": "下载日行情价格"
+ },
+ "action.market.diagnose-prices.field.code.hint": {
+  "en_hash": "5268da372b",
+  "zh": "任一上市公司；不保存任何数据。"
+ },
+ "action.market.diagnose-prices.field.code.label": {
+  "en_hash": "7a1994999d",
+  "zh": "公司"
+ },
+ "action.market.diagnose-prices.label": {
+  "en_hash": "a03d349ec1",
+  "zh": "测试价格来源"
+ },
+ "action.market.diagnose-prices.note": {
+  "en_hash": "6dbd9fa2bb",
+  "zh": "向每个公开数据源请求该公司最近一个月的价格，并报告各数据源的返回结果。"
+ },
+ "action.market.import-market-csv.field.path.label": {
+  "en_hash": "9e18582273",
+  "zh": "CSV 文件"
+ },
+ "action.market.import-market-csv.field.security_code.hint": {
+  "en_hash": "bad5ba13e2",
+  "zh": "仅当文件只含一家公司时填写。"
+ },
+ "action.market.import-market-csv.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.market.import-market-csv.field.source.hint": {
+  "en_hash": "cf423d5d13",
+  "zh": "数据集或供应商名称，作为来源记录保存。"
+ },
+ "action.market.import-market-csv.field.source.label": {
+  "en_hash": "492cc77196",
+  "zh": "来源标签"
+ },
+ "action.market.import-market-csv.label": {
+  "en_hash": "ae58673ae5",
+  "zh": "从 CSV 导入价格"
+ },
+ "action.market.import-market-csv.note": {
+  "en_hash": "e60f8df79e",
+  "zh": "列：code、date、open、high、low、close（其他列可选）。"
+ },
+ "action.market.show-market.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.market.show-market.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.market.show-market.field.start.hint": {
+  "en_hash": "0c6c4102d4",
+  "zh": "可选"
+ },
+ "action.market.show-market.field.start.label": {
+  "en_hash": "3f66052a10",
+  "zh": "起始"
+ },
+ "action.market.show-market.label": {
+  "en_hash": "586a96d3a7",
+  "zh": "显示价格"
+ },
+ "action.ownership.extract-control.field.again.hint": {
+  "en_hash": "93e93f4859",
+  "zh": "通常会跳过本版本已读取的报告，停止后再次运行将从中断处继续。"
+ },
+ "action.ownership.extract-control.field.again.label": {
+  "en_hash": "d1257059f1",
+  "zh": "重新读取报告"
+ },
+ "action.ownership.extract-control.field.security_code.hint": {
+  "en_hash": "7bb1962600",
+  "zh": "留空则对全部公司运行。"
+ },
+ "action.ownership.extract-control.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.ownership.extract-control.label": {
+  "en_hash": "7b982b214a",
+  "zh": "读取控股股东与实际控制人"
+ },
+ "action.ownership.extract-control.note": {
+  "en_hash": "02ce6e107c",
+  "zh": "同时划分企业性质（中央国有企业、地方国有企业、民营企业、外资企业、集体企业、无实际控制人），并记录依据。"
+ },
+ "action.ownership.extract-pledges.field.security_code.hint": {
+  "en_hash": "7bb1962600",
+  "zh": "留空则对全部公司运行。"
+ },
+ "action.ownership.extract-pledges.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.ownership.extract-pledges.label": {
+  "en_hash": "9d923ae79c",
+  "zh": "读取股份质押"
+ },
+ "action.ownership.extract-pledges.note": {
+  "en_hash": "6200d6a2ab",
+  "zh": "股份质押及解除质押公告（请先以类别 all 编制目录）。"
+ },
+ "action.ownership.extract-top-holders.field.again.hint": {
+  "en_hash": "93e93f4859",
+  "zh": "通常会跳过本版本已读取的报告，停止后再次运行将从中断处继续。"
+ },
+ "action.ownership.extract-top-holders.field.again.label": {
+  "en_hash": "d1257059f1",
+  "zh": "重新读取报告"
+ },
+ "action.ownership.extract-top-holders.field.security_code.hint": {
+  "en_hash": "7bb1962600",
+  "zh": "留空则对全部公司运行。"
+ },
+ "action.ownership.extract-top-holders.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.ownership.extract-top-holders.label": {
+  "en_hash": "286b578bed",
+  "zh": "从报告中读取前十名股东"
+ },
+ "action.ownership.extract-top-holders.note": {
+  "en_hash": "a8d8b982bb",
+  "zh": "取自已下载定期报告中的“前十名股东持股情况”及前十名无限售条件股东持股情况表。"
+ },
+ "action.ownership.import-capital-csv.field.path.label": {
+  "en_hash": "9e18582273",
+  "zh": "CSV 文件"
+ },
+ "action.ownership.import-capital-csv.field.source.hint": {
+  "en_hash": "cf423d5d13",
+  "zh": "数据集或供应商名称，作为来源记录保存。"
+ },
+ "action.ownership.import-capital-csv.field.source.label": {
+  "en_hash": "492cc77196",
+  "zh": "来源标签"
+ },
+ "action.ownership.import-capital-csv.label": {
+  "en_hash": "ead37bdfce",
+  "zh": "导入股本"
+ },
+ "action.ownership.import-capital-csv.note": {
+  "en_hash": "8b0b9bbcea",
+  "zh": "列：security_code、observation_date、total_shares、tradable_shares、restricted_shares……"
+ },
+ "action.ownership.import-control-csv.field.path.label": {
+  "en_hash": "9e18582273",
+  "zh": "CSV 文件"
+ },
+ "action.ownership.import-control-csv.field.source.hint": {
+  "en_hash": "cf423d5d13",
+  "zh": "数据集或供应商名称，作为来源记录保存。"
+ },
+ "action.ownership.import-control-csv.field.source.label": {
+  "en_hash": "492cc77196",
+  "zh": "来源标签"
+ },
+ "action.ownership.import-control-csv.label": {
+  "en_hash": "ed8213037b",
+  "zh": "导入控制人"
+ },
+ "action.ownership.import-control-csv.note": {
+  "en_hash": "53b2881b64",
+  "zh": "列：security_code、observation_date、controlling_shareholder、actual_controller、ownership_type。"
+ },
+ "action.ownership.import-control-edges-csv.field.path.label": {
+  "en_hash": "9e18582273",
+  "zh": "CSV 文件"
+ },
+ "action.ownership.import-control-edges-csv.field.source.hint": {
+  "en_hash": "cf423d5d13",
+  "zh": "数据集或供应商名称，作为来源记录保存。"
+ },
+ "action.ownership.import-control-edges-csv.field.source.label": {
+  "en_hash": "492cc77196",
+  "zh": "来源标签"
+ },
+ "action.ownership.import-control-edges-csv.label": {
+  "en_hash": "27e68fa97c",
+  "zh": "导入控制链关系"
+ },
+ "action.ownership.import-control-edges-csv.note": {
+  "en_hash": "5706470369",
+  "zh": "用于报告中“方框图”所示的持股比例：security_code、observation_date、parent_name、child_name、pct。"
+ },
+ "action.ownership.import-ownership-csv.field.path.label": {
+  "en_hash": "9e18582273",
+  "zh": "CSV 文件"
+ },
+ "action.ownership.import-ownership-csv.field.source.hint": {
+  "en_hash": "cf423d5d13",
+  "zh": "数据集或供应商名称，作为来源记录保存。"
+ },
+ "action.ownership.import-ownership-csv.field.source.label": {
+  "en_hash": "492cc77196",
+  "zh": "来源标签"
+ },
+ "action.ownership.import-ownership-csv.label": {
+  "en_hash": "eb5beb23f0",
+  "zh": "导入股东"
+ },
+ "action.ownership.import-ownership-csv.note": {
+  "en_hash": "f5cb3a3ae0",
+  "zh": "列：security_code、observation_date、shareholder_name、rank、shares、ownership_pct……"
+ },
+ "action.ownership.resolve-entities.label": {
+  "en_hash": "48845f56f0",
+  "zh": "关联机构与人员"
+ },
+ "action.ownership.resolve-entities.note": {
+  "en_hash": "00605a3aa8",
+  "zh": "建立作为股东、子公司及控制人出现的机构名录。然后在“董事会与行业”页面运行“跨公司识别董事”。"
+ },
+ "action.ownership.show-capital.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.ownership.show-capital.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.ownership.show-capital.label": {
+  "en_hash": "dfb31bb273",
+  "zh": "显示股本"
+ },
+ "action.ownership.show-ownership.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.ownership.show-ownership.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.ownership.show-ownership.label": {
+  "en_hash": "58eb378a07",
+  "zh": "显示股东"
+ },
+ "action.people.esg.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.people.esg.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.people.esg.field.year.hint": {
+  "en_hash": "eb1ef3bd70",
+  "zh": "可选，例如 2025；留空 = 最新。"
+ },
+ "action.people.esg.field.year.label": {
+  "en_hash": "6ce9c84539",
+  "zh": "会计年度"
+ },
+ "action.people.esg.label": {
+  "en_hash": "a50554871d",
+  "zh": "ESG 概况"
+ },
+ "action.people.esg.note": {
+  "en_hash": "93a9ef56c6",
+  "zh": "已披露的环境与社会数据、公司治理指标、监管措施及评级。不计算综合评分。"
+ },
+ "action.people.human-capital-history.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.people.human-capital-history.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.people.human-capital-history.label": {
+  "en_hash": "3067eac219",
+  "zh": "研发投入与员工情况历年数据"
+ },
+ "action.people.human-capital.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.people.human-capital.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.people.human-capital.field.period.hint": {
+  "en_hash": "1012a2c531",
+  "zh": "可选，YYYY-MM-DD；留空 = 最近年度。"
+ },
+ "action.people.human-capital.field.period.label": {
+  "en_hash": "170a28a9db",
+  "zh": "期间"
+ },
+ "action.people.human-capital.label": {
+  "en_hash": "7520e9bbbb",
+  "zh": "研发投入与员工情况"
+ },
+ "action.people.human-capital.note": {
+  "en_hash": "168bdd41cf",
+  "zh": "研发投入占比及资本化情况、研发人员、按专业构成和教育程度划分的员工、专利。"
+ },
+ "action.people_esg.extract-esg.field.security_code.hint": {
+  "en_hash": "7bb1962600",
+  "zh": "留空则对全部公司运行。"
+ },
+ "action.people_esg.extract-esg.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.people_esg.extract-esg.label": {
+  "en_hash": "05d666f105",
+  "zh": "从报告中提取 ESG 信息"
+ },
+ "action.people_esg.extract-esg.note": {
+  "en_hash": "ec730b3fda",
+  "zh": "读取年度报告及可持续发展报告（ESG 报告）：重点排污单位情况、排放、温室气体、对外捐赠、乡村振兴。请先以类型 all 编制公告目录。"
+ },
+ "action.people_esg.extract-human-capital.field.again.hint": {
+  "en_hash": "93e93f4859",
+  "zh": "通常会跳过本版本已读取的报告，停止后再次运行将从中断处继续。"
+ },
+ "action.people_esg.extract-human-capital.field.again.label": {
+  "en_hash": "d1257059f1",
+  "zh": "重新读取报告"
+ },
+ "action.people_esg.extract-human-capital.field.security_code.hint": {
+  "en_hash": "7bb1962600",
+  "zh": "留空则对全部公司运行。"
+ },
+ "action.people_esg.extract-human-capital.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.people_esg.extract-human-capital.label": {
+  "en_hash": "5e926cb498",
+  "zh": "从报告中提取研发投入与员工情况"
+ },
+ "action.people_esg.extract-human-capital.note": {
+  "en_hash": "dd5099db39",
+  "zh": "读取“研发投入”表、“员工情况”（专业构成及教育程度）及专利数量。"
+ },
+ "action.people_esg.import-esg-ratings-csv.field.path.label": {
+  "en_hash": "9e18582273",
+  "zh": "CSV 文件"
+ },
+ "action.people_esg.import-esg-ratings-csv.field.source.hint": {
+  "en_hash": "cf423d5d13",
+  "zh": "数据集或供应商名称，作为来源记录保存。"
+ },
+ "action.people_esg.import-esg-ratings-csv.field.source.label": {
+  "en_hash": "492cc77196",
+  "zh": "来源标签"
+ },
+ "action.people_esg.import-esg-ratings-csv.label": {
+  "en_hash": "8d4c7dede1",
+  "zh": "导入 ESG 评级"
+ },
+ "action.people_esg.import-esg-ratings-csv.note": {
+  "en_hash": "867b4dc5fa",
+  "zh": "列：security_code、provider、rating_date、rating、score。评级属于许可数据。"
+ },
+ "action.people_esg.import-human-capital-csv.field.path.label": {
+  "en_hash": "9e18582273",
+  "zh": "CSV 文件"
+ },
+ "action.people_esg.import-human-capital-csv.field.source.hint": {
+  "en_hash": "cf423d5d13",
+  "zh": "数据集或供应商名称，作为来源记录保存。"
+ },
+ "action.people_esg.import-human-capital-csv.field.source.label": {
+  "en_hash": "492cc77196",
+  "zh": "来源标签"
+ },
+ "action.people_esg.import-human-capital-csv.label": {
+  "en_hash": "92683be9cd",
+  "zh": "导入研发投入与员工数据"
+ },
+ "action.people_esg.import-human-capital-csv.note": {
+  "en_hash": "ae1f84ceaf",
+  "zh": "长格式：security_code、reporting_period、item、value（项目代码：运行 human-capital-items 查看）。"
+ },
+ "action.regulatory.extract-regulatory-events.field.again.hint": {
+  "en_hash": "93e93f4859",
+  "zh": "通常会跳过本版本已读取的报告，停止后再次运行将从中断处继续。"
+ },
+ "action.regulatory.extract-regulatory-events.field.again.label": {
+  "en_hash": "d1257059f1",
+  "zh": "重新读取报告"
+ },
+ "action.regulatory.extract-regulatory-events.field.docs.label": {
+  "en_hash": "573413d578",
+  "zh": "读取已下载的文件"
+ },
+ "action.regulatory.extract-regulatory-events.field.security_code.hint": {
+  "en_hash": "7bb1962600",
+  "zh": "留空则对全部公司运行。"
+ },
+ "action.regulatory.extract-regulatory-events.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.regulatory.extract-regulatory-events.label": {
+  "en_hash": "c1fe94c2cd",
+  "zh": "从公告中提取"
+ },
+ "action.regulatory.extract-regulatory-events.note": {
+  "en_hash": "3d3b4ea77f",
+  "zh": "请先以类型 all 编制公告目录：此类事项分属多个公告类别。"
+ },
+ "action.regulatory.import-regulatory-document.field.path.hint": {
+  "en_hash": "32fd96854a",
+  "zh": "证监会或证券交易所的决定书（PDF、HTML 或文本）。"
+ },
+ "action.regulatory.import-regulatory-document.field.path.label": {
+  "en_hash": "c3117a0b2a",
+  "zh": "文件或网址"
+ },
+ "action.regulatory.import-regulatory-document.field.security_code.hint": {
+  "en_hash": "61518d8200",
+  "zh": "留空 = 根据文件自动识别。"
+ },
+ "action.regulatory.import-regulatory-document.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.regulatory.import-regulatory-document.label": {
+  "en_hash": "1609039dfd",
+  "zh": "导入监管机构的决定书"
+ },
+ "action.regulatory.regulatory-status.field.as_of.hint": {
+  "en_hash": "e4e0e957a7",
+  "zh": "可选，YYYY-MM-DD；留空 = 最新。"
+ },
+ "action.regulatory.regulatory-status.field.as_of.label": {
+  "en_hash": "a8770f2d4d",
+  "zh": "截至日期"
+ },
+ "action.regulatory.regulatory-status.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.regulatory.regulatory-status.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.regulatory.regulatory-status.label": {
+  "en_hash": "751b486b30",
+  "zh": "某一日期的监管状态"
+ },
+ "action.regulatory.show-events.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.regulatory.show-events.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.regulatory.show-events.label": {
+  "en_hash": "50cb854d59",
+  "zh": "显示监管事项"
+ },
+ "action.research.chart.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.research.chart.field.kind.label": {
+  "en_hash": "66c7734789",
+  "zh": "图表"
+ },
+ "action.research.chart.field.metrics.label": {
+  "en_hash": "b5e2d31cc2",
+  "zh": "指标（财务数据）"
+ },
+ "action.research.chart.field.out.hint": {
+  "en_hash": "6b84ea2c04",
+  "zh": "不含扩展名的文件名"
+ },
+ "action.research.chart.field.out.label": {
+  "en_hash": "f313a0b181",
+  "zh": "另存为"
+ },
+ "action.research.chart.label": {
+  "en_hash": "65cf77d0d5",
+  "zh": "导出图表"
+ },
+ "action.research.chart.note": {
+  "en_hash": "db9b382e2f",
+  "zh": "输出 SVG（用于论文及演示文稿）及与图表数据完全一致的 CSV；安装 matplotlib 时（源代码安装）另输出 PNG。"
+ },
+ "action.research.export.field.out.label": {
+  "en_hash": "30baa24967",
+  "zh": "文件夹"
+ },
+ "action.research.export.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.research.export.field.table.label": {
+  "en_hash": "0424f6e702",
+  "zh": "数据表"
+ },
+ "action.research.export.label": {
+  "en_hash": "24c3e675f2",
+  "zh": "将数据表导出为 CSV"
+ },
+ "action.research.export.note": {
+  "en_hash": "92b42eb425",
+  "zh": "UTF-8 编码的 CSV，可直接在 Excel 中打开。"
+ },
+ "action.research.index-documents.field.security_code.hint": {
+  "en_hash": "7bb1962600",
+  "zh": "留空则对全部公司运行。"
+ },
+ "action.research.index-documents.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.research.index-documents.label": {
+  "en_hash": "c97be4c439",
+  "zh": "为检索建立文件索引"
+ },
+ "action.research.index-documents.note": {
+  "en_hash": "76f7f019a5",
+  "zh": "读取一次已下载文件的文本，以便检索。"
+ },
+ "action.research.licences.label": {
+  "en_hash": "a73bf38650",
+  "zh": "显示许可类别"
+ },
+ "action.research.licences.note": {
+  "en_hash": "1c9f6036ed",
+  "zh": "按许可类别及来源标签统计各数据表的记录数。导入数据在标记前视为许可数据。"
+ },
+ "action.research.quality-report.field.out.label": {
+  "en_hash": "30baa24967",
+  "zh": "文件夹"
+ },
+ "action.research.quality-report.label": {
+  "en_hash": "b00813af85",
+  "zh": "数据质量报告"
+ },
+ "action.research.quality-report.note": {
+  "en_hash": "9336fc0274",
+  "zh": "按数据层、板块及年度统计的覆盖率、解析器准确率、人工复核结果、校验发现比率及已知缺口。"
+ },
+ "action.research.query.field.out.hint": {
+  "en_hash": "bbf09d2ad8",
+  "zh": "可选文件名，例如 exports/result.csv"
+ },
+ "action.research.query.field.out.label": {
+  "en_hash": "f142818a71",
+  "zh": "保存至"
+ },
+ "action.research.query.field.sql.label": {
+  "en_hash": "2064cb643c",
+  "zh": "SQL"
+ },
+ "action.research.query.label": {
+  "en_hash": "aa11eaf7d0",
+  "zh": "只读查询（SQL）"
+ },
+ "action.research.query.note": {
+  "en_hash": "cb568bc27c",
+  "zh": "每次查询均与数据指纹一同记录，以便复现结果。"
+ },
+ "action.research.release.field.author.label": {
+  "en_hash": "798a576f8c",
+  "zh": "作者（用于引用）"
+ },
+ "action.research.release.field.coarsen.hint": {
+  "en_hash": "77057643db",
+  "zh": "需同时去标识化。"
+ },
+ "action.research.release.field.coarsen.label": {
+  "en_hash": "2c85c15115",
+  "zh": "年龄按五岁分组"
+ },
+ "action.research.release.field.drop_free_text.hint": {
+  "en_hash": "3f5ca8f769",
+  "zh": "需同时去标识化：最严格的设置。"
+ },
+ "action.research.release.field.drop_free_text.label": {
+  "en_hash": "73ad06ecdc",
+  "zh": "删除标题及其他自由文本"
+ },
+ "action.research.release.field.formats.hint": {
+  "en_hash": "42e044779b",
+  "zh": "安装 pyarrow 组件时提供 Parquet 格式。"
+ },
+ "action.research.release.field.formats.label": {
+  "en_hash": "2804d9f16a",
+  "zh": "格式"
+ },
+ "action.research.release.field.include_licensed.hint": {
+  "en_hash": "eb304c5802",
+  "zh": "仅供自用：供应商数据不得再分发。"
+ },
+ "action.research.release.field.include_licensed.label": {
+  "en_hash": "7bfb7314a7",
+  "zh": "纳入许可数据"
+ },
+ "action.research.release.field.pseudonymise.hint": {
+  "en_hash": "a449689c5b",
+  "zh": "董事、高级管理人员及自然人股东将替换为稳定的标识符（P…）。"
+ },
+ "action.research.release.field.pseudonymise.label": {
+  "en_hash": "05b796ba0d",
+  "zh": "个人姓名去标识化"
+ },
+ "action.research.release.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.research.release.label": {
+  "en_hash": "c3e35b812f",
+  "zh": "创建数据集发布"
+ },
+ "action.research.release.note": {
+  "en_hash": "4f01d22e6a",
+  "zh": "生成一个注明日期的文件夹，内含 CSV 文件、数据库快照、数据质量报告、CITATION.cff 及文件哈希清单。除非勾选，许可数据（供应商评级、申万行业分类、未标注来源的 CSV 导入）不予纳入；清单记录了未纳入的内容。"
+ },
+ "action.research.search-documents.field.query.hint": {
+  "en_hash": "a5fb02c710",
+  "zh": "例如 资金占用 或 保留意见"
+ },
+ "action.research.search-documents.field.query.label": {
+  "en_hash": "c3328c39b0",
+  "zh": "文本"
+ },
+ "action.research.search-documents.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.research.search-documents.label": {
+  "en_hash": "64b7667664",
+  "zh": "在文件中检索"
+ },
+ "action.research.set-licence.field.licence.label": {
+  "en_hash": "ef26c9c607",
+  "zh": "许可类别"
+ },
+ "action.research.set-licence.field.source.label": {
+  "en_hash": "492cc77196",
+  "zh": "来源标签"
+ },
+ "action.research.set-licence.label": {
+  "en_hash": "143e1092a9",
+  "zh": "标记来源的许可类别"
+ },
+ "action.research.set-licence.note": {
+  "en_hash": "6ae678592b",
+  "zh": "例如，将自行编码的 CSV 标记为 MANUAL，使其纳入数据集发布。"
+ },
+ "action.research.trace.field.row_id.hint": {
+  "en_hash": "d1c281b6ab",
+  "zh": "列表及导出文件中显示的编号。"
+ },
+ "action.research.trace.field.row_id.label": {
+  "en_hash": "c7e7fb8f2d",
+  "zh": "记录编号"
+ },
+ "action.research.trace.field.table.label": {
+  "en_hash": "0424f6e702",
+  "zh": "数据表"
+ },
+ "action.research.trace.label": {
+  "en_hash": "0d5c416e08",
+  "zh": "将数据追溯至来源"
+ },
+ "action.research.trace.note": {
+  "en_hash": "5a67c77756",
+  "zh": "显示文件、页码、原始文本及提取方法，并核对文件哈希值。"
+ },
+ "action.segments.extract-segments.field.again.hint": {
+  "en_hash": "93e93f4859",
+  "zh": "通常会跳过本版本已读取的报告，停止后再次运行将从中断处继续。"
+ },
+ "action.segments.extract-segments.field.again.label": {
+  "en_hash": "d1257059f1",
+  "zh": "重新读取报告"
+ },
+ "action.segments.extract-segments.field.security_code.hint": {
+  "en_hash": "7bb1962600",
+  "zh": "留空则对全部公司运行。"
+ },
+ "action.segments.extract-segments.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.segments.extract-segments.label": {
+  "en_hash": "3894e2dc01",
+  "zh": "从报告中提取分部信息"
+ },
+ "action.segments.extract-segments.note": {
+  "en_hash": "c3269b10b8",
+  "zh": "读取“营业收入构成”表及分部毛利率表。请先编制定期报告目录并下载文件。"
+ },
+ "action.segments.extract-subsidiaries.field.again.hint": {
+  "en_hash": "93e93f4859",
+  "zh": "通常会跳过本版本已读取的报告，停止后再次运行将从中断处继续。"
+ },
+ "action.segments.extract-subsidiaries.field.again.label": {
+  "en_hash": "d1257059f1",
+  "zh": "重新读取报告"
+ },
+ "action.segments.extract-subsidiaries.field.security_code.hint": {
+  "en_hash": "7bb1962600",
+  "zh": "留空则对全部公司运行。"
+ },
+ "action.segments.extract-subsidiaries.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.segments.extract-subsidiaries.label": {
+  "en_hash": "756f28b29c",
+  "zh": "从报告中提取子公司"
+ },
+ "action.segments.extract-subsidiaries.note": {
+  "en_hash": "242ca74545",
+  "zh": "读取“企业集团的构成”（持股比例、经营地及注册地、取得方式）及“主要控股参股公司分析”（财务数据）。"
+ },
+ "action.segments.import-segments-csv.field.path.label": {
+  "en_hash": "9e18582273",
+  "zh": "CSV 文件"
+ },
+ "action.segments.import-segments-csv.field.source.hint": {
+  "en_hash": "cf423d5d13",
+  "zh": "数据集或供应商名称，作为来源记录保存。"
+ },
+ "action.segments.import-segments-csv.field.source.label": {
+  "en_hash": "492cc77196",
+  "zh": "来源标签"
+ },
+ "action.segments.import-segments-csv.label": {
+  "en_hash": "d4098d3069",
+  "zh": "从 CSV 导入分部信息"
+ },
+ "action.segments.import-segments-csv.note": {
+  "en_hash": "016d61008c",
+  "zh": "列：security_code、reporting_period、dimension、segment_name、revenue、cost、gross_margin。"
+ },
+ "action.segments.import-subsidiaries-csv.field.path.label": {
+  "en_hash": "9e18582273",
+  "zh": "CSV 文件"
+ },
+ "action.segments.import-subsidiaries-csv.field.source.hint": {
+  "en_hash": "cf423d5d13",
+  "zh": "数据集或供应商名称，作为来源记录保存。"
+ },
+ "action.segments.import-subsidiaries-csv.field.source.label": {
+  "en_hash": "492cc77196",
+  "zh": "来源标签"
+ },
+ "action.segments.import-subsidiaries-csv.label": {
+  "en_hash": "82a317e99e",
+  "zh": "从 CSV 导入子公司"
+ },
+ "action.segments.import-subsidiaries-csv.note": {
+  "en_hash": "aabffab4a4",
+  "zh": "列：security_code、observation_date、entity_name、relationship、registered_place、direct_pct、indirect_pct、acquisition_method。"
+ },
+ "action.selftest.self-test.2.field.offline.label": {
+  "en_hash": "9c7b67dadd",
+  "zh": "使用预设应答"
+ },
+ "action.selftest.self-test.2.field.out.label": {
+  "en_hash": "ee3f561d97",
+  "zh": "报告文件夹"
+ },
+ "action.selftest.self-test.2.label": {
+  "en_hash": "14f9d3b9e6",
+  "zh": "检查自检程序本身（离线）"
+ },
+ "action.selftest.self-test.2.note": {
+  "en_hash": "6579d397a5",
+  "zh": "以内置的示例应答进行相同检查，无需联网。"
+ },
+ "action.selftest.self-test.field.out.label": {
+  "en_hash": "ee3f561d97",
+  "zh": "报告文件夹"
+ },
+ "action.selftest.self-test.label": {
+  "en_hash": "695aca4fa5",
+  "zh": "运行在线自检"
+ },
+ "action.selftest.self-test.note": {
+  "en_hash": "407d6074f4",
+  "zh": "约 16 次请求（每秒一次）。PASS = 正常；WARN = 有应答但内容异常；FAIL = 网站已变更，需要更新程序；NETWORK UNREACHABLE = 本机无法连接（请检查网络、代理或防火墙）。报告问题时请附上 selftest_report.json。"
+ },
+ "action.structure.scope-changes.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.structure.scope-changes.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.structure.scope-changes.field.date_from.hint": {
+  "en_hash": "b38bcb78c9",
+  "zh": "可选；留空 = 上一期报告。"
+ },
+ "action.structure.scope-changes.field.date_from.label": {
+  "en_hash": "3f66052a10",
+  "zh": "起始"
+ },
+ "action.structure.scope-changes.field.date_to.hint": {
+  "en_hash": "1cc971cff6",
+  "zh": "可选；留空 = 最新报告。"
+ },
+ "action.structure.scope-changes.field.date_to.label": {
+  "en_hash": "ae79ea1e9c",
+  "zh": "截止"
+ },
+ "action.structure.scope-changes.label": {
+  "en_hash": "92fe019dc3",
+  "zh": "合并范围的变更"
+ },
+ "action.structure.segment-history.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.structure.segment-history.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.structure.segment-history.field.dimension.label": {
+  "en_hash": "45e147abd9",
+  "zh": "维度"
+ },
+ "action.structure.segment-history.label": {
+  "en_hash": "1b7f17cf80",
+  "zh": "分部历年数据"
+ },
+ "action.structure.segments.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.structure.segments.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.structure.segments.field.dimension.hint": {
+  "en_hash": "a8593cc8a6",
+  "zh": "留空 = 全部维度。"
+ },
+ "action.structure.segments.field.dimension.label": {
+  "en_hash": "45e147abd9",
+  "zh": "维度"
+ },
+ "action.structure.segments.field.period.hint": {
+  "en_hash": "e4e0e957a7",
+  "zh": "可选，YYYY-MM-DD；留空 = 最新。"
+ },
+ "action.structure.segments.field.period.label": {
+  "en_hash": "170a28a9db",
+  "zh": "期间"
+ },
+ "action.structure.segments.label": {
+  "en_hash": "31760a7207",
+  "zh": "业务分部"
+ },
+ "action.structure.segments.note": {
+  "en_hash": "b23db27e55",
+  "zh": "各分部的占比、增长率及毛利率，境外收入占比及集中度（HHI）。"
+ },
+ "action.structure.subsidiaries.field.as_of.hint": {
+  "en_hash": "67949cb276",
+  "zh": "可选，YYYY-MM-DD。"
+ },
+ "action.structure.subsidiaries.field.as_of.label": {
+  "en_hash": "a8770f2d4d",
+  "zh": "截至日期"
+ },
+ "action.structure.subsidiaries.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.structure.subsidiaries.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.structure.subsidiaries.label": {
+  "en_hash": "9809e1f202",
+  "zh": "集团结构"
+ },
+ "action.structure.subsidiaries.note": {
+  "en_hash": "7ff7a633d6",
+  "zh": "子公司及联营企业的持股比例与注册地、境外实体，以及持股50%或以下仍纳入合并范围的情况（列出以供复核）。"
+ },
+ "action.topology.import-analyst-forecasts-csv.field.licence.hint": {
+  "en_hash": "9feb0ee702",
+  "zh": "您使用这些预测所依据的许可，例如终端服务条款"
+ },
+ "action.topology.import-analyst-forecasts-csv.field.licence.label": {
+  "en_hash": "fef8e889dc",
+  "zh": "许可"
+ },
+ "action.topology.import-analyst-forecasts-csv.field.path.label": {
+  "en_hash": "9e18582273",
+  "zh": "CSV 文件"
+ },
+ "action.topology.import-analyst-forecasts-csv.field.source.label": {
+  "en_hash": "492cc77196",
+  "zh": "来源标签"
+ },
+ "action.topology.import-analyst-forecasts-csv.label": {
+  "en_hash": "285a4aff73",
+  "zh": "导入分析师预测"
+ },
+ "action.topology.import-analyst-forecasts-csv.note": {
+  "en_hash": "8039aea03b",
+  "zh": "列：code、period、measure、low、high（或 value）、issuer、published_date。与业绩预告分开存放；除非选择纳入许可数据，否则不纳入数据集发布。"
+ },
+ "action.topology.read-guidance.field.again.hint": {
+  "en_hash": "b5d03a32c9",
+  "zh": "包括本版本已读取的文件。"
+ },
+ "action.topology.read-guidance.field.again.label": {
+  "en_hash": "c6c842b15a",
+  "zh": "重新读取"
+ },
+ "action.topology.read-guidance.field.security_code.hint": {
+  "en_hash": "7bb1962600",
+  "zh": "留空则对全部公司运行。"
+ },
+ "action.topology.read-guidance.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.topology.read-guidance.label": {
+  "en_hash": "72ac1ae261",
+  "zh": "读取业绩预告与业绩快报"
+ },
+ "action.topology.read-guidance.note": {
+  "en_hash": "e3828f8953",
+  "zh": "业绩预告与业绩快报：先下载这些公告，再读取其区间与日期。公司业绩指引是已披露的预期替代指标，并非投资者预期。"
+ },
+ "action.topology.topology.field.as_of.label": {
+  "en_hash": "3011562209",
+  "zh": "披露截至"
+ },
+ "action.topology.topology.field.codes.hint": {
+  "en_hash": "c26315d870",
+  "zh": "以逗号分隔的代码"
+ },
+ "action.topology.topology.field.codes.label": {
+  "en_hash": "9dba7ad7c5",
+  "zh": "公司"
+ },
+ "action.topology.topology.field.end.label": {
+  "en_hash": "ae79ea1e9c",
+  "zh": "截止"
+ },
+ "action.topology.topology.field.episode.hint": {
+  "en_hash": "fe6fc1903f",
+  "zh": "可选，例如 semiconductors-2024"
+ },
+ "action.topology.topology.field.episode.label": {
+  "en_hash": "709a23220f",
+  "zh": "名称"
+ },
+ "action.topology.topology.field.expectations.label": {
+  "en_hash": "ad7c70de24",
+  "zh": "预期"
+ },
+ "action.topology.topology.field.include_licensed.hint": {
+  "en_hash": "e18cc90627",
+  "zh": "仅供自用。"
+ },
+ "action.topology.topology.field.include_licensed.label": {
+  "en_hash": "7bfb7314a7",
+  "zh": "纳入许可数据"
+ },
+ "action.topology.topology.field.industry.hint": {
+  "en_hash": "887873b747",
+  "zh": "证监会行业分类的大类，例如 C39（计算机、通信和其他电子设备制造业，含半导体）"
+ },
+ "action.topology.topology.field.industry.label": {
+  "en_hash": "aecc674b3b",
+  "zh": "或按行业"
+ },
+ "action.topology.topology.field.out.label": {
+  "en_hash": "30baa24967",
+  "zh": "文件夹"
+ },
+ "action.topology.topology.field.start.label": {
+  "en_hash": "3f66052a10",
+  "zh": "起始"
+ },
+ "action.topology.topology.field.top_holders.label": {
+  "en_hash": "cb8f8633eb",
+  "zh": "显示的股东数"
+ },
+ "action.topology.topology.label": {
+  "en_hash": "aa04ce7ad4",
+  "zh": "生成拓扑视图"
+ },
+ "action.topology.topology.note": {
+  "en_hash": "b83148a384",
+  "zh": "在此显示分层图，并在浏览器中打开交互视图（二维及三维，附证据查看器），可离线使用。文件夹中还包括观测值（CSV）、快照（JSON）及清单。"
+ },
+ "action.universe.diagnose-quote-list.label": {
+  "en_hash": "3b7a082a2a",
+  "zh": "诊断行情列表"
+ },
+ "action.universe.diagnose-quote-list.note": {
+  "en_hash": "30ecf2dd70",
+  "zh": "上市日期来自东方财富的公开行情列表。如“更新上市公司名录”未报告上市日期，此项将逐一尝试各种请求方式（约六次请求），并说明哪一种有效及应如何处理。"
+ },
+ "action.universe.extract-listing-events.field.security_code.hint": {
+  "en_hash": "7bb1962600",
+  "zh": "留空则对全部公司运行。"
+ },
+ "action.universe.extract-listing-events.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.universe.extract-listing-events.label": {
+  "en_hash": "d2bc151b37",
+  "zh": "从公告中读取上市相关事件"
+ },
+ "action.universe.extract-listing-events.note": {
+  "en_hash": "e320c84e71",
+  "zh": "从目录中的公告读取首次公开发行、终止上市，以及简称、代码和板块变更（类别请选 all）。"
+ },
+ "action.universe.import-listing-events-csv.field.path.label": {
+  "en_hash": "9e18582273",
+  "zh": "CSV 文件"
+ },
+ "action.universe.import-listing-events-csv.field.source.hint": {
+  "en_hash": "cf423d5d13",
+  "zh": "数据集或供应商名称，作为来源记录保存。"
+ },
+ "action.universe.import-listing-events-csv.field.source.label": {
+  "en_hash": "492cc77196",
+  "zh": "来源标签"
+ },
+ "action.universe.import-listing-events-csv.label": {
+  "en_hash": "31a4e5a9ca",
+  "zh": "导入历史上市记录"
+ },
+ "action.universe.import-listing-events-csv.note": {
+  "en_hash": "1071e50f0c",
+  "zh": "用于已终止上市的公司及更早的变更。列：security_code、event_type、event_date、old_value、new_value。"
+ },
+ "action.universe.rebuild-security-history.field.security_code.hint": {
+  "en_hash": "7bb1962600",
+  "zh": "留空则对全部公司运行。"
+ },
+ "action.universe.rebuild-security-history.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.universe.rebuild-security-history.label": {
+  "en_hash": "db1ad51384",
+  "zh": "生成上市沿革"
+ },
+ "action.universe.rebuild-security-history.note": {
+  "en_hash": "b660584f5f",
+  "zh": "将上市相关事件及风险警示（ST、*ST）转换为注明日期的简称、板块及状态区间。新增事件后请重新运行。"
+ },
+ "action.universe.security-history.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.universe.security-history.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.universe.security-history.label": {
+  "en_hash": "79f0ae8e13",
+  "zh": "公司上市沿革"
+ },
+ "action.universe.show-company.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.universe.show-company.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.universe.show-company.label": {
+  "en_hash": "5b814cd1ec",
+  "zh": "查询公司"
+ },
+ "action.universe.universe-at.field.boards.hint": {
+  "en_hash": "217ab65e42",
+  "zh": "可选，例如 STAR,CHINEXT"
+ },
+ "action.universe.universe-at.field.boards.label": {
+  "en_hash": "3d3d9d394f",
+  "zh": "板块"
+ },
+ "action.universe.universe-at.field.on.label": {
+  "en_hash": "eb9a4bc1c0",
+  "zh": "日期"
+ },
+ "action.universe.universe-at.field.out.hint": {
+  "en_hash": "67651443d6",
+  "zh": "可选文件名"
+ },
+ "action.universe.universe-at.field.out.label": {
+  "en_hash": "1d5307edeb",
+  "zh": "另存为 CSV"
+ },
+ "action.universe.universe-at.label": {
+  "en_hash": "f8f3feb31d",
+  "zh": "某一日期的上市公司"
+ },
+ "action.universe.universe-at.note": {
+  "en_hash": "337f35ab3b",
+  "zh": "包括其后终止上市的公司，并使用其当时的简称，从而避免样本的幸存者偏差。"
+ },
+ "action.universe.universe-stats.label": {
+  "en_hash": "3ae7b8afd2",
+  "zh": "按板块统计"
+ },
+ "action.universe.update-universe.label": {
+  "en_hash": "9c5bb19688",
+  "zh": "更新上市公司名录"
+ },
+ "action.universe.update-universe.note": {
+  "en_hash": "59d48adf12",
+  "zh": "下载巨潮资讯网的官方股票列表（约5,000家公司），耗时不到一分钟。"
+ },
+ "action.universe.validate-universe.label": {
+  "en_hash": "b0d4ea6a1b",
+  "zh": "检查上市公司名录"
+ },
+ "action.universe.validate-universe.note": {
+  "en_hash": "40331326ac",
+  "zh": "确认每个代码与其交易所及板块一致。"
+ },
+ "action.validate.show-flags.field.details.hint": {
+  "en_hash": "fef769b2a5",
+  "zh": "关闭：按规则统计数量，并列出校验发现最多的公司。"
+ },
+ "action.validate.show-flags.field.details.label": {
+  "en_hash": "74c4748a60",
+  "zh": "列出全部校验发现"
+ },
+ "action.validate.show-flags.field.export.hint": {
+  "en_hash": "67209e6e1c",
+  "zh": "可选文件名，例如 exports/findings.csv"
+ },
+ "action.validate.show-flags.field.export.label": {
+  "en_hash": "1feee0e744",
+  "zh": "导出为 CSV"
+ },
+ "action.validate.show-flags.field.rule.hint": {
+  "en_hash": "b931a437a7",
+  "zh": "可选，例如 SEGMENT_SUM_MISMATCH：列出该规则的记录"
+ },
+ "action.validate.show-flags.field.rule.label": {
+  "en_hash": "78e1790e29",
+  "zh": "规则"
+ },
+ "action.validate.show-flags.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.validate.show-flags.field.severity.label": {
+  "en_hash": "de314fa0c9",
+  "zh": "严重程度"
+ },
+ "action.validate.show-flags.label": {
+  "en_hash": "2ab446f58a",
+  "zh": "显示校验发现"
+ },
+ "action.validate.show-flags.note": {
+  "en_hash": "ecb17f47bf",
+  "zh": "先显示汇总；指定公司、规则或勾选“列出全部校验发现”则显示明细记录及公司代码。"
+ },
+ "action.validate.validate-all.field.security_code.hint": {
+  "en_hash": "7bb1962600",
+  "zh": "留空则对全部公司运行。"
+ },
+ "action.validate.validate-all.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.validate.validate-all.label": {
+  "en_hash": "e3171e79a1",
+  "zh": "运行全部检查"
+ },
+ "action.validate.validate-all.note": {
+  "en_hash": "91e71d1a8c",
+  "zh": "同时关联相关事件（例如立案调查及其后的行政处罚）。新增数据后请重新运行。"
+ },
+ "error.changed": {
+  "en_hash": "a2974e5a89",
+  "zh": "请运行“检查 > 自检”，查看数据源是否已变更。"
+ },
+ "error.moved": {
+  "en_hash": "6aed31c463",
+  "zh": "数据源已不再提供该地址，可能已迁移。请运行“检查 > 自检”（ashare-cli self-test）查看哪个数据源发生变更，并在报告问题时附上 selftest_report.json。"
+ },
+ "error.refused": {
+  "en_hash": "48cb89dd3e",
+  "zh": "数据源拒绝了请求或限制了访问频率。请稍候再试；本程序从不规避此类限制。"
+ },
+ "error.server": {
+  "en_hash": "9f2f9f0b9e",
+  "zh": "数据源服务器出错。请稍后再试。"
+ },
+ "error.timeout": {
+  "en_hash": "4796431a98",
+  "zh": "数据源未及时应答。请稍后再试。"
+ },
+ "error.unreachable": {
+  "en_hash": "656c0d0796",
+  "zh": "本机无法连接数据源。请检查网络连接、代理或防火墙，然后运行“检查 > 自检”。"
+ },
+ "group.analyse": {
+  "en_hash": "28b6dc3117",
+  "zh": "分析"
+ },
+ "group.check": {
+  "en_hash": "4b5e84be0e",
+  "zh": "检查"
+ },
+ "group.collect": {
+  "en_hash": "04aac4c041",
+  "zh": "采集"
+ },
+ "section.accuracy.intro": {
+  "en_hash": "ee3614b003",
+  "zh": "以一组经您手工核对数值的报告（“标准语料库”）为基准，衡量从文件中读取数据的准确程度。评估结果决定所提取数值的置信度。"
+ },
+ "section.accuracy.title": {
+  "en_hash": "8eba9cb96a",
+  "zh": "解析器准确率"
+ },
+ "section.actions.intro": {
+  "en_hash": "ed92e7d41e",
+  "zh": "从已下载的公告中读取现金红利、送红股及资本公积金转增股本、向特定对象发行、配股、回购股份、注销及转股。"
+ },
+ "section.actions.title": {
+  "en_hash": "607ddf9b7c",
+  "zh": "公司行为"
+ },
+ "section.board.intro": {
+  "en_hash": "4babb27c08",
+  "zh": "公司由谁经营，以及与同行业可比公司的比较。"
+ },
+ "section.board.title": {
+  "en_hash": "643461606e",
+  "zh": "董事会与行业"
+ },
+ "section.company.intro": {
+  "en_hash": "7b84b2834e",
+  "zh": "一家公司的全部已知信息，可选择以过去某一日期为准（仅使用该日期前已披露的信息）。"
+ },
+ "section.company.title": {
+  "en_hash": "7a1994999d",
+  "zh": "公司"
+ },
+ "section.datasets.intro": {
+  "en_hash": "feaae65bd9",
+  "zh": "无前视偏差的研究面板数据、估值及事件研究。每份面板数据均附变量说明手册及清单，便于说明及重建数据集。"
+ },
+ "section.datasets.title": {
+  "en_hash": "93a7f22476",
+  "zh": "数据集"
+ },
+ "section.disclosures.intro": {
+  "en_hash": "9dbcbd4557",
+  "zh": "来自巨潮资讯网的公告与定期报告。下载文件后，后续步骤可从中提取数据、公司行为及监管事项。"
+ },
+ "section.disclosures.title": {
+  "en_hash": "26dfc22b1a",
+  "zh": "公告"
+ },
+ "section.financials.intro": {
+  "en_hash": "e015f50806",
+  "zh": "从已下载报告中读取的财务报表数据。如有原生 XBRL 则优先使用（高置信度）；否则从 PDF 文本中读取（中或低置信度）。"
+ },
+ "section.financials.title": {
+  "en_hash": "0aeb7c8384",
+  "zh": "财务数据"
+ },
+ "section.home.title": {
+  "en_hash": "76e7a3a3f9",
+  "zh": "入门"
+ },
+ "section.indices.intro": {
+  "en_hash": "12b7b8096b",
+  "zh": "历年指数样本、交易日历及停牌日。指数样本来自已公布的样本调整或许可文件。"
+ },
+ "section.indices.title": {
+  "en_hash": "f90956f310",
+  "zh": "指数与交易日历"
+ },
+ "section.industry.intro": {
+  "en_hash": "90d627e29e",
+  "zh": "历年行业分类（证监会行业分类2012年版、申万行业分类2021年版或其他标准），从您取得的分类表导入，用于确定可比公司组。"
+ },
+ "section.industry.title": {
+  "en_hash": "973d438fe5",
+  "zh": "行业"
+ },
+ "section.management.intro": {
+  "en_hash": "6bfebdaa4f",
+  "zh": "董事、监事和高级管理人员：从公告中读取聘任（选举）与辞职，从年度报告中读取董事、监事、高级管理人员情况表（任期、持股、薪酬）。"
+ },
+ "section.management.title": {
+  "en_hash": "63cecca67b",
+  "zh": "管理层"
+ },
+ "section.market.intro": {
+  "en_hash": "ec055d9951",
+  "zh": "日行情价格。公开数据源（EASTMONEY_PUBLIC、TENCENT_PUBLIC）并非证券交易所权威数据；请先运行“测试价格来源”，再在“设置 > 价格来源”中选择。许可数据可从 CSV 导入，同一交易日优先于公开数据源。"
+ },
+ "section.market.title": {
+  "en_hash": "bc7eaf4306",
+  "zh": "行情数据"
+ },
+ "section.operations.title": {
+  "en_hash": "a1fdaa6b2a",
+  "zh": "运行维护"
+ },
+ "section.ownership.intro": {
+  "en_hash": "6d68c99c6b",
+  "zh": "历年股东、股份质押、控制人及股本：从报告中读取，或从经授权的数据集导入。"
+ },
+ "section.ownership.title": {
+  "en_hash": "aec551ab9b",
+  "zh": "股权与股本"
+ },
+ "section.people.intro": {
+  "en_hash": "c94bb693a2",
+  "zh": "某一年度的研发投入、员工情况及可持续发展信息。"
+ },
+ "section.people.title": {
+  "en_hash": "dc9fa4d335",
+  "zh": "人员与 ESG"
+ },
+ "section.people_esg.intro": {
+  "en_hash": "03de0a58cb",
+  "zh": "研发投入与研发人员、员工构成与教育程度、专利、环境与社会信息披露、可持续发展报告及第三方 ESG 评级。"
+ },
+ "section.people_esg.title": {
+  "en_hash": "b915725fa7",
+  "zh": "研发、人员与 ESG"
+ },
+ "section.regulatory.intro": {
+  "en_hash": "dc37d8c0ae",
+  "zh": "立案调查、行政处罚、行政监管措施、交易所纪律处分、问询、诉讼、审计意见、风险警示（ST/*ST）及停牌。"
+ },
+ "section.regulatory.title": {
+  "en_hash": "778e54bd80",
+  "zh": "监管与法律"
+ },
+ "section.research.intro": {
+  "en_hash": "84febe0a34",
+  "zh": "在文件中检索，将任何数据追溯至来源页，并生成可复现的输出。"
+ },
+ "section.research.title": {
+  "en_hash": "be601df25e",
+  "zh": "研究"
+ },
+ "section.review.title": {
+  "en_hash": "e29a79fe0c",
+  "zh": "人工复核"
+ },
+ "section.segments.intro": {
+  "en_hash": "ddb9eec188",
+  "zh": "从已下载的年度报告及半年度报告中读取按行业、产品、地区及销售模式划分的营业收入，以及集团的子公司和联营企业。"
+ },
+ "section.segments.title": {
+  "en_hash": "c12e6ebba1",
+  "zh": "分部与集团"
+ },
+ "section.selftest.intro": {
+  "en_hash": "e3dcb72158",
+  "zh": "确认各公开数据源（巨潮资讯网、上交所、深交所及价格数据源）仍按本程序预期的格式应答。首次使用时，以及任何采集步骤无结果时，请运行此项。"
+ },
+ "section.selftest.title": {
+  "en_hash": "4b7b65f759",
+  "zh": "自检"
+ },
+ "section.settings.title": {
+  "en_hash": "c7f73bb54d",
+  "zh": "设置"
+ },
+ "section.structure.intro": {
+  "en_hash": "4612621809",
+  "zh": "公司的收入构成及集团组织方式，以最新报告为准，或以过去某一日期的已知信息为准。"
+ },
+ "section.structure.title": {
+  "en_hash": "9322ade90d",
+  "zh": "业务与集团"
+ },
+ "section.topology.intro": {
+  "en_hash": "8194901f7c",
+  "zh": "一组公司在若干年度内的 NVF 各层：制度协调、生产能力、公司基本面、投资者预期及市场估值，并附每项内容的来源文件，以及某层无数据时的缺口。每条连线均为有文件依据的事实；连线并不证明一事导致另一事。"
+ },
+ "section.topology.title": {
+  "en_hash": "3aedd475ce",
+  "zh": "拓扑视图"
+ },
+ "section.universe.intro": {
+  "en_hash": "0f62ff63fd",
+  "zh": "A股上市公司名录（上交所主板、科创板、深交所主板、创业板），取自巨潮资讯网。请首先运行此项；其他各步骤均以这些公司为对象。"
+ },
+ "section.universe.title": {
+  "en_hash": "3ea47af537",
+  "zh": "上市公司名录"
+ },
+ "section.validate.intro": {
+  "en_hash": "751cf4bb01",
+  "zh": "在不改动数据的前提下进行校验：会计恒等式、股本勾稽、不同报告间数值不一致（追溯调整）、股权数据一致性及不同来源之间的冲突。"
+ },
+ "section.validate.title": {
+  "en_hash": "6752f198b5",
+  "zh": "校验"
+ },
+ "ui.browse": {
+  "en_hash": "c1b20f5242",
+  "zh": "浏览…"
+ },
+ "ui.change": {
+  "en_hash": "49b1cd843f",
+  "zh": "更改…"
+ },
+ "ui.check.code": {
+  "en_hash": "9e67e97de6",
+  "zh": "“{label}”须为六位代码。"
+ },
+ "ui.check.date": {
+  "en_hash": "9d7ef3e964",
+  "zh": "“{label}”须为日期，例如 2026-01-31。"
+ },
+ "ui.check.integer": {
+  "en_hash": "ab0536c30f",
+  "zh": "“{label}”须为整数。"
+ },
+ "ui.check.number": {
+  "en_hash": "8a814c7062",
+  "zh": "“{label}”须为数字。"
+ },
+ "ui.check.required": {
+  "en_hash": "78d841243a",
+  "zh": "“{label}”为必填项。"
+ },
+ "ui.check.year": {
+  "en_hash": "93cdd34652",
+  "zh": "“{label}”须为年份，例如 2025。"
+ },
+ "ui.clear": {
+  "en_hash": "719ea396ad",
+  "zh": "清除"
+ },
+ "ui.copy": {
+  "en_hash": "af74f7c536",
+  "zh": "复制"
+ },
+ "ui.count.actions": {
+  "en_hash": "607ddf9b7c",
+  "zh": "公司行为"
+ },
+ "ui.count.bars": {
+  "en_hash": "d78c63e3d9",
+  "zh": "价格记录"
+ },
+ "ui.count.companies": {
+  "en_hash": "9dba7ad7c5",
+  "zh": "公司"
+ },
+ "ui.count.disclosures": {
+  "en_hash": "26dfc22b1a",
+  "zh": "公告"
+ },
+ "ui.count.events": {
+  "en_hash": "bb44b2efde",
+  "zh": "监管事项"
+ },
+ "ui.count.figures": {
+  "en_hash": "2d4c1ae181",
+  "zh": "财务数据"
+ },
+ "ui.count.findings": {
+  "en_hash": "0e83414b64",
+  "zh": "校验发现"
+ },
+ "ui.expand": {
+  "en_hash": "9869e506c3",
+  "zh": "展开"
+ },
+ "ui.heavy.catalogue": {
+  "en_hash": "da4c9da8da",
+  "zh": "此操作将为全部 {n:,} 家公司编制公告目录并下载报告。下载全市场一年的报告涉及数万个文件（数十 GB），按限速需耗时数小时。"
+ },
+ "ui.heavy.continue": {
+  "en_hash": "49eacec123",
+  "zh": "您可随时按“停止”；再次运行即可继续。建议先输入证券代码，以一家公司试运行。\n\n是否继续？"
+ },
+ "ui.heavy.download": {
+  "en_hash": "cb7e543ff4",
+  "zh": "此操作将下载所选类别中尚未保存到本地的全部目录文件；全市场可能需要数小时。"
+ },
+ "ui.heavy.market": {
+  "en_hash": "38326a0464",
+  "zh": "此操作将下载全部 {n:,} 家公司的历史价格，每家一次请求（约 {m} 分钟）。如只需日行情价格，“运行维护 > 每日更新”约需60次请求。"
+ },
+ "ui.home.first_run": {
+  "en_hash": "748ecac7aa",
+  "zh": "建议的首次运行步骤"
+ },
+ "ui.home.intro": {
+  "en_hash": "2e0c6a3bee",
+  "zh": "逐步采集数据，然后进行分析与校验。每项操作都会记录来源文件，任何数据均可追溯至来源。"
+ },
+ "ui.home.note1": {
+  "en_hash": "6cfb40a5fa",
+  "zh": "请求均限速（每秒一次），且从不绕过登录或验证码。"
+ },
+ "ui.home.note2": {
+  "en_hash": "16b13bd4c4",
+  "zh": "公开价格数据源均有标注，并非证券交易所权威数据。"
+ },
+ "ui.home.note3": {
+  "en_hash": "b3ef39bcc1",
+  "zh": "“截至日期”只使用该日期前已披露的信息，避免前视偏差。"
+ },
+ "ui.home.note4": {
+  "en_hash": "1999be0d33",
+  "zh": "带 * 的字段为必填项。证券代码留空通常表示全部公司。"
+ },
+ "ui.home.notes": {
+  "en_hash": "70440046a3",
+  "zh": "说明"
+ },
+ "ui.home.step.actions.note": {
+  "en_hash": "1f6f5f2235",
+  "zh": "另见“监管与法律”一节。"
+ },
+ "ui.home.step.actions.title": {
+  "en_hash": "0554d65c05",
+  "zh": "提取公司行为与监管事项"
+ },
+ "ui.home.step.company.note": {
+  "en_hash": "0e5329846a",
+  "zh": "一页式摘要，可保存或打印。"
+ },
+ "ui.home.step.company.title": {
+  "en_hash": "d37904daec",
+  "zh": "打开公司报告"
+ },
+ "ui.home.step.disclosures.note": {
+  "en_hash": "9953c27515",
+  "zh": "先以一个代码试运行（例如 600519）并下载文件。"
+ },
+ "ui.home.step.disclosures.title": {
+  "en_hash": "8ecf15485e",
+  "zh": "为单个公司编制公告目录"
+ },
+ "ui.home.step.financials.note": {
+  "en_hash": "20806ce705",
+  "zh": "从已下载的报告中读取财务报表。"
+ },
+ "ui.home.step.financials.title": {
+  "en_hash": "79baed4f14",
+  "zh": "提取财务数据"
+ },
+ "ui.home.step.industry.note": {
+  "en_hash": "cbb58cffb6",
+  "zh": "用于确定可比公司组及行业统计。"
+ },
+ "ui.home.step.industry.title": {
+  "en_hash": "119a31413f",
+  "zh": "导入行业分类表（可选）"
+ },
+ "ui.home.step.universe.note": {
+  "en_hash": "10eca19223",
+  "zh": "从巨潮资讯网下载上市公司名录。"
+ },
+ "ui.home.step.universe.title": {
+  "en_hash": "9c5bb19688",
+  "zh": "更新上市公司名录"
+ },
+ "ui.home.step.validate.note": {
+  "en_hash": "603145f6cb",
+  "zh": "标记不一致之处；从不改动数据。"
+ },
+ "ui.home.step.validate.title": {
+  "en_hash": "e3171e79a1",
+  "zh": "运行全部检查"
+ },
+ "ui.log.boards": {
+  "en_hash": "7930fce3c4",
+  "zh": "可选板块：{boards}"
+ },
+ "ui.log.folder": {
+  "en_hash": "42e7dbc1ad",
+  "zh": "数据文件夹已更改为 {folder}"
+ },
+ "ui.log.no_chart": {
+  "en_hash": "2809d50c1e",
+  "zh": "（无图表：{error}）"
+ },
+ "ui.log.price_source": {
+  "en_hash": "34ca028cba",
+  "zh": "价格来源：{v}"
+ },
+ "ui.log.workers": {
+  "en_hash": "560dc08179",
+  "zh": "同时读取的文件数：{v}"
+ },
+ "ui.none": {
+  "en_hash": "71f8e7976e",
+  "zh": "无"
+ },
+ "ui.open": {
+  "en_hash": "cf9b77061f",
+  "zh": "打开"
+ },
+ "ui.output": {
+  "en_hash": "4bed336194",
+  "zh": "输出"
+ },
+ "ui.run": {
+  "en_hash": "b1b392607d",
+  "zh": "运行"
+ },
+ "ui.run_log": {
+  "en_hash": "cac6c0b799",
+  "zh": "运行日志"
+ },
+ "ui.settings.about": {
+  "en_hash": "6b21fb791a",
+  "zh": "关于"
+ },
+ "ui.settings.about_note": {
+  "en_hash": "b38ddafaee",
+  "zh": "相同功能也可通过程序文件夹中的命令行程序 ashare-cli.exe 使用（运行 ashare-cli --help）。用户指南、方法说明及变量说明手册位于 docs 文件夹。"
+ },
+ "ui.settings.automatic": {
+  "en_hash": "b50247867f",
+  "zh": "自动（{n}）"
+ },
+ "ui.settings.boards": {
+  "en_hash": "a83600abcb",
+  "zh": "可选板块"
+ },
+ "ui.settings.boards_note": {
+  "en_hash": "9e3e29c9ff",
+  "zh": "默认关闭。开启后，“更新上市公司名录”也会收录这些证券，并从证券交易所的B股列表及行情列表读取其上市日期。开启后请运行自检。"
+ },
+ "ui.settings.bse": {
+  "en_hash": "51e9265027",
+  "zh": "北京证券交易所（代码 920、43、83、87、88）"
+ },
+ "ui.settings.bshare": {
+  "en_hash": "82e86f9d02",
+  "zh": "B股（上交所 900，深交所 200 及 201；美元及港元）"
+ },
+ "ui.settings.check_updates": {
+  "en_hash": "736b9062b3",
+  "zh": "检查更新"
+ },
+ "ui.settings.contents": {
+  "en_hash": "5c28f7e9df",
+  "zh": "内容：ashares.db（数据库），disclosures\\ 与 raw\\（原始文件及应答），exports\\、reports\\、releases\\，run_log.txt（每项操作及其对应命令）。"
+ },
+ "ui.settings.eastmoney": {
+  "en_hash": "c67b0d6c9e",
+  "zh": "东方财富（公开）"
+ },
+ "ui.settings.folder": {
+  "en_hash": "9421c0213a",
+  "zh": "数据文件夹"
+ },
+ "ui.settings.folder_note": {
+  "en_hash": "043cd39c3b",
+  "zh": "数据库、已下载文件、导出文件及报告的存放位置。"
+ },
+ "ui.settings.language": {
+  "en_hash": "9407e9ca65",
+  "zh": "界面语言"
+ },
+ "ui.settings.language_note": {
+  "en_hash": "c71d29006c",
+  "zh": "本窗口的页面、操作、字段及提示信息。各命令本身的输出、运行日志、变量名及文件保持英文，因此数据集不会因界面语言而不同。"
+ },
+ "ui.settings.locked": {
+  "en_hash": "936fe2e004",
+  "zh": "操作运行期间设置处于锁定状态，更改将适用于下一项操作。"
+ },
+ "ui.settings.none": {
+  "en_hash": "edce1cab21",
+  "zh": "无：仅从 CSV 导入"
+ },
+ "ui.settings.price": {
+  "en_hash": "67fcdada9a",
+  "zh": "价格来源"
+ },
+ "ui.settings.price_note": {
+  "en_hash": "8447d835b8",
+  "zh": "日行情价格的来源：用于下载、历史补齐及每日更新。两个公开数据源均为非官方数据源，并非证券交易所权威数据；其使用条款请自行核查。“测试价格来源”（行情数据）可显示哪个数据源能从您的网络应答。选择“无”则不下载任何价格：请改为从 CSV 导入许可价格。同一交易日，导入的价格始终优先于公开数据源。"
+ },
+ "ui.settings.tencent": {
+  "en_hash": "5f2f12ba2e",
+  "zh": "腾讯（公开）"
+ },
+ "ui.settings.updates": {
+  "en_hash": "c76d18079a",
+  "zh": "更新"
+ },
+ "ui.settings.updates_note": {
+  "en_hash": "3bade21cf1",
+  "zh": "除非在此填写更新服务器，本程序不会联系任何更新服务器。检查仅报告是否有新版本，从不下载或安装任何内容。"
+ },
+ "ui.settings.workers": {
+  "en_hash": "3849bd7137",
+  "zh": "读取文件"
+ },
+ "ui.settings.workers_note": {
+  "en_hash": "c3540775ab",
+  "zh": "提取时同时读取多个文件，每个工作进程一个；所有结果均由主程序写入，数据库只有一个写入方。“自动”使用除一个以外的全部处理器核心（最多八个）；选择 1 则逐个读取文件。"
+ },
+ "ui.side.data": {
+  "en_hash": "035987659b",
+  "zh": "数据：{name}"
+ },
+ "ui.status.failed": {
+  "en_hash": "d535ceb3d9",
+  "zh": "上一项操作失败（见输出）"
+ },
+ "ui.status.gaps": {
+  "en_hash": "cadc85dfa1",
+  "zh": "已完成，但存在缺口（见输出中的列表）"
+ },
+ "ui.status.ready": {
+  "en_hash": "20c7c5522f",
+  "zh": "就绪"
+ },
+ "ui.status.running": {
+  "en_hash": "ef518f3e88",
+  "zh": "正在运行：{label}…"
+ },
+ "ui.status.stopped": {
+  "en_hash": "107060caab",
+  "zh": "已停止；再次运行即可继续"
+ },
+ "ui.status.stopping": {
+  "en_hash": "794d2fe924",
+  "zh": "当前请求完成后停止…"
+ },
+ "ui.stop": {
+  "en_hash": "9e253470c8",
+  "zh": "停止"
+ },
+ "ui.win.cancel": {
+  "en_hash": "77dfd2135f",
+  "zh": "取消"
+ },
+ "ui.win.cancelling_after_the_current": {
+  "en_hash": "e32139c6f9",
+  "zh": "当前项目完成后取消…"
+ },
+ "ui.win.cannot_render": {
+  "en_hash": "cb153a1e49",
+  "zh": "来源页：无法显示（{error}）"
+ },
+ "ui.win.chart": {
+  "en_hash": "66c7734789",
+  "zh": "图表"
+ },
+ "ui.win.chart_hint": {
+  "en_hash": "895bd29b90",
+  "zh": "将鼠标悬停于数据点或柱形上可查看来源；单击可在输出面板中显示完整的来源追溯。"
+ },
+ "ui.win.close": {
+  "en_hash": "bbfa773e5a",
+  "zh": "关闭"
+ },
+ "ui.win.col.created": {
+  "en_hash": "accf40c89b",
+  "zh": "创建时间"
+ },
+ "ui.win.col.done": {
+  "en_hash": "e9b450d14b",
+  "zh": "已完成"
+ },
+ "ui.win.col.error": {
+  "en_hash": "7f2f6a15cf",
+  "zh": "错误"
+ },
+ "ui.win.col.failed": {
+  "en_hash": "09fef5d8d9",
+  "zh": "失败"
+ },
+ "ui.win.col.field": {
+  "en_hash": "c326a4660b",
+  "zh": "字段"
+ },
+ "ui.win.col.id": {
+  "en_hash": "474ae52625",
+  "zh": "编号"
+ },
+ "ui.win.col.item": {
+  "en_hash": "ecdda59aea",
+  "zh": "项目"
+ },
+ "ui.win.col.kind": {
+  "en_hash": "e00ac23f2a",
+  "zh": "类别"
+ },
+ "ui.win.col.status": {
+  "en_hash": "bae7d5be70",
+  "zh": "状态"
+ },
+ "ui.win.col.total": {
+  "en_hash": "b25928c699",
+  "zh": "合计"
+ },
+ "ui.win.col.value": {
+  "en_hash": "8dce170de2",
+  "zh": "数值"
+ },
+ "ui.win.confidence_below": {
+  "en_hash": "3ed81950cf",
+  "zh": "置信度低于"
+ },
+ "ui.win.correct_value": {
+  "en_hash": "fdb43ea9fb",
+  "zh": "正确数值"
+ },
+ "ui.win.dataset_explorer": {
+  "en_hash": "06767779c3",
+  "zh": "数据集浏览器"
+ },
+ "ui.win.empty_panel": {
+  "en_hash": "9ba14a72b9",
+  "zh": "该面板数据没有记录，无可浏览的内容。"
+ },
+ "ui.win.idle": {
+  "en_hash": "cc1ebdd04e",
+  "zh": "空闲"
+ },
+ "ui.win.items": {
+  "en_hash": "5778b2cbb2",
+  "zh": "{n} 项"
+ },
+ "ui.win.match": {
+  "en_hash": "7cb379787f",
+  "zh": "，已标出匹配内容"
+ },
+ "ui.win.next_page": {
+  "en_hash": "4bfc194b68",
+  "zh": "下一页"
+ },
+ "ui.win.no_match": {
+  "en_hash": "21e942d302",
+  "zh": "，本页未找到匹配内容"
+ },
+ "ui.win.no_panel_loaded": {
+  "en_hash": "fba066b8f1",
+  "zh": "未加载面板数据"
+ },
+ "ui.win.no_rows": {
+  "en_hash": "1d1ea8dd10",
+  "zh": "无记录"
+ },
+ "ui.win.open_panel": {
+  "en_hash": "3b8b4a62f6",
+  "zh": "打开面板数据…"
+ },
+ "ui.win.operations": {
+  "en_hash": "a1fdaa6b2a",
+  "zh": "运行维护"
+ },
+ "ui.win.ops_intro": {
+  "en_hash": "cf8dad7191",
+  "zh": "保持数据库更新。每日更新只获取新内容：上次运行以来的公告（全市场，每个交易所每日一次检索）、全部公司的当日价格，以及对有新文件的公司进行提取。任务可取消及续行；不会重复记录。"
+ },
+ "ui.win.page_of": {
+  "en_hash": "677a805acd",
+  "zh": "来源页 第 {page} 页，共 {pages} 页"
+ },
+ "ui.win.previous_page": {
+  "en_hash": "81f547195b",
+  "zh": "上一页"
+ },
+ "ui.win.reason_needed_to_correct": {
+  "en_hash": "05b09d4347",
+  "zh": "理由（更正或驳回时必填）"
+ },
+ "ui.win.refresh": {
+  "en_hash": "56e3badc4e",
+  "zh": "刷新"
+ },
+ "ui.win.refresh_list": {
+  "en_hash": "7fe6bbe7e6",
+  "zh": "刷新列表"
+ },
+ "ui.win.remove_schedule": {
+  "en_hash": "ef0a8a1371",
+  "zh": "取消定时"
+ },
+ "ui.win.resume_selected_job": {
+  "en_hash": "d977f27998",
+  "zh": "继续所选任务"
+ },
+ "ui.win.review": {
+  "en_hash": "e29a79fe0c",
+  "zh": "人工复核"
+ },
+ "ui.win.review_buttons": {
+  "en_hash": "c83888b755",
+  "zh": "接受 = 数值正确。更正 = 输入正确数值。未披露 = 报告未提供该数值。暂缓 = 稍后决定。"
+ },
+ "ui.win.review_intro": {
+  "en_hash": "c9cf479ee4",
+  "zh": "需要人工复核的数值：校验发现、两种文本提取方法之间的分歧及低置信度数值，按重要性排序。复核决定单独保存；原始数值从不改动。"
+ },
+ "ui.win.rows_vars": {
+  "en_hash": "161103911c",
+  "zh": "{rows} 行，{cols} 个数值变量"
+ },
+ "ui.win.run_automatically_on_weekdays": {
+  "en_hash": "7fb7186208",
+  "zh": "工作日自动运行，时间"
+ },
+ "ui.win.run_daily_update": {
+  "en_hash": "49369a3379",
+  "zh": "运行每日更新"
+ },
+ "ui.win.save_chart_svg": {
+  "en_hash": "ce522e1b13",
+  "zh": "保存图表（SVG）…"
+ },
+ "ui.win.save_data_csv": {
+  "en_hash": "65bb81ecd0",
+  "zh": "保存数据（CSV）…"
+ },
+ "ui.win.save_png": {
+  "en_hash": "2b3d575a46",
+  "zh": "保存 PNG…"
+ },
+ "ui.win.save_svg": {
+  "en_hash": "c3e5df5d3b",
+  "zh": "保存 SVG…"
+ },
+ "ui.win.schedule": {
+  "en_hash": "0a8adac9d6",
+  "zh": "定时"
+ },
+ "ui.win.second_variable_scatter": {
+  "en_hash": "7644858755",
+  "zh": "第二个变量（散点图）"
+ },
+ "ui.win.security_code": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "ui.win.select_job": {
+  "en_hash": "e89316c921",
+  "zh": "请先在列表中选择一项任务。"
+ },
+ "ui.win.show": {
+  "en_hash": "d97d1ee339",
+  "zh": "显示"
+ },
+ "ui.win.source_page": {
+  "en_hash": "bac4b415b2",
+  "zh": "来源页"
+ },
+ "ui.win.source_page_document_not": {
+  "en_hash": "4d1bff7523",
+  "zh": "来源页：文件未下载"
+ },
+ "ui.win.source_page_preview_needs": {
+  "en_hash": "cabe55cc5d",
+  "zh": "来源页：预览需要 PDF 文件及 pypdfium2 组件"
+ },
+ "ui.win.storage": {
+  "en_hash": "9e092dda4f",
+  "zh": "存储空间"
+ },
+ "ui.win.update_queue": {
+  "en_hash": "46b1b5298d",
+  "zh": "更新复核队列"
+ },
+ "ui.win.variable": {
+  "en_hash": "19de69cb60",
+  "zh": "变量"
+ }
+}

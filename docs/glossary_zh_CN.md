@@ -193,6 +193,25 @@ These describe the program, not the market, so the choice is a matter of clarity
 | Busy days | 公告密集日 | **Settled** |
 | Quote list (Eastmoney) | 行情列表 | Named as a vendor service |
 
+## 11. Terms added in v2.1 (proposed; the renderings stand until reviewed)
+
+These are the interface's own terms for the features of v2.1 (plan v2.1, section 13, decision 1). They follow part 10: plain technical usage where no official term exists.
+
+| English | Proposed | Notes |
+|---|---|---|
+| Price source | 价格来源 | Settings; the two public feeds are named 东方财富（公开）and 腾讯（公开） |
+| Findings summary; rate of what was checked | 校验发现汇总；占已检查项目的比例 | "Show findings" |
+| Guidance (management guidance, as a proxy for expectations) | 公司业绩指引（业绩预告、业绩快报） | Always with the note that it is a disclosed proxy, not investors' expectations (投资者预期) |
+| Analyst forecast | 分析师预测 | Imported only, with its licence |
+| Topology view | 拓扑视图 | The desktop page and the offline viewer |
+| NVF layers | 制度协调 / 生产能力 / 公司基本面 / 投资者预期 / 市场估值 | Institutional coordination, productive capability, corporate fundamentals, investor expectations, market valuation |
+| Evidential status | 证据性质 | Documented fact 有文件依据的事实; observed association 观察到的关联; estimated relationship 估计的关系; theoretical proposition 理论命题 |
+| Data gap | 数据缺口 | A layer with no data, shown rather than filled |
+| Licensed data | 许可数据 | As in part 10 (licence class 许可类别) |
+| Worker (parallel reading) | 工作进程 | Settings > Reading documents (读取文件) |
+| Interface language | 界面语言 | |
+| Earnings forecast and flash report, read together | 读取业绩预告与业绩快报 | The action "Read guidance" |
+
 ## Review record
 
 | Date | Reviewer | Rows settled | Notes |

@@ -960,6 +960,7 @@ def write_panel(result: dict, out_dir: str, name: str = "panel", formats: tuple[
 
 def _write_panel_files(result: dict, out: Path, name: str, formats, allow_empty: bool) -> dict:
     from .research import database_fingerprint
+    _ensure()               # the variable labels and types, whether or not a panel was built in this process
     rows = result["rows"]
     names = result["params"]["variables"]
     cols = []

@@ -29,6 +29,8 @@ pdfium_data = collect_data_files("pypdfium2_raw") + collect_data_files("pypdfium
 migrations = collect_data_files("ashare", subdir="migrations", include_py_files=True)
 # v2.1: the offline topology viewer's page, script, style sheet and bundled libraries (with their licences)
 viewer = collect_data_files("ashare", subdir="viz/viewer")
+# v2.1: the interface catalogues (English and Simplified Chinese)
+viewer += collect_data_files("ashare", subdir="i18n")
 hidden += collect_submodules("alembic", filter=lambda n: not n.startswith("alembic.testing")) + ["mako.template"]
 
 # Size: rich needs pygments only for the Python lexer (help formatting).

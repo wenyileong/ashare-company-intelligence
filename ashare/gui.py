@@ -26,6 +26,8 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 from . import __version__
+from .i18n import (tr, set_language, language, default_language, section_title, section_intro, group_label,
+                   action_label, action_note, field_label, field_hint)
 
 APP_NAME = "A-share Company Intelligence"
 TODAY = _dt.date.today().isoformat()
@@ -430,7 +432,7 @@ SECTIONS = [
              F("min_class", "Minimum confidence", "choice:,LOW,MEDIUM,HIGH", "", "--min-class"),
              F("exclude_financials", "Exclude financial firms", "bool", False, ("--exclude-financials", None)),
              F("formats", "Formats", "choice:csv,dta;csv" + (";csv,dta,parquet" if _PARQUET else ""), "csv,dta",
-               "--formats", "dta = Stata" + ("" if _PARQUET else "; Parquet needs pyarrow, which this build lacks")),
+               "--formats", "dta = Stata. Parquet is offered where the pyarrow package is installed."),
              F("universe_basis", "Companies in each row", "choice:auto,listing,report-evidence", "auto",
                "--universe-basis", "auto = listed on the date by its listing record, or (yearly rows) published a "
                "report for that year; marked in the universe_basis column"),
@@ -542,7 +544,7 @@ SECTIONS = [
            "matplotlib is installed (source installations).", after="open_folder"),
          A("Create a dataset release", "release", [
              F("formats", "Formats", "choice:csv,sqlite;csv" + (";csv,sqlite,parquet" if _PARQUET else ""),
-               "csv,sqlite", "--formats", "" if _PARQUET else "Parquet needs pyarrow, which this build lacks."), CODE_OPT(""),
+               "csv,sqlite", "--formats", "Parquet is offered where the pyarrow package is installed."), CODE_OPT(""),
              F("pseudonymise", "Pseudonymise personal names", "bool", False, ("--pseudonymise", None),
                "Directors, officers and natural-person shareholders become stable identifiers (P…)."),
              F("coarsen", "Ages in five-year bands", "bool", False, ("--coarsen", None),
@@ -651,6 +653,20 @@ def _number_collect_pages():
 _number_collect_pages()
 
 
+def _assign_keys():
+    """v2.1 (plan D): a stable key for each action, from its page and command, for the interface catalogues."""
+    from collections import Counter
+    for sec in SECTIONS:
+        seen = Counter()
+        for a in sec["actions"]:
+            base = f"action.{sec['id']}.{a['command']}"
+            seen[base] += 1
+            a["key"] = base if seen[base] == 1 else f"{base}.{seen[base]}"
+
+
+_assign_keys()
+
+
 def build_argv(command: str, fields: list, values: dict) -> list[str]:
     """Translate form values into CLI arguments (pure; unit-tested)."""
     argv = [command]
@@ -671,24 +687,26 @@ def build_argv(command: str, fields: list, values: dict) -> list[str]:
     return argv
 
 
-def check_values(fields: list, values: dict) -> list[str]:
-    """Return human-readable problems with the form (pure; unit-tested)."""
+def check_values(fields: list, values: dict, label_of=None) -> list[str]:
+    """Return human-readable problems with the form (pure; unit-tested). ``label_of`` gives a field's label in the
+    interface language (v2.1)."""
     problems = []
     for f in fields:
         v = values.get(f["key"])
         v = "" if v is None or isinstance(v, bool) else str(v).strip()
+        label = label_of(f) if label_of else f["label"]
         if f["required"] and not v:
-            problems.append(f"{f['label']} is required.")
+            problems.append(tr("ui.check.required", "{label} is required.").format(label=label))
         if v and f["kind"] == "date" and not DATE_RE.match(v):
-            problems.append(f"{f['label']} must be a date like 2026-01-31.")
+            problems.append(tr("ui.check.date", "{label} must be a date like 2026-01-31.").format(label=label))
         if v and f["kind"] == "code" and not re.fullmatch(r"\d{1,6}", v):
-            problems.append(f"{f['label']} must be a six-digit code.")
+            problems.append(tr("ui.check.code", "{label} must be a six-digit code.").format(label=label))
         if v and f["kind"] == "year" and not re.fullmatch(r"(19|20)\d{2}", v):
-            problems.append(f"{f['label']} must be a year such as 2025.")
+            problems.append(tr("ui.check.year", "{label} must be a year such as 2025.").format(label=label))
         if v and f["kind"] == "number" and not re.fullmatch(r"-?\d+(\.\d+)?", v):
-            problems.append(f"{f['label']} must be a number.")
+            problems.append(tr("ui.check.number", "{label} must be a number.").format(label=label))
         if v and f["kind"] == "integer" and not re.fullmatch(r"-?\d+", v):
-            problems.append(f"{f['label']} must be a whole number.")
+            problems.append(tr("ui.check.integer", "{label} must be a whole number.").format(label=label))
     return problems
 
 
@@ -833,6 +851,17 @@ def open_path(path) -> None:
         subprocess.Popen(["xdg-open", path])
 
 
+def COUNT_LABELS() -> dict:
+    """The home page's counts in the interface language (the keys of ``database_summary``)."""
+    return {"Companies": tr("ui.count.companies", "Companies"),
+            "Disclosures": tr("ui.count.disclosures", "Disclosures"),
+            "Financial figures": tr("ui.count.figures", "Financial figures"),
+            "Price bars": tr("ui.count.bars", "Price bars"),
+            "Corporate actions": tr("ui.count.actions", "Corporate actions"),
+            "Regulatory events": tr("ui.count.events", "Regulatory events"),
+            "Validation findings": tr("ui.count.findings", "Validation findings")}
+
+
 def database_summary() -> dict:
     """Row counts for the home page."""
     from .models import init_db, engine
@@ -869,6 +898,9 @@ class App(tk.Tk):
         os.environ["ASHARE_OPTIONAL_BOARDS"] = ",".join(self.settings.get("optional_boards") or [])
         os.environ["ASHARE_PRICE_SOURCE"] = self.settings.get("price_source") or "eastmoney"
         apply_workers(self.settings.get("workers"))
+        set_language(self.settings.get("language") or default_language())
+        self._saved_forms: dict = {}             # v2.1: form values kept when the language is switched
+        self._forms: dict = {}
         self.settings_widgets: list = []          # v2.1 (finding 10): locked while an action runs
         self.out_queue: queue.Queue = queue.Queue()
         self.busy = False
@@ -889,7 +921,11 @@ class App(tk.Tk):
 
         def pick(*names):
             return next((n for n in names if n in families), names[-1])
-        base = pick("Segoe UI", "Microsoft YaHei UI", "Helvetica Neue", "DejaVu Sans", "TkDefaultFont")
+        if language() == "zh_CN":            # v2.1: Microsoft YaHei UI first in Chinese (plan, 5.3)
+            base = pick("Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", "WenQuanYi Micro Hei",
+                        "Segoe UI", "DejaVu Sans", "TkDefaultFont")
+        else:
+            base = pick("Segoe UI", "Microsoft YaHei UI", "Helvetica Neue", "DejaVu Sans", "TkDefaultFont")
         # Output tables need a fixed-width font to stay aligned.
         mono = pick("Consolas", "Cascadia Mono", "Menlo", "DejaVu Sans Mono", "Courier New", "TkFixedFont")
         self.f_body = (base, 10)
@@ -940,17 +976,29 @@ class App(tk.Tk):
         tk.Label(side, text="A-share", justify="left", bg=P["side"], fg=P["accent"],
                  font=self.f_card, anchor="w").pack(fill="x", padx=18, pady=(18, 0))
         tk.Label(side, text="Company Intelligence", justify="left", bg=P["side"], fg=P["fg"],
-                 font=self.f_bold, anchor="w").pack(fill="x", padx=18, pady=(0, 12))
+                 font=self.f_bold, anchor="w").pack(fill="x", padx=18, pady=(0, 4))
+        # v2.1 (plan D): the language switch, "EN | 中文"
+        lang = tk.Frame(side, bg=P["side"])
+        lang.pack(fill="x", padx=18, pady=(0, 10))
+        self.lang_buttons = {}
+        for i, (code, name) in enumerate((("en", "EN"), ("zh_CN", "中文"))):
+            if i:
+                tk.Label(lang, text="|", bg=P["side"], fg=P["muted"], font=self.f_small).pack(side="left", padx=4)
+            b = tk.Label(lang, text=name, bg=P["side"], font=self.f_small + (("bold",) if language() == code else ()),
+                         fg=P["accent"] if language() == code else P["muted"], cursor="hand2")
+            b.pack(side="left")
+            b.bind("<Button-1>", lambda e, c=code: self.switch_language(c))
+            self.lang_buttons[code] = b
         group = None
         for sec in SECTIONS:
             if sec["group"] != group:
                 group = sec["group"]
                 if group:
-                    tk.Label(side, text=group.upper(), bg=P["side"], fg=P["muted"], font=self.f_group,
+                    tk.Label(side, text=group_label(group).upper(), bg=P["side"], fg=P["muted"], font=self.f_group,
                              anchor="w").pack(fill="x", padx=18, pady=(8, 1))
                 elif sec["id"] == "settings":
                     tk.Frame(side, height=1, bg=P["line"]).pack(fill="x", padx=14, pady=(12, 6))
-            lbl = tk.Label(side, text=sec["title"], bg=P["side"], fg=P["fg"], font=self.f_nav, anchor="w",
+            lbl = tk.Label(side, text=section_title(sec), bg=P["side"], fg=P["fg"], font=self.f_nav, anchor="w",
                            padx=18, pady=2, cursor="hand2")
             lbl.pack(fill="x")
             lbl.bind("<Button-1>", lambda e, i=sec["id"]: self.show(i))
@@ -975,15 +1023,16 @@ class App(tk.Tk):
         tk.Frame(out, height=1, bg=P["line"]).pack(fill="x")
         bar = ttk.Frame(out, padding=(20, 8, 20, 4))
         bar.pack(fill="x")
-        ttk.Label(bar, text="Output", font=self.f_bold).pack(side="left")
-        self.status = tk.StringVar(value="Ready")
+        ttk.Label(bar, text=tr("ui.output", "Output"), font=self.f_bold).pack(side="left")
+        self.status = tk.StringVar(value=tr("ui.status.ready", "Ready"))
         self.status_lbl = ttk.Label(bar, textvariable=self.status, style="Muted.TLabel")
         self.status_lbl.pack(side="left", padx=12)
         self.progress = ttk.Progressbar(bar, mode="indeterminate", length=120)
-        self.stop_btn = ttk.Button(bar, text="Stop", style="Small.TButton", command=self._stop)
-        for text, cmd in (("Clear", lambda: self.log.delete("1.0", "end")), ("Copy", self._copy),
-                          ("Expand", self._toggle_output),
-                          ("Run log", lambda: self._open(self.folder / "run_log.txt"))):
+        self.stop_btn = ttk.Button(bar, text=tr("ui.stop", "Stop"), style="Small.TButton", command=self._stop)
+        for text, cmd in ((tr("ui.clear", "Clear"), lambda: self.log.delete("1.0", "end")),
+                          (tr("ui.copy", "Copy"), self._copy),
+                          (tr("ui.expand", "Expand"), self._toggle_output),
+                          (tr("ui.run_log", "Run log"), lambda: self._open(self.folder / "run_log.txt"))):
             ttk.Button(bar, text=text, style="Small.TButton", command=cmd).pack(side="right", padx=(6, 0))
         box = ttk.Frame(out, padding=(20, 0, 20, 14))
         box.pack(fill="both", expand=True)
@@ -1051,7 +1100,7 @@ class App(tk.Tk):
             from .gui_review import ReviewPage
             self.review_page = ReviewPage(self, frame)
             return frame
-        self._header(inner, sec["title"], sec["intro"])
+        self._header(inner, section_title(sec), section_intro(sec))
         for action in sec["actions"]:
             self._build_card(inner, action)
         return frame
@@ -1064,14 +1113,15 @@ class App(tk.Tk):
         body.pack(fill="x", padx=16, pady=12)
         head = tk.Frame(body, bg=P["card"])
         head.pack(fill="x")
-        ttk.Label(head, text=action["label"], style="CardTitle.TLabel").pack(side="left")
+        ttk.Label(head, text=action_label(action), style="CardTitle.TLabel").pack(side="left")
         values = {}
-        btn = ttk.Button(head, text="Run", style="Accent.TButton",
+        self._forms[action["key"]] = values
+        btn = ttk.Button(head, text=tr("ui.run", "Run"), style="Accent.TButton",
                          command=lambda a=action, v=values: self._run(a, v))
         btn.pack(side="right")
         self.run_buttons.append(btn)
         if action["note"]:
-            ttk.Label(body, text=action["note"], style="CardMuted.TLabel", wraplength=700,
+            ttk.Label(body, text=action_note(action), style="CardMuted.TLabel", wraplength=700,
                       justify="left").pack(anchor="w", pady=(2, 0))
         if action["fields"]:
             grid = tk.Frame(body, bg=P["card"])
@@ -1081,21 +1131,23 @@ class App(tk.Tk):
             for i, f in enumerate(action["fields"]):
                 cell = tk.Frame(grid, bg=P["card"])
                 cell.grid(row=i // 3, column=i % 3, sticky="nw", padx=(0, 22), pady=(0, 8))
-                values[f["key"]] = self._field(cell, f)
+                values[f["key"]] = self._field(cell, f, action)
         return card
 
-    def _field(self, cell, f):
+    def _field(self, cell, f, action):
         kind = f["kind"]
+        saved = self._saved_forms.get(action["key"], {})
+        hint = field_hint(action, f)
         if kind == "bool":
-            var = tk.BooleanVar(value=bool(f["default"]))
-            ttk.Checkbutton(cell, text=f["label"], variable=var).pack(anchor="w", pady=(18, 0))
-            if f["hint"]:
-                ttk.Label(cell, text=f["hint"], style="CardMuted.TLabel", wraplength=230,
+            var = tk.BooleanVar(value=bool(saved.get(f["key"], f["default"])))
+            ttk.Checkbutton(cell, text=field_label(action, f), variable=var).pack(anchor="w", pady=(18, 0))
+            if hint:
+                ttk.Label(cell, text=hint, style="CardMuted.TLabel", wraplength=230,
                           justify="left").pack(anchor="w", pady=(2, 0))
             return var
-        label = f["label"] + (" *" if f["required"] else "")
+        label = field_label(action, f) + (" *" if f["required"] else "")
         ttk.Label(cell, text=label, style="Card.TLabel", font=self.f_small).pack(anchor="w")
-        var = tk.StringVar(value=f["default"])
+        var = tk.StringVar(value=saved.get(f["key"], f["default"]))
         if kind.startswith("choice:"):
             opts = kind[7:].split(";") if ";" in kind else kind[7:].split(",")
             w = ttk.Combobox(cell, textvariable=var, values=opts, state="readonly",
@@ -1105,34 +1157,43 @@ class App(tk.Tk):
             row = tk.Frame(cell, bg=PALETTE["card"])
             row.pack(anchor="w")
             ttk.Entry(row, textvariable=var, width=24).pack(side="left")
-            ttk.Button(row, text="Browse…", style="Small.TButton",
+            ttk.Button(row, text=tr("ui.browse", "Browse…"), style="Small.TButton",
                        command=lambda: self._browse(var, kind)).pack(side="left", padx=(4, 0))
         else:
             width = {"date": 12, "code": 10, "year": 8, "number": 8, "integer": 8}.get(kind, 46 if f["key"] == "sql" else 24)
             ttk.Entry(cell, textvariable=var, width=width).pack(anchor="w")
-        if f["hint"]:
-            ttk.Label(cell, text=f["hint"], style="CardMuted.TLabel", wraplength=230,
+        if hint:
+            ttk.Label(cell, text=hint, style="CardMuted.TLabel", wraplength=230,
                       justify="left").pack(anchor="w", pady=(2, 0))
         return var
 
     def _build_home(self, inner):
         P = PALETTE
-        ttk.Label(inner, text="Getting started", style="Title.TLabel").pack(anchor="w")
-        ttk.Label(inner, text="Collect data step by step, then analyse and validate it. Every action keeps a record of "
-                              "its source document, so any figure can be traced back.",
+        ttk.Label(inner, text=tr("section.home.title", "Getting started"), style="Title.TLabel").pack(anchor="w")
+        ttk.Label(inner, text=tr("ui.home.intro", "Collect data step by step, then analyse and validate it. Every "
+                                                  "action keeps a record of its source document, so any figure can "
+                                                  "be traced back."),
                   style="Muted.TLabel", wraplength=760, justify="left").pack(anchor="w", pady=(4, 16))
         self.summary_frame = tk.Frame(inner, bg=P["bg"])
         self.summary_frame.pack(fill="x", pady=(0, 18))
         steps = [
-            ("universe", "Update the company list", "Downloads the list of listed companies from CNINFO."),
-            ("disclosures", "Catalogue announcements for a company", "Try one code (e.g. 600519) with documents downloaded."),
-            ("financials", "Extract financial figures", "Reads statements from the downloaded reports."),
-            ("actions", "Extract corporate actions and regulatory events", "Also see the Regulatory & legal section."),
-            ("industry", "Import an industry classification list (optional)", "Enables peer groups and industry statistics."),
-            ("validate", "Run all checks", "Flags inconsistencies; never changes data."),
-            ("company", "Open the company report", "A one-page summary you can save or print."),
+            ("universe", tr("ui.home.step.universe.title", "Update the company list"),
+             tr("ui.home.step.universe.note", "Downloads the list of listed companies from CNINFO.")),
+            ("disclosures", tr("ui.home.step.disclosures.title", "Catalogue announcements for a company"),
+             tr("ui.home.step.disclosures.note", "Try one code (e.g. 600519) with documents downloaded.")),
+            ("financials", tr("ui.home.step.financials.title", "Extract financial figures"),
+             tr("ui.home.step.financials.note", "Reads statements from the downloaded reports.")),
+            ("actions", tr("ui.home.step.actions.title", "Extract corporate actions and regulatory events"),
+             tr("ui.home.step.actions.note", "Also see the Regulatory & legal section.")),
+            ("industry", tr("ui.home.step.industry.title", "Import an industry classification list (optional)"),
+             tr("ui.home.step.industry.note", "Enables peer groups and industry statistics.")),
+            ("validate", tr("ui.home.step.validate.title", "Run all checks"),
+             tr("ui.home.step.validate.note", "Flags inconsistencies; never changes data.")),
+            ("company", tr("ui.home.step.company.title", "Open the company report"),
+             tr("ui.home.step.company.note", "A one-page summary you can save or print.")),
         ]
-        ttk.Label(inner, text="Suggested first run", font=self.f_bold).pack(anchor="w", pady=(0, 6))
+        ttk.Label(inner, text=tr("ui.home.first_run", "Suggested first run"), font=self.f_bold).pack(anchor="w",
+                                                                                                    pady=(0, 6))
         for n, (sid, title, note) in enumerate(steps, 1):
             row = tk.Frame(inner, bg=P["bg"])
             row.pack(fill="x", pady=3)
@@ -1141,11 +1202,14 @@ class App(tk.Tk):
             col.pack(side="left", fill="x", expand=True)
             ttk.Button(col, text=title, style="Link.TButton", command=lambda i=sid: self.show(i)).pack(anchor="w")
             ttk.Label(col, text=note, style="Muted.TLabel").pack(anchor="w")
-        ttk.Label(inner, text="Notes", font=self.f_bold).pack(anchor="w", pady=(20, 4))
-        for line in ("Requests are rate-limited (one per second) and never bypass logins or CAPTCHAs.",
-                     "Public price feeds are labelled as such and are not exchange-authoritative.",
-                     "'As of' dates use only information published by that date, avoiding look-ahead bias.",
-                     "Fields marked * are required. Leaving a security code blank usually means all companies."):
+        ttk.Label(inner, text=tr("ui.home.notes", "Notes"), font=self.f_bold).pack(anchor="w", pady=(20, 4))
+        for line in (tr("ui.home.note1", "Requests are rate-limited (one per second) and never bypass logins or "
+                                         "CAPTCHAs."),
+                     tr("ui.home.note2", "Public price feeds are labelled as such and are not exchange-authoritative."),
+                     tr("ui.home.note3", "'As of' dates use only information published by that date, avoiding "
+                                         "look-ahead bias."),
+                     tr("ui.home.note4", "Fields marked * are required. Leaving a security code blank usually means all "
+                                         "companies.")):
             ttk.Label(inner, text="•  " + line, style="Muted.TLabel", wraplength=760, justify="left").pack(anchor="w", pady=1)
 
     def _refresh_summary(self):
@@ -1161,84 +1225,116 @@ class App(tk.Tk):
             box.grid(row=0, column=i, sticky="nsew", padx=(0, 8))
             self.summary_frame.columnconfigure(i, weight=1)
             tk.Label(box, text=f"{v:,}", bg=P["card"], fg=P["fg"], font=self.f_big).pack(anchor="w", padx=12, pady=(8, 0))
-            tk.Label(box, text=k, bg=P["card"], fg=P["muted"], font=self.f_small).pack(anchor="w", padx=12, pady=(0, 8))
+            tk.Label(box, text=COUNT_LABELS().get(k, k), bg=P["card"], fg=P["muted"],
+                     font=self.f_small).pack(anchor="w", padx=12, pady=(0, 8))
 
     def _build_settings(self, inner):
-        ttk.Label(inner, text="Settings", style="Title.TLabel").pack(anchor="w")
-        ttk.Label(inner, text="Where the database, downloaded documents, exports and reports are kept.",
+        ttk.Label(inner, text=tr("section.settings.title", "Settings"), style="Title.TLabel").pack(anchor="w")
+        ttk.Label(inner, text=tr("ui.settings.language", "Interface language"), font=self.f_bold).pack(anchor="w",
+                                                                                                    pady=(4, 4))
+        ttk.Label(inner, text=tr("ui.settings.language_note",
+                                 "Pages, actions, fields and messages of this window. Each command's own output, "
+                                 "the run log, variable names and files stay in English, so a dataset never depends "
+                                 "on the interface language."), style="Muted.TLabel", wraplength=760,
+                  justify="left").pack(anchor="w")
+        lrow = ttk.Frame(inner)
+        lrow.pack(fill="x", pady=(6, 0))
+        self.lang_var = tk.StringVar(value=language())
+        for code, name in (("en", "English"), ("zh_CN", "中文（简体）")):
+            rb = ttk.Radiobutton(lrow, text=name, value=code, variable=self.lang_var,
+                                 command=lambda: self.switch_language(self.lang_var.get()))
+            rb.pack(side="left", padx=(0, 14))
+            self._lockable(rb)
+        ttk.Label(inner, text=tr("ui.settings.folder", "Data folder"), font=self.f_bold).pack(anchor="w",
+                                                                                           pady=(22, 4))
+        ttk.Label(inner, text=tr("ui.settings.folder_note",
+                                 "Where the database, downloaded documents, exports and reports are kept."),
                   style="Muted.TLabel").pack(anchor="w", pady=(4, 16))
         self.folder_var = tk.StringVar(value=str(self.folder))
         row = ttk.Frame(inner)
         row.pack(fill="x")
         ttk.Entry(row, textvariable=self.folder_var, state="readonly", width=70).pack(side="left")
-        chg = ttk.Button(row, text="Change…", command=self._choose_folder)
+        chg = ttk.Button(row, text=tr("ui.change", "Change…"), command=self._choose_folder)
         chg.pack(side="left", padx=6)
         self._lockable(chg)
-        ttk.Button(row, text="Open", command=lambda: self._open(self.folder)).pack(side="left")
-        ttk.Label(inner, text="Contents: ashares.db (database), disclosures\\ and raw\\ (original documents and "
-                              "responses), exports\\, reports\\, releases\\, run_log.txt (every action with its "
-                              "equivalent command).", style="Muted.TLabel", wraplength=760, justify="left").pack(anchor="w", pady=(10, 0))
-        ttk.Label(inner, text="Optional boards", font=self.f_bold).pack(anchor="w", pady=(22, 4))
-        ttk.Label(inner, text="Off by default. When on, 'Update the company list' also accepts these securities "
-                              "(their CNINFO list and query settings are not yet verified against the live site; "
-                              "run the self-test after enabling).", style="Muted.TLabel", wraplength=760,
+        ttk.Button(row, text=tr("ui.open", "Open"), command=lambda: self._open(self.folder)).pack(side="left")
+        ttk.Label(inner, text=tr("ui.settings.contents",
+                                 "Contents: ashares.db (database), disclosures\\ and raw\\ (original documents and "
+                                 "responses), exports\\, reports\\, releases\\, run_log.txt (every action with "
+                                 "its equivalent command)."), style="Muted.TLabel", wraplength=760, justify="left").pack(anchor="w", pady=(10, 0))
+        ttk.Label(inner, text=tr("ui.settings.boards", "Optional boards"), font=self.f_bold).pack(anchor="w",
+                                                                                               pady=(22, 4))
+        ttk.Label(inner, text=tr("ui.settings.boards_note",
+                                 "Off by default. When on, 'Update the company list' also accepts these securities, "
+                                 "and reads their listing dates from the exchanges' B-share lists and the quote list. "
+                                 "Run the self-test after enabling."), style="Muted.TLabel", wraplength=760,
                   justify="left").pack(anchor="w")
         self.board_vars = {}
         enabled = set(self.settings.get("optional_boards") or [])
-        for key, label in (("BSE", "Beijing Stock Exchange (codes 920, 43, 83, 87, 88)"),
-                           ("B_SHARE", "B-shares (SSE 900, SZSE 200 and 201; USD and HKD)")):
+        for key, label in (("BSE", tr("ui.settings.bse", "Beijing Stock Exchange (codes 920, 43, 83, 87, 88)")),
+                           ("B_SHARE", tr("ui.settings.bshare", "B shares (SSE 900, SZSE 200 and 201; USD and HKD)"))):
             var = tk.BooleanVar(value=key in enabled)
             self.board_vars[key] = var
             cb = ttk.Checkbutton(inner, text=label, variable=var, style="Plain.TCheckbutton",
                                  command=self._save_boards)
             cb.pack(anchor="w", pady=(4, 0))
             self._lockable(cb)
-        ttk.Label(inner, text="Price source", font=self.f_bold).pack(anchor="w", pady=(22, 4))
-        ttk.Label(inner, text="Where daily prices come from: downloads, the backfill and the daily update. Both public "
-                              "sources are unofficial feeds, not exchange-authoritative; their terms are yours to "
-                              "check. 'Test price sources' (Market data) shows which one answers from your network. "
-                              "'None' downloads nothing: import licensed prices from CSV instead. Imported prices "
-                              "are always preferred to a public feed's for the same day.", style="Muted.TLabel",
+        ttk.Label(inner, text=tr("ui.settings.price", "Price source"), font=self.f_bold).pack(anchor="w",
+                                                                                           pady=(22, 4))
+        ttk.Label(inner, text=tr("ui.settings.price_note",
+                                 "Where daily prices come from: downloads, the backfill and the daily update. Both "
+                                 "public sources are unofficial feeds, not exchange-authoritative; their terms are "
+                                 "yours to check. 'Test price sources' (Market data) shows which one answers from "
+                                 "your network. 'None' downloads nothing: import licensed prices from CSV instead. "
+                                 "Imported prices are always preferred to a public feed's for the same day."), style="Muted.TLabel",
                   wraplength=760, justify="left").pack(anchor="w")
         self.price_var = tk.StringVar(value=self.settings.get("price_source") or "eastmoney")
         prow = ttk.Frame(inner)
         prow.pack(fill="x", pady=(6, 0))
-        for key, label in (("eastmoney", "Eastmoney (public)"), ("tencent", "Tencent (public)"),
-                           ("none", "None: CSV import only")):
+        for key, label in (("eastmoney", tr("ui.settings.eastmoney", "Eastmoney (public)")),
+                           ("tencent", tr("ui.settings.tencent", "Tencent (public)")),
+                           ("none", tr("ui.settings.none", "None: CSV import only"))):
             rb = ttk.Radiobutton(prow, text=label, value=key, variable=self.price_var,
                                  command=self._save_price_source)
             rb.pack(side="left", padx=(0, 14))
             self._lockable(rb)
-        ttk.Label(inner, text="Reading documents", font=self.f_bold).pack(anchor="w", pady=(22, 4))
-        ttk.Label(inner, text="Extraction reads several documents at once, one per worker; the program writes every "
-                              "result itself, so the database sees one writer. 'Automatic' uses all processor cores "
-                              "but one (at most eight); 1 reads one document at a time.", style="Muted.TLabel",
+        ttk.Label(inner, text=tr("ui.settings.workers", "Reading documents"), font=self.f_bold).pack(anchor="w",
+                                                                                                  pady=(22, 4))
+        ttk.Label(inner, text=tr("ui.settings.workers_note",
+                                 "Extraction reads several documents at once, one per worker; the program writes "
+                                 "every result itself, so the database sees one writer. 'Automatic' uses all "
+                                 "processor cores but one (at most eight); 1 reads one document at a time."), style="Muted.TLabel",
                   wraplength=760, justify="left").pack(anchor="w")
         wrow = ttk.Frame(inner)
         wrow.pack(fill="x", pady=(6, 0))
         from .parallel import MAX_WORKERS
-        auto = f"Automatic ({max(1, min(MAX_WORKERS, (os.cpu_count() or 2) - 1))})"
+        auto = tr("ui.settings.automatic", "Automatic ({n})").format(
+            n=max(1, min(MAX_WORKERS, (os.cpu_count() or 2) - 1)))
         self.workers_var = tk.StringVar(value=str(self.settings.get("workers") or auto))
         wc = ttk.Combobox(wrow, textvariable=self.workers_var, state="readonly", width=24,
                           values=[auto] + [str(n) for n in range(1, 9)])
         wc.pack(side="left")
         wc.bind("<<ComboboxSelected>>", lambda _e: self._save_workers())
         self._lockable(wc, readonly=True)
-        ttk.Label(inner, text="Settings are locked while an action runs, and apply to the next action.",
+        ttk.Label(inner, text=tr("ui.settings.locked", "Settings are locked while an action runs, and apply to the "
+                                                       "next action."),
                   style="Muted.TLabel").pack(anchor="w", pady=(14, 0))
-        ttk.Label(inner, text="Updates", font=self.f_bold).pack(anchor="w", pady=(22, 4))
-        ttk.Label(inner, text="The program contacts no update server unless you enter one here. The check only "
-                              "reports whether a newer version exists; it never downloads or installs anything.",
+        ttk.Label(inner, text=tr("ui.settings.updates", "Updates"), font=self.f_bold).pack(anchor="w", pady=(22, 4))
+        ttk.Label(inner, text=tr("ui.settings.updates_note",
+                                 "The program contacts no update server unless you enter one here. The check only "
+                                 "reports whether a newer version exists; it never downloads or installs anything."),
                   style="Muted.TLabel", wraplength=760, justify="left").pack(anchor="w")
         urow = ttk.Frame(inner)
         urow.pack(fill="x", pady=(6, 0))
         self.update_var = tk.StringVar(value=self.settings.get("update_url") or "")
         ttk.Entry(urow, textvariable=self.update_var, width=60).pack(side="left")
-        ttk.Button(urow, text="Check for updates", command=self._check_update).pack(side="left", padx=6)
-        ttk.Label(inner, text="About", font=self.f_bold).pack(anchor="w", pady=(22, 4))
-        ttk.Label(inner, text=f"{APP_NAME} v{__version__}. The same functions are available from the command line as "
-                              "ashare-cli.exe in the program folder (run 'ashare-cli --help'). The user guide, "
-                              "methods document and codebook are in the docs folder.",
+        ttk.Button(urow, text=tr("ui.settings.check_updates", "Check for updates"),
+                   command=self._check_update).pack(side="left", padx=6)
+        ttk.Label(inner, text=tr("ui.settings.about", "About"), font=self.f_bold).pack(anchor="w", pady=(22, 4))
+        ttk.Label(inner, text=f"{APP_NAME} v{__version__}. " + tr(
+            "ui.settings.about_note", "The same functions are available from the command line as ashare-cli.exe in "
+                                      "the program folder (run 'ashare-cli --help'). The user guide, methods "
+                                      "document and codebook are in the docs folder."),
                   style="Muted.TLabel", wraplength=760, justify="left").pack(anchor="w")
 
     def _check_update(self):
@@ -1258,7 +1354,7 @@ class App(tk.Tk):
         self.settings["price_source"] = v
         save_settings(self.settings)
         os.environ["ASHARE_PRICE_SOURCE"] = v
-        self._log(f"Price source: {v}\n", "muted")
+        self._log(tr("ui.log.price_source", "Price source: {v}").format(v=v) + "\n", "muted")
 
     def _lockable(self, widget, readonly: bool = False):
         """v2.1 (finding 10): a setting that cannot change while an action runs."""
@@ -1281,18 +1377,45 @@ class App(tk.Tk):
         self.settings["workers"] = v if v.isdigit() else None
         save_settings(self.settings)
         apply_workers(self.settings["workers"])
-        self._log(f"Documents read at once: {v}\n", "muted")
+        self._log(tr("ui.log.workers", "Documents read at once: {v}").format(v=v) + "\n", "muted")
 
     def _save_boards(self):
         on = [k for k, v in self.board_vars.items() if v.get()]
         self.settings["optional_boards"] = on
         save_settings(self.settings)
         os.environ["ASHARE_OPTIONAL_BOARDS"] = ",".join(on)
-        self._log(f"Optional boards: {', '.join(on) or 'none'}\n", "muted")
+        self._log(tr("ui.log.boards", "Optional boards: {boards}").format(
+            boards=", ".join(on) or tr("ui.none", "none")) + "\n", "muted")
 
     # -- behaviour ------------------------------------------------------------
     def _current_nav(self):
         return self.nav.get(getattr(self, "_current", None))
+
+    def switch_language(self, code: str):
+        """v2.1 (plan D): rebuild the window in the other language, keeping the forms and the output."""
+        ops = getattr(self, "operations_page", None)
+        if self.busy or (ops is not None and getattr(ops, "running", None)) or code == language():
+            if hasattr(self, "lang_var"):
+                self.lang_var.set(language())
+            return
+        self._saved_forms = {k: {f: v.get() for f, v in vals.items()} for k, vals in self._forms.items()}
+        self.settings["language"] = code
+        save_settings(self.settings)
+        set_language(code)
+        log = self.log.get("1.0", "end-1c")
+        current = getattr(self, "_current", "home")
+        for w in list(self.winfo_children()):
+            if isinstance(w, tk.Toplevel):
+                continue                          # chart, review and explorer windows stay open
+            w.destroy()
+        self.run_buttons, self.settings_widgets, self._forms = [], [], {}
+        self.pages, self.nav = {}, {}
+        self._fonts()
+        self._style()
+        self._build()
+        self.log.insert("1.0", log)
+        self.log.see("end")
+        self.show(current if current in self.pages else "home")
 
     def show(self, sid):
         for p in self.pages.values():
@@ -1308,7 +1431,8 @@ class App(tk.Tk):
     def _update_folder_label(self):
         parts = self.folder.parts
         short = str(Path(*parts[-2:])) if len(parts) > 2 else str(self.folder)
-        self.side_folder.configure(text=f"v{__version__} · data: {self.folder.name}")
+        self.side_folder.configure(text=f"v{__version__} · " + tr("ui.side.data", "data: {name}").format(
+            name=self.folder.name))
 
     def _init_db(self):
         code, out = run_command(["init-db"])
@@ -1332,7 +1456,7 @@ class App(tk.Tk):
         self._update_folder_label()
         self.settings["data_folder"] = str(self.folder)
         save_settings(self.settings)
-        self._log(f"Data folder changed to {self.folder}\n", "muted")
+        self._log(tr("ui.log.folder", "Data folder changed to {folder}").format(folder=self.folder) + "\n", "muted")
         threading.Thread(target=self._init_db, daemon=True).start()
 
     def _open(self, path):
@@ -1358,9 +1482,9 @@ class App(tk.Tk):
             ExplorerWindow(self, None)
             return
         vals = {k: v.get() for k, v in values.items()}
-        problems = check_values(action["fields"], vals)
+        problems = check_values(action["fields"], vals, label_of=lambda f: field_label(action, f))
         if problems:
-            messagebox.showwarning(action["label"], "\n".join(problems))
+            messagebox.showwarning(action_label(action), "\n".join(problems))
             return
         if not self._confirm_heavy(action, vals):
             return
@@ -1370,13 +1494,13 @@ class App(tk.Tk):
         for b in self.run_buttons:
             b.state(["disabled"])
         self._lock_settings(True)
-        self.status.set(f"Running: {action['label']}…")
+        self.status.set(tr("ui.status.running", "Running: {label}…").format(label=action_label(action)))
         self.progress.pack(side="left", padx=8)
         self.progress.start(12)
         self.stop_btn.pack(side="left", padx=(10, 0), before=self.status_lbl)   # first, so it always has room
         self.stop_btn.state(["!disabled"])
         shown = " ".join(a if " " not in a else f'"{a}"' for a in argv)
-        self._log(f"\n› {action['label']}   (ashare-cli {shown})\n", "cmd")
+        self._log(f"\n› {action_label(action)}   (ashare-cli {shown})\n", "cmd")
 
         def work():
             started = _dt.datetime.now()
@@ -1400,7 +1524,7 @@ class App(tk.Tk):
         from .http import request_cancel
         request_cancel()
         self.stop_btn.state(["disabled"])
-        self.status.set("Stopping after the current request…")
+        self.status.set(tr("ui.status.stopping", "Stopping after the current request…"))
 
     def _confirm_heavy(self, action, vals) -> bool:
         """Warn before whole-market actions that take hours (v2.0.1)."""
@@ -1414,17 +1538,21 @@ class App(tk.Tk):
             n = 0
         if cmd == "catalogue-disclosures" and not vals.get("download"):
             return True             # market-wide catalogue: a few hundred requests
-        text = {"catalogue-disclosures": "This catalogues announcements for all {n:,} companies and then downloads "
-                                         "the reports. Downloading a year of reports for the whole market is tens "
-                                         "of thousands of files (tens of GB) and takes many hours at the polite rate.",
-                "acquire-market": "This downloads price history for all {n:,} companies, one request each "
-                                  "(about {m} minutes). For daily prices, Operations > Daily update needs about 60 "
-                                  "requests.",
-                "download-documents": "This downloads every catalogued document of the chosen kinds that is not yet "
-                                      "on disk; for the whole market that can be many hours."}[cmd]
-        return messagebox.askyesno(action["label"], text.format(n=n, m=n // 60 + 1) +
-                                   "\n\nYou can press Stop at any time; running it again resumes. Try one company "
-                                   "first by entering a security code.\n\nContinue?")
+        text = {"catalogue-disclosures": tr("ui.heavy.catalogue",
+                                            "This catalogues announcements for all {n:,} companies and then downloads "
+                                            "the reports. Downloading a year of reports for the whole market is tens "
+                                            "of thousands of files (tens of GB) and takes many hours at the polite "
+                                            "rate."),
+                "acquire-market": tr("ui.heavy.market",
+                                     "This downloads price history for all {n:,} companies, one request each (about "
+                                     "{m} minutes). For daily prices, Operations > Daily update needs about 60 "
+                                     "requests."),
+                "download-documents": tr("ui.heavy.download",
+                                         "This downloads every catalogued document of the chosen kinds that is not "
+                                         "yet on disk; for the whole market that can be many hours.")}[cmd]
+        return messagebox.askyesno(action_label(action), text.format(n=n, m=n // 60 + 1) + "\n\n" + tr(
+            "ui.heavy.continue", "You can press Stop at any time; running it again resumes. Try one company first by "
+                                 "entering a security code.\n\nContinue?"))
 
     def _done(self, action, code, out):
         self.busy = False
@@ -1434,8 +1562,10 @@ class App(tk.Tk):
         for b in self.run_buttons:
             b.state(["!disabled"])
         self._lock_settings(False)
-        self.status.set({0: "Ready", 3: "Finished with gaps (see the list in the output)",
-                         130: "Stopped; run it again to resume"}.get(code, "Last action failed (see output)"))
+        self.status.set({0: tr("ui.status.ready", "Ready"),
+                         3: tr("ui.status.gaps", "Finished with gaps (see the list in the output)"),
+                         130: tr("ui.status.stopped", "Stopped; run it again to resume")}.get(
+            code, tr("ui.status.failed", "Last action failed (see output)")))
         if code == 0:
             self._maybe_chart(action, getattr(self, "_last_vals", {}))
         if code == 0 and action.get("after") == "explore":
@@ -1472,7 +1602,7 @@ class App(tk.Tk):
         try:
             spec = builder(vals)
         except Exception as exc:
-            self._log(f"(No chart: {exc})\n", "muted")
+            self._log(tr("ui.log.no_chart", "(No chart: {error})").format(error=exc) + "\n", "muted")
             return
         if spec.graph is not None:
             if len(spec.graph.get("nodes") or []) < 2:
