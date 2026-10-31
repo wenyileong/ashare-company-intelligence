@@ -513,6 +513,16 @@ BASIS_LABELS = {"document_pairs": "document pairs compared", "interim_annual_pai
 DISCREPANCY_RULES = ("EXTRACTION_DISCREPANCY", "RESTATEMENT_OR_DISCREPANCY", "RESTATEMENT_EXPLAINED", "CORRECTED_REPORT")
 
 
+def summary_path() -> "Path":
+    """``validation_summary.json`` beside the database (the data folder), like the pseudonymisation key."""
+    import os
+    from pathlib import Path
+    from .config import db_path
+    if os.getenv("ASHARE_SUMMARY_FILE"):                 # tests, and other back ends than SQLite
+        return Path(os.environ["ASHARE_SUMMARY_FILE"])
+    return Path(db_path()).resolve().parent / SUMMARY_FILE
+
+
 def _scope_key(security_code: str | None) -> str:
     return str(security_code).zfill(6) if security_code else "ALL"
 
@@ -522,7 +532,7 @@ def save_validation_summary(security_code, companies: int, checked: dict, flags:
     round 3), in ``validation_summary.json`` in the data folder."""
     import json
     from pathlib import Path
-    p = Path(path or SUMMARY_FILE)
+    p = Path(path) if path else summary_path()
     try:
         data = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
     except (OSError, ValueError):
@@ -538,7 +548,7 @@ def save_validation_summary(security_code, companies: int, checked: dict, flags:
 def load_validation_summary(security_code=None, path=None) -> dict | None:
     import json
     from pathlib import Path
-    p = Path(path or SUMMARY_FILE)
+    p = Path(path) if path else summary_path()
     try:
         return json.loads(p.read_text(encoding="utf-8")).get("scopes", {}).get(_scope_key(security_code))
     except (OSError, ValueError, AttributeError):

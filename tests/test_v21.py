@@ -652,3 +652,151 @@ def test_panel_names_how_many_companies_have_figures_and_reports(boards, tmp_pat
     assert line.startswith(f"Financial figures exist for 0 of {cov['companies']:,} companies; periodic reports are "
                            "downloaded for 1.") and "Download periodic reports" in line
     assert "Run 'Extract figures" in coverage_line({"companies": 1, "with_figures": 0, "with_reports": 1})
+
+
+# --- C. Polish (findings 7 to 10 and 16 to 18) ---------------------------------------------------------------------
+
+def _panel_result():
+    return {"rows": [{"code": "600519", "name": "x", "period": "2025-12-31", "revenue": 1.0}],
+            "params": {"variables": ["revenue"], "unit": "year", "start": "2025-01-01", "end": "2025-12-31"},
+            "max_published": None, "dropped": {}}
+
+
+def test_a_panel_is_written_in_every_format_or_not_at_all(db, tmp_path, monkeypatch):
+    """Finding 7: Parquet without pyarrow, or any failure, leaves no partial panel and keeps an earlier one."""
+    from ashare import panel, stata
+    out = tmp_path / "panels"
+    panel.write_panel(_panel_result(), str(out), "p", ("csv",))
+    before = {f.name: f.read_bytes() for f in out.iterdir()}
+    monkeypatch.setattr(panel, "parquet_available", lambda: False)
+    with pytest.raises(RuntimeError, match="pyarrow"):
+        panel.write_panel(_panel_result(), str(out), "p", ("csv", "parquet"))
+    assert {f.name: f.read_bytes() for f in out.iterdir()} == before
+
+    def broken(*a, **k):
+        raise OSError("disk full")
+    monkeypatch.setattr(stata, "write_dta", broken)
+    with pytest.raises(OSError):
+        panel.write_panel(_panel_result(), str(out), "q", ("csv", "dta"))
+    assert not any(f.name.startswith("q") or f.name.startswith(".partial") for f in out.iterdir())
+    r = panel.write_panel(_panel_result(), str(out), "r", ("csv",))
+    assert all(Path(f).exists() and Path(f).parent == out for f in r["files"])
+
+
+def test_parquet_is_offered_only_with_pyarrow():
+    from ashare import gui
+    fields = [f for sec in gui.SECTIONS for a in sec["actions"] for f in a["fields"] if f["key"] == "formats"]
+    assert fields and all(("parquet" in f["kind"]) == gui._PARQUET for f in fields)
+
+
+@pytest.mark.parametrize("argv, words", [
+    (["show-market", "600519"], ["No daily prices recorded for 600519", "acquire-market"]),
+    (["show-events", "600519"], ["No regulatory or legal events", "extract-regulatory-events"]),
+    (["transactions", "600519"], ["No transaction events", "extract-transactions"]),
+    (["show-market", "999999"], ["999999 is not in the company list"]),
+    (["build-calendar"], ["No trading days could be derived", "import-calendar-csv"]),
+    (["compare", "--codes", "600519"], ["No figures for 600519", "Extract figures from reports"]),
+])
+def test_empty_results_say_why_and_what_to_do(company, monkeypatch, argv, words):
+    """Findings 8 and 18."""
+    from typer.testing import CliRunner
+    from ashare.cli import app
+    monkeypatch.setenv("COLUMNS", "200")
+    r = CliRunner().invoke(app, argv)
+    assert r.exit_code == 0, r.output
+    flat = " ".join(r.output.split())
+    for w in words:
+        assert w in flat, (w, r.output)
+
+
+def test_shenzhen_201_codes_are_b_shares(monkeypatch):
+    """Finding 9: 201872 is China Merchants Port's B share (招港B)."""
+    from ashare.universe import rejection_reason, infer_exchange, infer_board
+    monkeypatch.delenv("ASHARE_OPTIONAL_BOARDS", raising=False)
+    assert rejection_reason("201872").startswith("B shares")
+    assert infer_exchange("201872") is None
+    monkeypatch.setenv("ASHARE_OPTIONAL_BOARDS", "B_SHARE")
+    assert infer_exchange("201872") == "SZSE" and infer_board("SZSE", "201872") == "SZSE_B"
+
+
+def test_settings_are_locked_while_an_action_runs():
+    """Finding 10 (review round 4): every setting, not only the optional boards."""
+    from ashare.gui import App
+
+    class W:
+        def __init__(self):
+            self.states = []
+
+        def state(self, s):
+            self.states.append(tuple(s))
+
+    class Fake:
+        busy = False
+        settings_widgets = []
+    f = Fake()
+    boards, combo = W(), W()
+    App._lockable(f, boards)
+    App._lockable(f, combo, readonly=True)
+    App._lock_settings(f, True)
+    assert boards.states[-1] == ("disabled",) and combo.states[-1] == ("disabled",)
+    App._lock_settings(f, False)
+    assert boards.states[-1] == ("!disabled",) and combo.states[-1] == ("!disabled", "readonly")
+    f.busy = True
+    late = W()
+    App._lockable(f, late)                          # a page built during a run starts locked
+    assert late.states == [("disabled",)]
+
+
+def test_workers_setting_applies_to_the_next_action(monkeypatch):
+    from ashare.gui import apply_workers
+    from ashare.parallel import workers
+    apply_workers("3")
+    assert workers() == 3
+    apply_workers(None)
+    assert workers() >= 1 and "ASHARE_WORKERS" not in __import__("os").environ
+
+
+def test_name_lookup_failures_are_retried_for_longer(monkeypatch):
+    """Finding 16: 'getaddrinfo failed' waits up to five minutes; other failures keep three attempts."""
+    from ashare import http
+    calls, slept = [], []
+    monkeypatch.setattr(http, "_sleep_checking", lambda s: slept.append(s))
+    monkeypatch.setattr(http.time, "sleep", lambda s: None)
+
+    def handler(request):
+        calls.append(1)
+        if len(calls) < 6:
+            raise httpx.ConnectError("[Errno 11001] getaddrinfo failed")
+        return httpx.Response(200, text="ok")
+    c = http.RateLimitedClient("t", transport=httpx.MockTransport(handler))
+    c.offline = False                                # behave as on the network
+    assert c.get("https://www.cninfo.com.cn/").text == "ok"
+    assert len(calls) == 6 and sum(slept) <= http.DNS_PATIENCE and len(slept) == 5
+    calls.clear()
+    slept.clear()
+
+    def refused(request):
+        calls.append(1)
+        raise httpx.ConnectError("[Errno 111] Connection refused")
+    c = http.RateLimitedClient("t", transport=httpx.MockTransport(refused))
+    c.offline = False
+    with pytest.raises(httpx.ConnectError):
+        c.get("https://www.cninfo.com.cn/")
+    assert len(calls) == 3 and not slept
+
+    def never(request):
+        raise httpx.ConnectError("getaddrinfo failed")
+    c = http.RateLimitedClient("t", transport=httpx.MockTransport(never))
+    c.offline = False
+    with pytest.raises(httpx.ConnectError):
+        c.get("https://www.cninfo.com.cn/")
+    assert sum(slept) == pytest.approx(http.DNS_PATIENCE)
+
+
+def test_explorer_explains_an_empty_panel(tmp_path):
+    from ashare.gui_review import empty_panel_reason
+    (tmp_path / "p.csv").write_text("code,period\n", encoding="utf-8")
+    assert "manifest was not found" in empty_panel_reason(tmp_path / "p.csv")
+    (tmp_path / "p_manifest.json").write_text('{"parameters": {"start": "2025-01-01", "end": "2025-12-31", '
+                                              '"unit": "year"}}', encoding="utf-8")
+    assert "2025-01-01 to 2025-12-31" in empty_panel_reason(tmp_path / "p.csv")

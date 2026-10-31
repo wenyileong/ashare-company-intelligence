@@ -168,6 +168,13 @@ def main(build_dir: str, out_file: str) -> int:
             "PyInstaller licence text below.", ""] + [f"--- {Path(f).name} ---\n{t.strip()}" for f, t in licence_texts(pi)]))
     except metadata.PackageNotFoundError:
         pass
+    # v2.1: the JavaScript libraries bundled in the offline topology viewer (ashare/viz/viewer/vendor)
+    js = Path(__file__).resolve().parents[1] / "ashare" / "viz" / "viewer" / "vendor" / "LICENSES.txt"
+    if js.exists():
+        summary.append("  3d-force-graph 1.80.1, force-graph 1.52.0, Chart.js 4.4.8 and the modules they bundle "
+                       "(three.js, d3)  (MIT and ISC), in the topology viewer")
+        parts.append("\n".join(["JavaScript libraries of the topology viewer (written into topology.html)",
+                                "Licence: MIT and ISC (below)", "", js.read_text(encoding="utf-8").strip()]))
     summary.append("  Microsoft Visual C++ runtime (VCRUNTIME140.dll)  (Microsoft redistributable)")
     parts.append("Microsoft Visual C++ runtime (VCRUNTIME140.dll)\nLicence: redistributed with the Python runtime "
                  "under the Microsoft Visual Studio redistributable terms; it remains Microsoft's property.")

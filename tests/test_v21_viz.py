@@ -341,20 +341,21 @@ def test_viewer_draws_both_views_with_fixed_positions(nvf, tmp_path):
             page.on("request", lambda r: requests.append(r.url) if not r.url.startswith(("file:", "data:", "blob:"))
                     else None)
             page.goto(path.as_uri())
-            page.wait_for_function("document.getElementById('graphStatus').textContent.includes('nodes')", timeout=20000)
+            page.wait_for_function("document.getElementById('graphStatus').textContent.includes('nodes')", timeout=120000)
             status = page.inner_text("#graphStatus")
             n_nodes = int(status.split()[0])
             assert n_nodes == len(snap["nodes"])
             assert page.locator(".kpi").count() == 4 and page.locator("#coverageTable tr").count() == 6
             assert "GAP" in page.inner_text("#coverageTable") or "PARTIAL" in page.inner_text("#coverageTable")
-            page.wait_for_timeout(800)
-            # the nodes stay where the snapshot puts them (finding P6)
-            moved = page.evaluate("""() => graph.graphData().nodes.filter(n =>
-                Math.abs(n.x - n.position.x) > 0.01 || Math.abs(n.y - n.position.y) > 0.01 ||
-                Math.abs(n.z - n.position.z) > 0.01).length""")
-            assert moved == 0
+            page.wait_for_timeout(1500)
+            # the nodes stay where the snapshot puts them (finding P6); 3D only where the browser has WebGL
+            if page.evaluate("webglAvailable()"):
+                moved = page.evaluate("""() => graph.graphData().nodes.filter(n =>
+                    Math.abs(n.x - n.position.x) > 0.01 || Math.abs(n.y - n.position.y) > 0.01 ||
+                    Math.abs(n.z - n.position.z) > 0.01).length""")
+                assert moved == 0
             page.select_option("#viewMode", "2d")                         # finding P5: the 2D view draws
-            page.wait_for_timeout(600)
+            page.wait_for_timeout(1500)
             assert page.evaluate("graph.graphData().nodes.length") == n_nodes
             moved = page.evaluate("""() => graph.graphData().nodes.filter(n =>
                 Math.abs(n.x - n.position.x) > 0.01 || Math.abs(n.y - n.position.y2) > 0.01).length""")
@@ -438,3 +439,28 @@ def test_topology_command_writes_the_view(nvf, tmp_path, monkeypatch):
     assert r.exit_code == 1 and "No company is classified in C39" in r.output
     r = CliRunner().invoke(app, ["topology", "--codes", "600519", "--start", "2023-01-01", "--end", "2023-06-30"])
     assert r.exit_code == 1 and "no fiscal year end" in r.output
+
+
+def test_viewer_falls_back_to_2d_without_webgl(nvf, tmp_path):
+    """Remote desktops and some graphics drivers give a browser no WebGL: the page must still work."""
+    from ashare.viz.snapshot import build_snapshot
+    from ashare.viz.viewer import write_viewer
+    snap = build_snapshot(["600519"], "2022-01-01", "2023-12-31", as_of="2024-06-30", key=KEY)
+    path = write_viewer(snap, tmp_path / "topology.html")
+    with _browser() as p:
+        try:
+            browser = p.chromium.launch(args=["--disable-3d-apis", "--disable-gpu"])
+        except Exception as exc:                       # noqa: BLE001
+            pytest.skip(f"no browser: {exc}")
+        try:
+            page = browser.new_page()
+            errors = []
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            page.goto(path.as_uri())
+            page.wait_for_function("document.getElementById('graphStatus').textContent.includes('nodes')",
+                                   timeout=120000)
+            assert page.input_value("#viewMode") == "2d"
+            assert "3D is unavailable" in page.inner_text("#axisNote")
+            assert page.locator(".kpi").count() == 4 and not errors
+        finally:
+            browser.close()

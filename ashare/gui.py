@@ -29,6 +29,13 @@ from . import __version__
 
 APP_NAME = "A-share Company Intelligence"
 TODAY = _dt.date.today().isoformat()
+# v2.1 (finding 7): Parquet is offered only where pyarrow is installed (not in the Windows build)
+def _has_pyarrow() -> bool:
+    import importlib.util
+    return importlib.util.find_spec("pyarrow") is not None
+
+
+_PARQUET = _has_pyarrow()
 LAST_YEAR_END = f"{_dt.date.today().year - 1}-12-31"   # v2.0.8 (finding 93): the last complete fiscal year
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
@@ -422,8 +429,8 @@ SECTIONS = [
              F("winsor", "Winsorise (%)", "number", "", "--winsor", "Optional, e.g. 1"),
              F("min_class", "Minimum confidence", "choice:,LOW,MEDIUM,HIGH", "", "--min-class"),
              F("exclude_financials", "Exclude financial firms", "bool", False, ("--exclude-financials", None)),
-             F("formats", "Formats", "choice:csv,dta;csv;csv,dta,parquet", "csv,dta", "--formats",
-               "dta = Stata; parquet needs pyarrow"),
+             F("formats", "Formats", "choice:csv,dta;csv" + (";csv,dta,parquet" if _PARQUET else ""), "csv,dta",
+               "--formats", "dta = Stata" + ("" if _PARQUET else "; Parquet needs pyarrow, which this build lacks")),
              F("universe_basis", "Companies in each row", "choice:auto,listing,report-evidence", "auto",
                "--universe-basis", "auto = listed on the date by its listing record, or (yearly rows) published a "
                "report for that year; marked in the universe_basis column"),
@@ -534,8 +541,8 @@ SECTIONS = [
            "Writes an SVG (for papers and slides) and a CSV of exactly the plotted data; PNG too when "
            "matplotlib is installed (source installations).", after="open_folder"),
          A("Create a dataset release", "release", [
-             F("formats", "Formats", "choice:csv,sqlite;csv;csv,sqlite,parquet", "csv,sqlite", "--formats",
-               "Parquet needs the optional pyarrow package."), CODE_OPT(""),
+             F("formats", "Formats", "choice:csv,sqlite;csv" + (";csv,sqlite,parquet" if _PARQUET else ""),
+               "csv,sqlite", "--formats", "" if _PARQUET else "Parquet needs pyarrow, which this build lacks."), CODE_OPT(""),
              F("pseudonymise", "Pseudonymise personal names", "bool", False, ("--pseudonymise", None),
                "Directors, officers and natural-person shareholders become stable identifiers (P…)."),
              F("coarsen", "Ages in five-year bands", "bool", False, ("--coarsen", None),
@@ -714,6 +721,14 @@ def default_data_folder() -> Path:
     return Path.home() / "Documents" / "AShareScraper"
 
 
+def apply_workers(value) -> None:
+    """The documents read at once (v2.1): a number from the settings, or automatic (cores less one)."""
+    if value and str(value).isdigit():
+        os.environ["ASHARE_WORKERS"] = str(value)
+    else:
+        os.environ.pop("ASHARE_WORKERS", None)
+
+
 def apply_data_folder(folder: Path) -> None:
     folder.mkdir(parents=True, exist_ok=True)
     os.environ["ASHARE_DB"] = str(folder / "ashares.db")
@@ -853,6 +868,8 @@ class App(tk.Tk):
         apply_data_folder(self.folder)
         os.environ["ASHARE_OPTIONAL_BOARDS"] = ",".join(self.settings.get("optional_boards") or [])
         os.environ["ASHARE_PRICE_SOURCE"] = self.settings.get("price_source") or "eastmoney"
+        apply_workers(self.settings.get("workers"))
+        self.settings_widgets: list = []          # v2.1 (finding 10): locked while an action runs
         self.out_queue: queue.Queue = queue.Queue()
         self.busy = False
         self.run_buttons: list[ttk.Button] = []
@@ -1154,7 +1171,9 @@ class App(tk.Tk):
         row = ttk.Frame(inner)
         row.pack(fill="x")
         ttk.Entry(row, textvariable=self.folder_var, state="readonly", width=70).pack(side="left")
-        ttk.Button(row, text="Change…", command=self._choose_folder).pack(side="left", padx=6)
+        chg = ttk.Button(row, text="Change…", command=self._choose_folder)
+        chg.pack(side="left", padx=6)
+        self._lockable(chg)
         ttk.Button(row, text="Open", command=lambda: self._open(self.folder)).pack(side="left")
         ttk.Label(inner, text="Contents: ashares.db (database), disclosures\\ and raw\\ (original documents and "
                               "responses), exports\\, reports\\, releases\\, run_log.txt (every action with its "
@@ -1167,11 +1186,13 @@ class App(tk.Tk):
         self.board_vars = {}
         enabled = set(self.settings.get("optional_boards") or [])
         for key, label in (("BSE", "Beijing Stock Exchange (codes 920, 43, 83, 87, 88)"),
-                           ("B_SHARE", "B-shares (SSE 900, SZSE 200; USD and HKD)")):
+                           ("B_SHARE", "B-shares (SSE 900, SZSE 200 and 201; USD and HKD)")):
             var = tk.BooleanVar(value=key in enabled)
             self.board_vars[key] = var
-            ttk.Checkbutton(inner, text=label, variable=var, style="Plain.TCheckbutton",
-                            command=self._save_boards).pack(anchor="w", pady=(4, 0))
+            cb = ttk.Checkbutton(inner, text=label, variable=var, style="Plain.TCheckbutton",
+                                 command=self._save_boards)
+            cb.pack(anchor="w", pady=(4, 0))
+            self._lockable(cb)
         ttk.Label(inner, text="Price source", font=self.f_bold).pack(anchor="w", pady=(22, 4))
         ttk.Label(inner, text="Where daily prices come from: downloads, the backfill and the daily update. Both public "
                               "sources are unofficial feeds, not exchange-authoritative; their terms are yours to "
@@ -1184,8 +1205,27 @@ class App(tk.Tk):
         prow.pack(fill="x", pady=(6, 0))
         for key, label in (("eastmoney", "Eastmoney (public)"), ("tencent", "Tencent (public)"),
                            ("none", "None: CSV import only")):
-            ttk.Radiobutton(prow, text=label, value=key, variable=self.price_var,
-                            command=self._save_price_source).pack(side="left", padx=(0, 14))
+            rb = ttk.Radiobutton(prow, text=label, value=key, variable=self.price_var,
+                                 command=self._save_price_source)
+            rb.pack(side="left", padx=(0, 14))
+            self._lockable(rb)
+        ttk.Label(inner, text="Reading documents", font=self.f_bold).pack(anchor="w", pady=(22, 4))
+        ttk.Label(inner, text="Extraction reads several documents at once, one per worker; the program writes every "
+                              "result itself, so the database sees one writer. 'Automatic' uses all processor cores "
+                              "but one (at most eight); 1 reads one document at a time.", style="Muted.TLabel",
+                  wraplength=760, justify="left").pack(anchor="w")
+        wrow = ttk.Frame(inner)
+        wrow.pack(fill="x", pady=(6, 0))
+        from .parallel import MAX_WORKERS
+        auto = f"Automatic ({max(1, min(MAX_WORKERS, (os.cpu_count() or 2) - 1))})"
+        self.workers_var = tk.StringVar(value=str(self.settings.get("workers") or auto))
+        wc = ttk.Combobox(wrow, textvariable=self.workers_var, state="readonly", width=24,
+                          values=[auto] + [str(n) for n in range(1, 9)])
+        wc.pack(side="left")
+        wc.bind("<<ComboboxSelected>>", lambda _e: self._save_workers())
+        self._lockable(wc, readonly=True)
+        ttk.Label(inner, text="Settings are locked while an action runs, and apply to the next action.",
+                  style="Muted.TLabel").pack(anchor="w", pady=(14, 0))
         ttk.Label(inner, text="Updates", font=self.f_bold).pack(anchor="w", pady=(22, 4))
         ttk.Label(inner, text="The program contacts no update server unless you enter one here. The check only "
                               "reports whether a newer version exists; it never downloads or installs anything.",
@@ -1219,6 +1259,29 @@ class App(tk.Tk):
         save_settings(self.settings)
         os.environ["ASHARE_PRICE_SOURCE"] = v
         self._log(f"Price source: {v}\n", "muted")
+
+    def _lockable(self, widget, readonly: bool = False):
+        """v2.1 (finding 10): a setting that cannot change while an action runs."""
+        self.settings_widgets.append((widget, readonly))
+        if self.busy:
+            widget.state(["disabled"])
+
+    def _lock_settings(self, locked: bool):
+        for w, readonly in self.settings_widgets:
+            try:
+                if locked:
+                    w.state(["disabled"])
+                else:
+                    w.state(["!disabled", "readonly"] if readonly else ["!disabled"])
+            except tk.TclError:
+                pass                      # a page rebuilt since
+
+    def _save_workers(self):
+        v = self.workers_var.get()
+        self.settings["workers"] = v if v.isdigit() else None
+        save_settings(self.settings)
+        apply_workers(self.settings["workers"])
+        self._log(f"Documents read at once: {v}\n", "muted")
 
     def _save_boards(self):
         on = [k for k, v in self.board_vars.items() if v.get()]
@@ -1289,6 +1352,11 @@ class App(tk.Tk):
     def _run(self, action, values):
         if self.busy:
             return
+        if action.get("after") == "explore" and action["command"] == "version":
+            # v2.1 (finding 17): opening the explorer runs nothing; it is not shown as a command
+            from .gui_review import ExplorerWindow
+            ExplorerWindow(self, None)
+            return
         vals = {k: v.get() for k, v in values.items()}
         problems = check_values(action["fields"], vals)
         if problems:
@@ -1301,6 +1369,7 @@ class App(tk.Tk):
         self.busy = True
         for b in self.run_buttons:
             b.state(["disabled"])
+        self._lock_settings(True)
         self.status.set(f"Running: {action['label']}…")
         self.progress.pack(side="left", padx=8)
         self.progress.start(12)
@@ -1364,6 +1433,7 @@ class App(tk.Tk):
         self.stop_btn.pack_forget()
         for b in self.run_buttons:
             b.state(["!disabled"])
+        self._lock_settings(False)
         self.status.set({0: "Ready", 3: "Finished with gaps (see the list in the output)",
                          130: "Stopped; run it again to resume"}.get(code, "Last action failed (see output)"))
         if code == 0:

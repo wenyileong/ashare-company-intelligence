@@ -27,6 +27,8 @@ pdfium_bins = collect_dynamic_libs("pypdfium2_raw")
 pdfium_data = collect_data_files("pypdfium2_raw") + collect_data_files("pypdfium2")
 # v2.0: Alembic loads the migration scripts from files, so they ship as source.
 migrations = collect_data_files("ashare", subdir="migrations", include_py_files=True)
+# v2.1: the offline topology viewer's page, script, style sheet and bundled libraries (with their licences)
+viewer = collect_data_files("ashare", subdir="viz/viewer")
 hidden += collect_submodules("alembic", filter=lambda n: not n.startswith("alembic.testing")) + ["mako.template"]
 
 # Size: rich needs pygments only for the Python lexer (help formatting).
@@ -45,7 +47,7 @@ a = Analysis(
     [os.path.join(SPECPATH, "launcher.py")],
     pathex=[ROOT],
     binaries=pdfium_bins,
-    datas=pdfium_data + migrations,
+    datas=pdfium_data + migrations + viewer,
     hiddenimports=hidden,
     excludes=["pandas", "numpy", "matplotlib", "pytest", "reportlab", "IPython", "PIL"] + unused,
     noarchive=False,

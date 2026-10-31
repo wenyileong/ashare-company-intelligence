@@ -86,6 +86,33 @@ def default_transport():
     return _DEFAULT_TRANSPORT
 
 
+DNS_PATIENCE = 300.0      # seconds a failed name lookup is retried for (v2.1, finding 16)
+
+
+def is_name_lookup_failure(exc: BaseException) -> bool:
+    """A failed DNS lookup: Windows error 11001 or 11002, or getaddrinfo's own message on any system."""
+    seen = set()
+    while exc is not None and id(exc) not in seen:
+        seen.add(id(exc))
+        text = str(exc).lower()
+        if "getaddrinfo" in text or "name or service not known" in text or "nodename nor servname" in text \
+                or "temporary failure in name resolution" in text or getattr(exc, "errno", None) in (11001, 11002):
+            return True
+        exc = exc.__cause__ or exc.__context__
+    return False
+
+
+def _sleep_checking(seconds: float) -> None:
+    """Sleep, answering Stop within a second."""
+    end = time.monotonic() + seconds
+    while True:
+        check_cancel()
+        left = end - time.monotonic()
+        if left <= 0:
+            return
+        time.sleep(min(1.0, left))
+
+
 class RateLimitedClient:
     def __init__(self, user_agent: str, requests_per_second: float = 1.0, transport=None,
                  retries: int = 3):
@@ -118,7 +145,9 @@ class RateLimitedClient:
 
     def _request(self, method: str, url: str, **kwargs):
         last_error = None
-        for attempt in range(self.retries):
+        attempt = 0
+        dns_waited = 0.0
+        while True:
             try:
                 self._pace()
                 response = self.client.request(method, url, **kwargs)
@@ -127,10 +156,20 @@ class RateLimitedClient:
                 return response
             except (httpx.HTTPError, OSError) as exc:
                 last_error = exc
-                if attempt == self.retries - 1:
+                # v2.1 (finding 16): a failed name lookup ("getaddrinfo failed") is usually a brief outage of the
+                # local network or resolver, before any request reaches the site. It is retried for up to
+                # DNS_PATIENCE seconds, in pauses of up to 30 s, before it counts as a failure.
+                if is_name_lookup_failure(exc) and not self.offline and dns_waited < DNS_PATIENCE:
+                    pause = min(30.0, DNS_PATIENCE - dns_waited, 5.0 * 2 ** min(attempt, 3))
+                    _sleep_checking(pause)
+                    dns_waited += pause
+                    attempt += 1
+                    continue
+                attempt += 1
+                if attempt >= self.retries:
                     raise
                 if not self.offline:
-                    time.sleep(min(2 ** attempt, 8))
+                    time.sleep(min(2 ** (attempt - 1), 8))
         raise last_error
 
     def get(self, url: str, **kwargs):

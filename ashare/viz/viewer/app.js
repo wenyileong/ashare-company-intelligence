@@ -47,7 +47,12 @@ function loadData() {
     $('eyebrow').textContent = `RESEARCH VIEW · SNAPSHOT SCHEMA ${DATA.schema_version}` + (p.episode ? ` · ${String(p.episode).toUpperCase()}` : '');
     $('subtitle').textContent = `${p.companies.length} compan${p.companies.length === 1 ? 'y' : 'ies'} · fiscal years ${p.periods[0].slice(0, 4)}–${p.periods[p.periods.length - 1].slice(0, 4)} · expectations: ${p.expectations === 'MANAGEMENT_GUIDANCE' ? 'management guidance (a proxy)' : 'analyst forecasts'}`;
     $('asOfPill').textContent = `As of ${p.as_of}`;
-    populateFilters(); renderKpis(); renderLegend(); renderCharts(); renderCoverage(); renderNotes(); renderGraph();
+    populateFilters(); renderKpis(); renderLegend(); renderCoverage(); renderNotes();
+    try { renderCharts(); } catch (e) { console.warn('charts', e); }
+    try { renderGraph(); } catch (e) {
+      $('graphCanvas').innerHTML = `<div class="error">The map could not be drawn here (${escapeHtml(e.message)}). The tables and charts are unaffected.</div>`;
+      $('graphStatus').textContent = 'Map unavailable';
+    }
     $('footerSourceCount').textContent = `${DATA.nodes.length} nodes · ${DATA.edges.length} links · published by ${p.as_of}`;
     $('footerSoftware').textContent = `${DATA.software} · offline snapshot · libraries bundled`;
   } catch (error) {
@@ -146,6 +151,13 @@ function makeNodeThreeObject(node, THREE) {
   return group;
 }
 
+function webglAvailable() {
+  try {
+    const c = document.createElement('canvas');
+    return !!(window.WebGLRenderingContext && (c.getContext('webgl2') || c.getContext('webgl')));
+  } catch (e) { return false; }
+}
+
 function linkStyle(l) { return EDGE_STYLES[l.evidence_status] || EDGE_STYLES.OBSERVED_ASSOCIATION; }
 
 function renderGraph() {
@@ -156,6 +168,16 @@ function renderGraph() {
   const data = buildGraphData();
   $('axisNote').innerHTML = mode === '3d' ? '<b>3D encoding:</b> X = NVF layer · Y = company lane · Z = year. Positions are fixed by the snapshot, not by a simulation.'
     : '<b>2D slice:</b> X = NVF layer · Y = company lane, with the years set apart within it. Choose a fiscal year to see one year at a time.';
+  if (mode === '3d' && !webglAvailable()) {
+    // Some computers (remote desktops, older graphics drivers) cannot draw 3D in a browser: use the 2D slice.
+    $('viewMode').value = '2d';
+    $('viewMode').querySelector('option[value="3d"]').disabled = true;
+    $('graphStatus').textContent = '3D unavailable here';
+    $('axisNote').innerHTML = '';
+    renderGraph();
+    $('axisNote').innerHTML = '<b>3D is unavailable in this browser</b> (it needs WebGL). The 2D slice shows the same nodes and lines. ' + $('axisNote').innerHTML;
+    return;
+  }
   if (mode === '3d') {
     if (!window.ForceGraph3D) { graphEl.innerHTML = '<div class="error">The 3D graph library is missing from this file. Use the 2D slice, or the tables and charts below.</div>'; return; }
     const THREE = window.THREE;

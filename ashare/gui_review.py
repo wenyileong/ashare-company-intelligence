@@ -374,6 +374,21 @@ CHARTS.update({"event-study": _event_study, "price-chart": _price, "control": _c
                "subsidiaries": _group_tree})
 
 
+def empty_panel_reason(path) -> str:
+    """Why a panel is empty, from its manifest when there is one (v2.1, finding 17)."""
+    p = Path(path)
+    manifest = p.with_name(p.stem + "_manifest.json")
+    try:
+        m = json.loads(manifest.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ("Its manifest was not found. Build the panel again (Research: 'Build a panel'); a panel without "
+                "rows is not written, and the output says why.")
+    params = m.get("parameters") or {}
+    return (f"It was built for {params.get('start')} to {params.get('end')} ({params.get('unit')}). Usually the "
+            "company list has no listing dates or statuses for that span: run 'Update the company list', then build "
+            "the panel again.")
+
+
 class ExplorerWindow(tk.Toplevel):
     """Dataset explorer: summaries, distributions, scatter plots and coverage of a panel CSV."""
 
@@ -424,6 +439,14 @@ class ExplorerWindow(tk.Toplevel):
         except Exception as exc:
             messagebox.showerror("Dataset explorer", str(exc))
             return
+        if not self.rows:                                   # v2.1 (finding 17): say why, not a blank view
+            reason = empty_panel_reason(path)
+            self.file_label.configure(text=f"{Path(path).name}: no rows")
+            self.canvas.delete("all")
+            self.canvas.create_text(20, 20, anchor="nw", width=820, fill="#57606a", font=("Segoe UI", 11),
+                                    text="The panel has no rows, so there is nothing to explore.\n\n" + reason)
+            self.app._log(f"\n› Dataset explorer: {Path(path).name} has no rows. {reason}\n", "cmd")
+            return
         cols = numeric_columns(self.rows)
         self.xbox.configure(values=cols)
         self.ybox.configure(values=cols)
@@ -437,6 +460,8 @@ class ExplorerWindow(tk.Toplevel):
         from .explorer import summary, correlations, chart_for
         from .charts.tk import render_tk
         if not self.rows:
+            self.app._log("\n› Dataset explorer: no panel with rows is open. Choose 'Open panel…', or build one "
+                          "(Research: 'Build a panel').\n", "cmd")
             return
         if kind in ("summary", "corr"):
             rows = summary(self.rows) if kind == "summary" else correlations(self.rows)

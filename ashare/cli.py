@@ -48,6 +48,19 @@ def _fmt(v):
     return str(v)
 
 
+def _empty_reason(code: str, what: str, how: str) -> str:
+    """v2.1 (findings 8 and 18): why a list is empty, and what to do."""
+    s = SessionLocal()
+    try:
+        known = s.query(Company).filter_by(security_code=str(code).zfill(6)).first() is not None
+    finally:
+        s.close()
+    if not known:
+        return (f"{str(code).zfill(6)} is not in the company list. Check the code, or run 'Update the company list' "
+                "(update-universe).")
+    return f"No {what} recorded for {str(code).zfill(6)}. {how}"
+
+
 def _table(rows, columns=None, title=None):
     """Print a list of dicts as an aligned table."""
     con = _console()
@@ -552,7 +565,15 @@ def show_market_cmd(
 ):
     """Stored daily prices of one company."""
     init_db()
-    for row in show_market(security_code, start, end):
+    rows = show_market(security_code, start, end)
+    if not rows:                                                       # finding 18
+        span = f" between {start or 'the start'} and {end or 'today'}" if (start or end) else ""
+        print(_empty_reason(security_code, f"daily prices{span}",
+                            "Download them with 'Download daily prices' (Market data; acquire-market), using the "
+                            "price source chosen under Settings ('Test price sources' shows which answers), or "
+                            "import a CSV (import-bars-csv)."))
+        return
+    for row in rows:
         print({
             "code": security_code.zfill(6), "date": row.trade_date,
             "open": row.open, "high": row.high, "low": row.low, "close": row.close,
@@ -676,7 +697,16 @@ def import_regulatory_csv_cmd(path: str, source: str = typer.Option("CSV_IMPORT"
 @app.command("show-events")
 def show_events_cmd(security_code: str, classification: str = typer.Option(None)):
     """Regulatory and legal events of one company."""
-    for e in show_events(security_code, classification):
+    init_db()
+    events = show_events(security_code, classification)
+    if not events:                                                     # finding 8
+        print(_empty_reason(security_code, "regulatory or legal events" + (f" classified {classification}"
+                                                                           if classification else ""),
+                            "They are read from catalogued announcements: run 'Catalogue disclosures' (kind all), "
+                            "then 'Extract from announcements' (extract-regulatory-events). A company may also "
+                            "simply have none."))
+        return
+    for e in events:
         print({
             "id": e.id, "date": e.event_date, "type": e.event_type, "subtype": e.event_subtype,
             "classification": e.legal_classification, "status": e.status,
@@ -824,6 +854,12 @@ def compare_cmd(
     cols = ["code"] + [m for m in res["metrics"]] + [c for c in ("net_margin", "liabilities_to_assets", "rd_intensity")
                                                     if any(c in r for r in res["rows"])]
     _table(res["rows"], cols, title="Comparison")
+    blank = [r["code"] for r in res["rows"] if all(r.get(m) is None for m in res["metrics"])]
+    if blank:                                                          # finding 8
+        print(f"[yellow]No figures for {', '.join(blank)}"
+              + (f" for the period {period}" if period else "") + (f" as published by {as_of}" if as_of else "")
+              + ". Download periodic reports ('Download documents', kind reports) and run 'Extract figures from "
+              "reports'; or leave the period blank for each company's latest.[/yellow]")
 
 
 @app.command("market-stats")
@@ -1670,7 +1706,12 @@ def company_indices_cmd(code: str, on: str = typer.Option(None, help="Date (defa
 def build_calendar_cmd(min_share: float = typer.Option(0.5, help="Share of securities that must have traded")):
     """Derive exchange trading days from stored daily prices."""
     from .security_master import build_trading_calendar
-    print(build_trading_calendar(min_share))
+    r = build_trading_calendar(min_share)
+    print(r)
+    if not r.get("days_added") and not r.get("exchanges"):            # finding 8
+        print("[yellow]No trading days could be derived: the calendar is built from stored daily prices, and none "
+              "are stored. Download prices first ('Download daily prices'), or import an official calendar "
+              "(import-calendar-csv).[/yellow]")
 
 
 @app.command("import-calendar-csv")
@@ -2131,7 +2172,15 @@ def transactions_cmd(code: str, event_type: str = typer.Option(None, help="MAJOR
                                                                            "GUARANTEE or SHAREHOLDER_MEETING")):
     """Transaction events of one company."""
     from .transactions import show_transactions
-    _table(show_transactions(code, event_type))
+    init_db()
+    rows = show_transactions(code, event_type)
+    if not rows:                                                       # finding 8
+        print(_empty_reason(code, "transaction events" + (f" of type {event_type}" if event_type else ""),
+                            "They are read from catalogued announcements: run 'Catalogue disclosures' (kind all), "
+                            "then 'Read restructurings, related-party deals, guarantees and meetings' "
+                            "(extract-transactions). A company may also simply have none."))
+        return
+    _table(rows)
 
 
 @app.command("version")

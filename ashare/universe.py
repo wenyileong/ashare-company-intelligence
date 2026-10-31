@@ -47,7 +47,8 @@ def clean_code(value) -> str:
 # are off: B-share codes (900xxx, 200xxx) and BSE codes stay excluded.
 OPTIONAL_BOARD_MAP = {
     "BSE": {"BSE": {"920": "BSE", "43": "BSE", "83": "BSE", "87": "BSE", "88": "BSE"}},
-    "B_SHARE": {"SSE": {"900": "SSE_B"}, "SZSE": {"200": "SZSE_B"}},
+    # v2.1 (finding 9): Shenzhen B shares also use 201xxx (201872 is China Merchants Port's B share, 招港B)
+    "B_SHARE": {"SSE": {"900": "SSE_B"}, "SZSE": {"200": "SZSE_B", "201": "SZSE_B"}},
 }
 SECURITY_TYPES = {"SSE_B": ("B_SHARE", "USD"), "SZSE_B": ("B_SHARE", "HKD"), "BSE": ("A_SHARE", "CNY")}
 
@@ -125,6 +126,6 @@ def rejection_reason(code: str) -> str:
     code = clean_code(code)
     if code.startswith(("920", "43", "83", "87", "88")):
         return "Beijing Stock Exchange (enable under Settings > Optional boards)"
-    if code.startswith(("900", "200")):
+    if code.startswith(("900", "200", "201")):
         return "B shares (enable under Settings > Optional boards)"
     return "code range not recognised"

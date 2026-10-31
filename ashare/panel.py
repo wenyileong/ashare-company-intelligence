@@ -926,13 +926,40 @@ class EmptyPanel(ValueError):
     """A panel with no rows (v2.0.3: refused rather than written and reported as done)."""
 
 
+def parquet_available() -> bool:
+    import importlib.util
+    return importlib.util.find_spec("pyarrow") is not None
+
+
 def write_panel(result: dict, out_dir: str, name: str = "panel", formats: tuple[str, ...] = ("csv", "dta"),
                 allow_empty: bool = False) -> dict:
     """Write the panel, a codebook, R helpers and a manifest. A panel with no
-    rows raises :class:`EmptyPanel` with the reason, unless ``allow_empty``."""
-    from .research import database_fingerprint
+    rows raises :class:`EmptyPanel` with the reason, unless ``allow_empty``.
+
+    v2.1 (finding 7): the panel is written in every requested format or not at all. The files are written to a
+    staging folder and moved into place only when all are written, so a failure (Parquet without pyarrow, a full
+    disk) leaves no partial panel and does not touch an earlier panel of the same name."""
+    import shutil
+    if "parquet" in formats and not parquet_available():
+        raise RuntimeError("Parquet output needs the optional pyarrow package (source installations); choose csv "
+                           "or dta")
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
+    stage = out / f".partial_{name}"
+    shutil.rmtree(stage, ignore_errors=True)
+    stage.mkdir()
+    try:
+        res = _write_panel_files(result, stage, name, formats, allow_empty)
+        for f in sorted(stage.iterdir()):
+            f.replace(out / f.name)
+        res["files"] = [str(out / Path(x).name) for x in res["files"]]
+        return res
+    finally:
+        shutil.rmtree(stage, ignore_errors=True)
+
+
+def _write_panel_files(result: dict, out: Path, name: str, formats, allow_empty: bool) -> dict:
+    from .research import database_fingerprint
     rows = result["rows"]
     names = result["params"]["variables"]
     cols = []
