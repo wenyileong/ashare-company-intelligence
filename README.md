@@ -1,13 +1,23 @@
-# China A-share Company Intelligence v2.0.9
+# China A-share Company Intelligence v2.1.0
 
 A provenance-preserving research data system for SSE Main Board, STAR Market, SZSE Main Board and ChiNext companies. The architecture is set out in `ashare_scraper_build_plan.md`. Changes by version, and the findings behind them, are in `CHANGELOG.md`. The live-run findings are in:
 - `docs/live_run_findings_v2.0.2.md`;
 - `docs/live_run_findings_v2.0.3.md`;
 - `docs/live_run_findings_v2.0.5.md`;
 - `docs/live_run_findings_v2.0.6.md`;
-- `docs/live_run_findings_v2.0.7.md`.
+- `docs/live_run_findings_v2.0.7.md`;
+- `docs/live_run_findings_v2.0.8.md`.
 
-The register of all 95 findings, and the plan for the next releases, is `docs/plan_v2.0.8_and_visualisation.md`.
+The register of the findings, and the visualisation plan, is `docs/plan_v2.0.8_and_visualisation.md`; the plan for v2.1 is `docs/plan_v2.1.md`.
+
+v2.1.0 closes the faults of the latest live runs (findings 96 to 109) and adds three things:
+
+- **Data corrections.** Beijing and B-share companies are no longer treated as delisted, and are dated from their own lists. Top-10 tables keep rows only one reading found, when the table still passes its checks. Failures leave their full error in a file; findings are given as rates of what was checked; panels say why rows lack figures.
+- **Speed.** Financial extraction reads only the key-figure and statement pages of a report, and every extractor reads several documents at once.
+- **The topology view.** For a set of companies or a CSRC industry over a span of years, the five layers of the Nested Valuation Framework, from institutional context to market valuation, with the document behind every item and the gaps shown. It is a layered chart in the desktop and an offline interactive page (2D and 3D) adapted from the NVF Topology Tester. Management guidance (业绩预告, 业绩快报) is read as a labelled proxy for expectations.
+- **A Chinese interface.** EN | 中文 switches the desktop between English and Simplified Chinese, in the official terms of the approved glossary; datasets are identical in both.
+
+After upgrading, see `CHANGELOG.md` for the steps that re-read the reports.
 
 v2.0.9 fixes a fault in v2.0.8: "Update the company list" failed with a TypeError when a company had a risk warning imposed and lifted on the same day. If the listing history cannot be rebuilt, the update now finishes anyway and says so.
 

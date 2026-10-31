@@ -76,7 +76,9 @@ def tr(key: str, en: str) -> str:
     entry = _catalogue().get(key)
     if not entry or not entry.get("zh") or entry.get("en_hash") != source_hash(en):
         return en
-    return entry["zh"]
+    # Tk wraps only at spaces, so a Chinese line broke at the space beside a Latin word ("留空 =" / "默认…") and
+    # left a ragged edge; with no-break spaces it wraps character by character, as Chinese text should
+    return entry["zh"].replace(" ", "\u00a0")
 
 
 def is_stale(key: str, en: str) -> bool:

@@ -11,8 +11,10 @@ This guide is for those who extend or maintain A-share Company Intelligence: add
 | Extraction | `parsers/` (registry, dual running), `layout.py` (table rows from character positions), one module per content type (`financials.py`, `cas.py`, `control.py`, `segments.py`, `group.py`, `management.py`, `transactions.py` and others) |
 | Checking | `crossvalidation.py`, `validation.py`, `reconciliation.py`, `review.py`, `evaluation.py` (corpus scoring and calibration), `selftest.py` |
 | Research outputs | `panel.py`, `stata.py`, `eventstudy.py`, `valuation.py`, `derived.py`, `security_master.py`, `charts/`, `report.py`, `research.py` |
+| Visualisation (v2.1) | `nvf/layers.py` (variables to NVF layers), `viz/snapshot.py` (build and rules), `viz/schema.py`, `viz/export.py`, `viz/viewer.py` and `viz/viewer/` (the offline page and its bundled libraries), `charts/layers.py`, `expectations.py` |
 | Distribution | `release.py`, `licences.py`, `quality.py`, `update.py` |
-| Interfaces | `cli.py` (typer), `gui.py` and `gui_review.py` (Tkinter) |
+| Interfaces | `cli.py` (typer), `gui.py` and `gui_review.py` (Tkinter), `i18n/` (interface language, v2.1) |
+| Speed (v2.1) | `reportreader.py` (section pages), `parallel.py` (worker processes), `extractstate.py` (progress and resume) |
 
 The desktop application runs every action through the command line in the same process (`gui.run_command`), so each action has a command and the run log records it. A new feature therefore needs a command first, and a form in `gui.SECTIONS` second; `tests/test_gui_helpers.py` checks that every form option exists on its command.
 
@@ -61,6 +63,10 @@ The test suite fails if precision on the synthetic corpus falls by more than one
 
 A table extractor reads a report through `ashare.reportreader.ReportReader`. Pass `reader=` and `sections=` to `parsers.dual_run`. The reader finds the sections' pages with pdfium's page text, and gives the parser pages of the document's full length, blank outside the sections, so page numbers stay right. A new extractor should name its section (heading patterns, and how many pages after the heading belong to it) in `SECTIONS`. It should run through `extractstate.run`, which counts the documents, reports progress and records each document read in `extraction_state`. `tests/test_v208.py::test_targeted_reading_matches_full_reading_on_the_synthetic_corpus` checks that targeted and full readings agree.
 
+### Reading in worker processes (v2.1)
+
+`extractstate.run(..., parse="module:function")` reads documents in worker processes (`ashare.parallel.imap`). The parse function takes `(job, reader)` and returns what the handler needs; it must be importable by name, touch no database and print nothing (the Windows desktop program has no standard output). The handler, in the main process, writes the result and returns the outcome; results arrive in the documents' order. A test that patches a parse function must set `ASHARE_WORKERS=1`, because a patch does not reach a spawned worker.
+
 ## 4. Adding a source
 
 1. Write an adapter in `sources/` that uses `RateLimitedClient` (never `httpx` directly), so that pacing, retries and offline test transports apply.
@@ -102,6 +108,16 @@ ASHARE_TEST_DB_URL=postgresql+psycopg://user:pass@localhost/test python -m pytes
 
 The `db` fixture gives each test its own database and folders; with `ASHARE_TEST_DB_URL` it recreates the PostgreSQL schema instead. Network access in tests goes through `httpx.MockTransport`, installed with `ashare.http.set_default_transport`. PDFs for tests are made with reportlab (`tests/helpers.make_pdf`). Live-source checks are not part of the suite: they are the self-test, run on a networked machine.
 
+### Interface text (v2.1)
+
+Every text the desktop shows is written in English where it is used, with a stable key:
+- the pages, actions and fields of `gui.SECTIONS` take their keys from their identifiers (`section.<id>.title`, `action.<page>.<command>.label`, `….field.<key>.hint`);
+- any other text is `tr("ui.<name>", "English text")`, with literal strings (use `.format()` on the result for values).
+
+After changing or adding text, run `python packaging/i18n_catalogue.py`. It rewrites `ashare/i18n/en.json` from the code and `zh_CN.json` from `packaging/i18n/zh_CN_source.json`, and `--todo` lists texts that have no Chinese yet. Add their renderings to the source file under the glossary (`docs/glossary_zh_CN.md`), adding new terms to its part 11 for review. The tests fail if `en.json` differs from the code, a key lacks Chinese, a translation is stale, placeholders differ, a glossary term is rendered otherwise, or a casual term is used.
+
+Command output stays English and must never depend on the language, nor may any file a command writes.
+
 ## 7. Building the Windows programs
 
 On Windows with Python 3.10 to 3.13, run `build_windows.bat`. It creates a build environment, runs the tests, builds both executables with PyInstaller (`packaging/ashare.spec`), builds the documentation (`packaging/build_docs.py`), signs the executables if a certificate is configured (`packaging/sign.bat`), builds the installer with NSIS if it is installed (`packaging/installer.nsi`), and writes a portable zip.
@@ -118,7 +134,7 @@ PyInstaller does not cross-compile: build the Windows programs on Windows (a Win
 1. Raise `__version__` in `ashare/__init__.py` (the default user agent follows it), the version in `packaging/installer.nsi` and the first line of `packaging/READ_ME_FIRST.txt`.
 2. Add a migration if the schema changed, and a test.
 3. If the financial extraction changed, raise `EXTRACTOR_VERSION` in `ashare/financials.py` (v2.0.6), so that documents read by the earlier version are read again; otherwise a rerun skips them. For the table extractors (top-10 holders, control, segments, R&D and workforce, subsidiaries, roster), raise their entry in `VERSIONS` in `ashare/extractstate.py` (v2.0.8). If you add a section to `SECTIONS` in `ashare/reportreader.py`, raise `INDEX_VERSION` there, so that the cached section indexes are rebuilt.
-4. Update `README.md`, `CHANGELOG.md`, the build plan's status and `CITATION.cff`.
+4. Update `README.md`, `CHANGELOG.md`, the build plan's status and `CITATION.cff`, and run `packaging/i18n_catalogue.py` if any interface text changed.
 5. Run the tests on SQLite and PostgreSQL, and the offline self-test.
 6. Build and sign the installer and the portable zips, and write `SHA256SUMS.txt` for the downloads.
 7. Create the GitHub release for the tag `vX.Y.Z`, attach the downloads, `LICENSE.md`, `THIRD_PARTY_NOTICES.txt` and `SHA256SUMS.txt`, and publish the update JSON if one is used.

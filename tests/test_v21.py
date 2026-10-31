@@ -174,6 +174,7 @@ def test_quote_list_can_read_one_optional_board(db):
 # --- A3. Errors in full (finding 96) ------------------------------------------------------------------------------
 
 def test_a_failed_action_leaves_its_traceback_in_a_file(db, monkeypatch, tmp_path):
+    pytest.importorskip("tkinter")                  # the desktop modules need Tk
     from ashare import crossvalidation
     from ashare.gui import run_command
 
@@ -684,6 +685,7 @@ def test_a_panel_is_written_in_every_format_or_not_at_all(db, tmp_path, monkeypa
 
 
 def test_parquet_is_offered_only_with_pyarrow():
+    pytest.importorskip("tkinter")                  # the desktop modules need Tk
     from ashare import gui
     fields = [f for sec in gui.SECTIONS for a in sec["actions"] for f in a["fields"] if f["key"] == "formats"]
     assert fields and all(("parquet" in f["kind"]) == gui._PARQUET for f in fields)
@@ -721,6 +723,7 @@ def test_shenzhen_201_codes_are_b_shares(monkeypatch):
 
 def test_settings_are_locked_while_an_action_runs():
     """Finding 10 (review round 4): every setting, not only the optional boards."""
+    pytest.importorskip("tkinter")                  # the desktop modules need Tk
     from ashare.gui import App
 
     class W:
@@ -748,6 +751,7 @@ def test_settings_are_locked_while_an_action_runs():
 
 
 def test_workers_setting_applies_to_the_next_action(monkeypatch):
+    pytest.importorskip("tkinter")                  # the desktop modules need Tk
     from ashare.gui import apply_workers
     from ashare.parallel import workers
     apply_workers("3")
@@ -794,6 +798,7 @@ def test_name_lookup_failures_are_retried_for_longer(monkeypatch):
 
 
 def test_explorer_explains_an_empty_panel(tmp_path):
+    pytest.importorskip("tkinter")                  # the desktop modules need Tk
     from ashare.gui_review import empty_panel_reason
     (tmp_path / "p.csv").write_text("code,period\n", encoding="utf-8")
     assert "manifest was not found" in empty_panel_reason(tmp_path / "p.csv")

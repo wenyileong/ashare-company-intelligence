@@ -25,6 +25,7 @@ def english_after():
 
 def test_en_catalogue_matches_the_code():
     """en.json lists exactly the texts the code shows (regenerate with packaging/i18n_catalogue.py)."""
+    pytest.importorskip("tkinter")                  # the desktop modules need Tk
     built = _catalogues().english()
     stored = json.loads((ROOT / "ashare" / "i18n" / "en.json").read_text(encoding="utf-8"))
     assert stored == built
@@ -95,6 +96,7 @@ def test_lookup_falls_back_to_english():
 
 
 def test_every_page_action_and_field_appears_in_chinese():
+    pytest.importorskip("tkinter")                  # the desktop modules need Tk
     from ashare import gui
     from ashare.i18n import (set_language, section_title, action_label, action_note, field_label, field_hint,
                              group_label)
@@ -115,6 +117,7 @@ def test_every_page_action_and_field_appears_in_chinese():
 
 
 def test_form_checks_are_in_the_interface_language():
+    pytest.importorskip("tkinter")                  # the desktop modules need Tk
     from ashare.gui import check_values
     from ashare.i18n import set_language
     f = {"key": "on", "label": "Date", "kind": "date", "required": True}
@@ -126,6 +129,7 @@ def test_form_checks_are_in_the_interface_language():
 
 def test_the_language_never_changes_a_command_or_a_dataset(db, tmp_path):
     """Plan 5.6: the same form gives the same command, and a panel built in Chinese mode is identical."""
+    pytest.importorskip("tkinter")                  # the desktop modules need Tk
     from ashare import gui
     from ashare.i18n import set_language
     from ashare.panel import write_panel

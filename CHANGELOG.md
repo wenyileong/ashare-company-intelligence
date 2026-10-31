@@ -1,6 +1,71 @@
 # Change log
 
-This log records what changed in each version and the important findings behind the changes. The live-run findings are kept in full in `docs/live_run_findings_v2.0.2.md` (findings 1 to 19) `docs/live_run_findings_v2.0.3.md` (findings 20 to 34) and `docs/live_run_findings_v2.0.5.md` (findings 35 to 57, the first live runs of the v2.0.4 catalogue engine) `docs/live_run_findings_v2.0.6.md` (findings 58 to 69) and `docs/live_run_findings_v2.0.7.md` (findings 70 to 95) and `docs/live_run_findings_v2.0.8.md` (findings 96 to 111). Earlier versions are described in `README.md` and in section 18 of `ashare_scraper_build_plan.md`.
+This log records what changed in each version and the important findings behind the changes. The live-run findings are kept in full in `docs/live_run_findings_v2.0.2.md` (findings 1 to 19) `docs/live_run_findings_v2.0.3.md` (findings 20 to 34) and `docs/live_run_findings_v2.0.5.md` (findings 35 to 57, the first live runs of the v2.0.4 catalogue engine) `docs/live_run_findings_v2.0.6.md` (findings 58 to 69) and `docs/live_run_findings_v2.0.7.md` (findings 70 to 95) and `docs/live_run_findings_v2.0.8.md` (findings 96 to 111). The plan for v2.1, with its six rounds of review, is `docs/plan_v2.1.md`. Earlier versions are described in `README.md` and in section 18 of `ashare_scraper_build_plan.md`.
+
+## v2.1.0 (31 October 2026)
+
+**Aim:** close every fault the live runs of v2.0.8 and v2.0.9 showed that the code can fix (findings 96 to 109), make extraction fast enough for the whole market, add the first two phases of the visualisation layer, and give the desktop a Chinese interface. The plan, with the review that corrected it in 25 places, is `docs/plan_v2.1.md`.
+
+**After upgrading:**
+1. "Update the company list". Beijing and B-share companies marked "in neither exchange's list" by v2.0.8 and v2.0.9 are set back to listed, and dated where their lists answer.
+2. "Extract figures from reports" (kind reports), then "Read top-10 shareholders from reports". Both read every report once more, because their versions are new (financials-3, top10-3); several reports are now read at once.
+3. "Run all checks", then "Show findings", which now gives rates.
+4. For the topology view: "Read guidance" (it downloads the earnings forecasts and flash reports first), then "Build the topology view" on the Topology page.
+
+Until steps 1 to 3 are done, do not use or release financial or shareholder figures read by earlier versions.
+
+### Data corrections (workstream A)
+
+- **Beijing and B shares (finding 104).** The exchanges' lists cover the Shanghai main board and STAR and Shenzhen's A shares. v2.0.8 marked any company absent from them NOT_IN_EXCHANGE_LIST, whatever its board, so 684 listed Beijing and B-share companies were treated as delisted.
+  - The status now applies only to a company whose own board's list was read whole in this run; a failed list changes nothing.
+  - With B shares enabled, the exchanges' own B-share lists are read (Shanghai `STOCK_TYPE=2`, Shenzhen `TABKEY=tab2`).
+  - With the Beijing Stock Exchange enabled, the quote list is asked for that board alone.
+  - Companies still without a listing date are counted by board.
+- **Shenzhen 201xxx codes (finding 9).** 201872, reported as "code range not recognised", is China Merchants Port's B share (招港B). Shenzhen B shares in 201xxx are recognised with the other B shares.
+- **Top-10 shareholders (finding 98).**
+  - Rows that only the second reading of a table found are kept when the table still passes its checks (ten rows at most, each percentage between 0 and 100, a total of no more than 100). They are matched to the kept rows by share count, not by rank, and marked SINGLE with lower confidence.
+  - The plain-text reading lost a row whose name it printed above the figures. Such rows are now read; on the synthetic corpus this raises the text reading's recall from 77.2% to 85.7% with no loss of precision.
+  - A tradable-holder row is matched by unrestricted shares when its name differs.
+  - `inspect-tables` writes, for one table of one report, its pages in both readings with the parser's decision on every line. Send its file instead of the report when a table is misread.
+- **Errors in full (finding 96).** A failed action writes its traceback to `logs/error_<time>.txt` and names the file in the output.
+- **Findings as rates (finding 108).** "Run all checks" saves what each check examined (document pairs, segment tables, top-10 tables, holder rows, balance sheets) in `validation_summary.json`, kept apart for the whole database and for each company. "Show findings" gives each rule as a rate of that, splits segment mismatches by size and differences between documents by pattern, and says when it can give counts only.
+- **Panel coverage (finding 109).** A panel with rows lacking figures says how many companies have figures and how many have downloaded reports, and what to run.
+- **The self-test (finding 106)** reports every quote-list variant tried, not only the last.
+- **Statement units.** A consolidated statement continued on the next page keeps the unit declared under its heading (banks declare 百万元 once); before, the continuation was read in yuan.
+
+### Extraction speed (workstream B)
+
+- **Financial extraction reads only its pages (findings 101 and 107).** In a report of more than 30 pages, only the key-figures table, the three consolidated statements (with the page before each heading, for a unit declared at its foot), the R&D and workforce pages and the cover are read. Shorter documents, and long ones without these headings, are read whole. On the synthetic corpus, padded to 55 pages, the facts are identical and the reading takes a fifth of the time; on real reports, where laying out a page is the slow step, the gain should be larger. `EXTRACTOR_VERSION` is "financials-3".
+- **Several documents at once (B3).** Every document extractor reads documents in worker processes (by default the processor cores less one, at most eight; Settings > Reading documents). Only the main program writes, in the documents' order, so SQLite sees one writer, the results equal a serial run's, and a stopped run marks nothing it did not write. The Windows program starts its workers correctly (`freeze_support` first in the launcher).
+- **The text layer (B2).** pdfium was compared with pypdf as the plain-text layer on the golden corpus. It improves three parsers but lowers the subsidiaries parser's precision from 82.4% to 77.8%, so pypdf stays; the comparison is `docs/text_layer_comparison_v2.1.md`.
+
+### Visualisation: the topology view (workstream E, phases V0 and V1)
+
+- **The graph snapshot** (`ashare/viz/`). For a list of companies (or a CSRC industry such as C39) and a span of fiscal years, as published by a date, it records the companies, their observations in the five NVF layers, shareholders, controllers, sectors and regulatory events, and every link with its evidential status and the document, page, classification or feed behind it. Every link built is a documented fact. Positions and values are decided in Python; the same parameters give the same file, byte for byte. Natural persons are masked with the release's own rule. A layer without data is shown as a gap, with the reason.
+- **The export**: `snapshot.json`, `observations.csv` (exactly the observations shown), `edges.csv`, `snapshot.schema.json` and a manifest with file hashes.
+- **The layered chart.** A new chart kind, `layers`: the five layers as columns and the companies as rows, drawn alike in the desktop and as SVG.
+- **The offline viewer** (`topology.html`), built from the uploaded NVF Topology Tester v0.1: its page, inspector, coverage table and charts are kept, and it now draws the snapshot instead of building its graph. The libraries are bundled (no CDN; licences in `THIRD_PARTY_NOTICES.txt`), so the file opens from disk with no network. The tester's faults are fixed: the 2D view draws (P5), positions are fixed when the nodes are created and the canvas fits its panel (P6), and nothing is calculated in the page (P7). Where a browser has no WebGL, the page falls back to the 2D view.
+- **Expectations.** `read-guidance` reads earnings forecasts (业绩预告) and flash reports (业绩快报) for their ranges, prior-year figures and changes, downloading those announcements first. It is labelled management guidance, a disclosed proxy, not investors' expectations. `import-analyst-forecasts-csv` imports licensed analyst forecasts with their licence; the two are never mixed in one series. Migration 0007 adds `expectation_observations`.
+- **The desktop**: a Topology page with these three actions; the layered chart opens in the chart window and the viewer in the browser.
+
+### Polish (workstream C)
+
+- **Panels written whole (finding 7).** A panel is written in every requested format or not at all, and an earlier panel of the same name is untouched by a failure. Parquet is offered only where pyarrow is installed.
+- **Empty results explained (findings 8 and 18).** `show-market`, `show-events`, `transactions`, `compare` and `build-calendar` say why there is nothing and what to run.
+- **Settings locked during an action (finding 10)**: the optional boards, price source, workers, language and data folder.
+- **Name-lookup failures (finding 16)** ("getaddrinfo failed") are retried for up to five minutes before they count as a failure.
+- **The dataset explorer (finding 17)** says why a panel is empty, and opening it no longer shows a placeholder command.
+
+### Chinese interface (workstream D)
+
+- **EN | 中文** in the window, and under Settings. The first start follows the Windows display language; the choice is saved, and switching rebuilds the window at once, keeping typed values and the output.
+- **What is translated.** All 26 pages, 115 actions and 241 fields, the Getting started and Settings pages, dialogs, status messages, the review, chart and explorer windows, and the desktop's error explanations: 789 texts. The renderings follow the approved glossary; part 11 of `docs/glossary_zh_CN.md` proposes the terms new in v2.1, for review.
+- **What stays in English**: command names and the run log, each command's own output, variable, column and file names, and the source data. A panel built in Chinese is identical to one built in English, and a test checks it.
+- **Catalogues.** `ashare/i18n/en.json` is generated from the code and checked against it by the tests; `zh_CN.json` records, for each text, the English it was translated from, so a later change shows English until the translation is reviewed.
+
+### Tests
+
+TESTS_PLACEHOLDER
 
 ## v2.0.9 (30 October 2026)
 

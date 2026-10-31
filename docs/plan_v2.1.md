@@ -1,6 +1,6 @@
 # v2.1 build plan
 
-**Status:** plan, revised 30 October 2026. It now carries the fixes planned as v2.0.10 (`docs/plan_v2.0.10.md`, merged here at the author's request) and the first two phases of the visualisation layer (decided on 29 October: V0 and V1 beside v2.1). The plan was tested for logic against the code in six rounds, until a round found nothing new; the faults found and how the plan answers them are in section 12. Nothing in it is built yet.
+**Status:** built, 31 October 2026, as v2.1.0. The author approved the glossary, deferred workstream G and the data licence, and kept parallel extraction on by default (section 13). What the build changed in the plan, and the faults found while building, are in section 15. The plan was tested for logic against the code in six rounds before the build (section 12).
 
 **Earlier version:** 18 October 2026: the language toggle, extraction speed and polish. Those three workstreams are kept, revised where the live runs since then changed them.
 
@@ -488,3 +488,31 @@ The earlier decisions stand: glossary approved (18 October); viewer inside this 
 - Visualisation V2 to V5.
 - The top-10 parser for new layouts, once shown (a patch after v2.1 if needed).
 - Traditional Chinese, only if there is demand.
+
+## 15. Build record (31 October 2026)
+
+### Decisions applied
+
+- **Section 13.** Glossary approved, with the terms new in v2.1 proposed as its part 11 for review; workstream G and the data licence deferred; parallel extraction on by default (Settings > Reading documents).
+- **The viewer.** At the author's instruction to use as much of the uploaded NVF Topology Tester v0.1 as possible, its page, script and style sheet were adapted into the offline viewer (renderer R2 of the visualisation plan), brought forward from V2. It draws the snapshot; it calculates nothing.
+
+### Departures from the plan
+
+- **B2.** pdfium was not adopted as the text layer, by the plan's own rule: the subsidiaries parser lost precision (`docs/text_layer_comparison_v2.1.md`). No version was raised for it.
+- **B4.** The profiling run over 200 real reports needs the author's reports; it is the author's to run.
+- **A2.** The `inspect-tables` output on the synthetic corpus showed one layout fault at once (below), so one parser change was made before the author's output, against the plan's order.
+
+### Faults found while building, and fixed
+
+| # | Fault | Found by | Fix |
+|---|---|---|---|
+| 1 | Parallel results came back in the order they finished, so the main process would write documents in a different order from a serial run | Review of `parallel.py` | Results are yielded in the documents' order; Stop is answered within half a second even while a long document is read |
+| 2 | A consolidated statement continued on the next page was read without its unit, so a bank's statement in 百万元 would be read in yuan after the first page | The test of a unit at the foot of the page before a statement | The unit declared under the heading carries over the statement's pages |
+| 3 | The plain-text reading of the top-10 table dropped every row whose name it printed on lines above the figures | `inspect-tables` on the synthetic corpus | Such rows are read; the text reading's recall rose from 77.2% to 85.7% |
+| 4 | `validation_summary.json` was written to the working folder, not the data folder | A test left the file in the repository | Written beside the database |
+| 5 | The viewer's canvas took the window's size, not its panel's, so the graph sat off centre (the tester's finding P6) | Screenshots of the viewer | The canvas takes its panel's size, and follows it |
+| 6 | With the link force removed, the viewer drew no lines (links were never joined to their nodes) | Screenshots | The link force is kept at zero strength |
+| 7 | In a browser without WebGL, the 3D library's error stopped the whole page | The browser test under a virtual display | The page falls back to the 2D view, and a graph failure never hides the tables and charts |
+| 8 | A panel written without one built first in the same process had no variable labels in its Stata file | The language identity test | The variable registry is loaded before writing |
+| 9 | The Parquet hint of two forms depended on whether pyarrow was installed, so the interface catalogue differed between machines | The catalogue test | One hint for every machine |
+

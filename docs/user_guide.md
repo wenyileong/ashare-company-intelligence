@@ -8,7 +8,7 @@ This guide covers the desktop application and the command line. The [methods doc
 
 ### Windows installer
 
-Run `AShareScraper-2.0.9-setup.exe`. It installs for the current user (no administrator rights are needed) into `%LOCALAPPDATA%\Programs\AShareScraper` and adds Start-menu entries for the application, the command line, this guide and the uninstaller. Two options are offered:
+Run `AShareScraper-2.1.0-setup.exe`. It installs for the current user (no administrator rights are needed) into `%LOCALAPPDATA%\Programs\AShareScraper` and adds Start-menu entries for the application, the command line, this guide and the uninstaller. Two options are offered:
 
 - a desktop shortcut;
 - adding the program folder to your PATH, so that `ashare-cli` runs from any command prompt.
@@ -74,7 +74,8 @@ Each page explains what its actions do. Fields marked as optional can be left bl
 
 - **Company**: an integrated profile and an HTML report for one company, with charts.
 - **Datasets**: research panels (company-year, company-quarter or company-date) with a codebook, and event studies. The dataset explorer opens a built panel with summaries, correlations and charts.
-- **Validate**: all validation stages, with flags listed by rule.
+- **Topology** (v2.1): the five NVF layers for a set of companies over a span of years, as a layered chart and an interactive view in the browser (section 7, "The topology view").
+- **Validate**: all validation stages, with findings by rule and, since v2.1, as rates of what was checked.
 - **Research**: full-text search, provenance traces, logged read-only SQL queries, exports, charts, dataset releases, the data-quality report and licence classes.
 
 **Check** keeps the data trustworthy:
@@ -84,9 +85,21 @@ Each page explains what its actions do. Fields marked as optional can be left bl
 - **Self-test**: checks that each public source still answers in the expected shape. Run it on first use and whenever a step returns nothing.
 - **Parser accuracy**: measures parsers against a golden corpus of hand-checked reports and sets the confidence attached to extracted values.
 
-**Settings**: the data folder, optional boards, and the update check.
+**Settings**: the interface language, the data folder, optional boards, the price source, how many documents are read at once, and the update check. Settings are locked while an action runs, and apply to the next action.
 
-The output panel at the bottom shows what each action did. **Copy** copies it, for example into a bug report.
+The output panel at the bottom shows what each action did. **Copy** copies it, for example into a bug report. When an action fails, the output names a file in the `logs` folder that holds the full error; send that file with a bug report.
+
+### Language (v2.1)
+
+**EN | 中文**, under the program's name in the sidebar (and under Settings), switches the window between English and Simplified Chinese at once; values already typed and the output are kept. The first start follows the Windows display language.
+
+The Chinese interface uses the official terms of the CSRC, the exchanges, CNINFO and the reports (`docs/glossary_zh_CN.md`). These stay in English in both languages:
+- the command shown above each result, and the run log;
+- each command's own output, in the output panel, so Chinese interface text sits above English output;
+- variable, column and file names, codebooks and manifests;
+- the chart labels of the layered view.
+
+So a dataset never depends on the interface language: a panel built in Chinese is identical to one built in English.
 
 ## 4. A first session
 
@@ -286,6 +299,36 @@ Neither public feed is exchange-authoritative, and their terms are yours to chec
 ### Top shareholders (v2.0.7)
 
 "Extract top shareholders" (`extract-top-holders`) reads the top-10 shareholder tables in both column orders used in periodic reports: the older one with the nature at the end, and the one with the nature after the name, as in the Shenzhen templates. A row whose figures fail the checks is left out rather than misread. Rows read from a document by an earlier version, and not by this one, are removed when the document is read again. Before v2.0.7, reports in the second layout gave shareholder names with the nature glued on, and figures one column out of place. After upgrading, run "Extract top shareholders" and then "Resolve entities".
+
+### What v2.1 changed in extraction
+
+- **Financial figures are read from their pages.** In a report of more than 30 pages, "Extract figures from reports" reads the key-figures table, the three consolidated statements, the R&D and workforce pages and the cover, not every page. Shorter documents (flash reports, forecasts, announcements) and reports without these headings are read whole. Every report is read once more after the upgrade (`financials-3`).
+- **Several documents at once.** Every extraction reads several documents at the same time, by default one per processor core less one (at most eight). **Settings > Reading documents** changes the number; 1 reads one at a time. Results and progress are the same; only the program itself writes to the database.
+- **Top-10 shareholders.** A row only one of the two readings of a table found is kept if the table still passes its checks, and marked for review. Rows whose name is printed above their figures are now read. Every report is read once more after the upgrade (`top10-3`).
+- **When a table is read wrongly or not at all**, `ashare-cli inspect-tables --code 600519 --year 2025 --table top10` (or `segments`, `control`, or a document ID instead of `--code`) writes `exports/inspect_<ID>_<table>.txt`. It holds the table's pages as each reading sees them, with the parser's decision on every line: heading, header, row read, or the check that rejected it. It contains the report's own text, shareholder names included; it is yours to share or not, and it lets a fault be found without the PDF.
+
+### Findings as rates (v2.1)
+
+"Run all checks" now records what each check examined (document pairs compared, segment tables, top-10 tables, holder rows, balance sheets) in `validation_summary.json`, beside the database. The whole database and each company are kept apart. "Show findings" then gives each rule as a rate, for example "EXTRACTION_DISCREPANCY 412, 3.1% of 13,280 document pairs compared". It splits segment mismatches by size (within 10%, within 50%, beyond) and differences between documents by pattern. Before the checks have been run under v2.1, it gives counts only and says so.
+
+### The topology view (v2.1)
+
+**Topology > Build the topology view** (`topology`) describes a set of companies over a span of fiscal years, as known on a date:
+- **Choose the companies** by code (`--codes 688981,002371`) or by CSRC industry (`--industry C39`, which needs imported industry classifications).
+- **The span** must contain at least one 31 December. **As published by** (`--as-of`) keeps only what was published by that date.
+- **What it shows**, in five layers:
+  - institutional coordination: the CSRC industry and regulatory events;
+  - productive capability: R&D expense and investment, R&D staff, capital expenditure;
+  - corporate fundamentals: revenue, net profit attributable, the top shareholders and the actual controller;
+  - investor expectations: management guidance (or imported analyst forecasts);
+  - market valuation: the closing price at each year end.
+- **Every line is a documented fact**: a report or announcement (with its page), a classification or a price feed states it. A line is not evidence that one thing caused another.
+- **A layer without data** is shown as a gap, with what to run to fill it.
+- **Natural persons** are shown under the same pseudonyms as in a pseudonymised release; licensed data are left out unless you include them.
+
+It shows the layered chart in the chart window and opens `topology.html` in your browser. That page works offline: it has the data and its libraries inside it, and can be sent to someone else. It offers a 3D view (layers, companies and years as the three axes), a 2D slice, filters, charts of revenue and profit, the coverage table, and an inspector that shows each item's document, page, method and confidence. Computers without 3D graphics in the browser get the 2D slice. The folder also holds `observations.csv` (exactly what is shown), `edges.csv`, `snapshot.json` with its schema, `layers.svg` and `layers.csv`, and a manifest.
+
+**Expectations.** "Read guidance" (`read-guidance`) reads earnings forecasts (业绩预告) and flash reports (业绩快报) for their ranges, prior-year figures and changes. It downloads those announcements first, since a catalogue run downloads only reports; catalogue with kind `all` before. Guidance is the company's own disclosed estimate: a proxy for expectations, labelled as such, not investors' expectations. Analyst forecasts can be imported from a file you are licensed to use (`import-analyst-forecasts-csv FILE --licence "…"`); they are kept apart from guidance, never mixed in one series, and left out of releases unless you include licensed data.
 
 ### PDF reader messages (v2.0.3)
 
