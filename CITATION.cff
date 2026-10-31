@@ -4,7 +4,7 @@ type: software
 title: "A-share Company Intelligence"
 abstract: "A provenance-preserving research data system for companies listed on the Shanghai and Shenzhen stock exchanges: collection from statutory disclosures, calibrated extraction, staged validation, point-in-time panels and licence-aware, optionally pseudonymised dataset releases."
 license: PolyForm-Strict-1.0.0
-version: "2.1.0"
+version: "2.1.1"
 date-released: 2026-10-31
 authors:
   - family-names: "Leong"

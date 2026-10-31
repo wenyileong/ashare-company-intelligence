@@ -683,12 +683,15 @@ def extract_financials(security_code: str | None = None, kind: str = "reports", 
                 prog.step()
                 continue
             jobs.append({"id": disclosure.id, "path": disclosure.local_path, "title": disclosure.title_cn,
-                         "announcement_date": disclosure.announcement_date})
+                         "announcement_date": disclosure.announcement_date, "group": company.id})
             by_id[disclosure.id] = (disclosure, company)
         with quiet_heartbeat():
             # v2.1 (plan B3): documents are read in worker processes; this process writes and marks each result
+            from .parallel import Slowest
+            slow = Slowest()
             for res in imap("ashare.financials:parse_financials_job", jobs, check=check_cancel):
                 disclosure, company = by_id[res["id"]]
+                slow.add(res, f"{company.security_code} {disclosure.title_cn or ''}")
                 if res.get("error"):
                     totals["errors"].append({"code": company.security_code, "disclosure_id": disclosure.id,
                                              "error": res["error"]})
@@ -721,6 +724,8 @@ def extract_financials(security_code: str | None = None, kind: str = "reports", 
                     totals["errors"].append({"code": company.security_code, "disclosure_id": disclosure.id,
                                              "error": repr(exc)})
                 prog.step()
+            if slow.report():
+                totals["slowest"] = slow.report()
         return totals
     finally:
         session.close()

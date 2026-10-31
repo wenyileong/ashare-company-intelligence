@@ -8,7 +8,7 @@ This guide covers the desktop application and the command line. The [methods doc
 
 ### Windows installer
 
-Run `AShareScraper-2.1.0-setup.exe`. It installs for the current user (no administrator rights are needed) into `%LOCALAPPDATA%\Programs\AShareScraper` and adds Start-menu entries for the application, the command line, this guide and the uninstaller. Two options are offered:
+Run `AShareScraper-2.1.1-setup.exe`. It installs for the current user (no administrator rights are needed) into `%LOCALAPPDATA%\Programs\AShareScraper` and adds Start-menu entries for the application, the command line, this guide and the uninstaller. Two options are offered:
 
 - a desktop shortcut;
 - adding the program folder to your PATH, so that `ashare-cli` runs from any command prompt.

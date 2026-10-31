@@ -129,10 +129,32 @@ def _upsert(session, company_id, disclosure_id, period, item, value, source, doc
     return "inserted" if created else "updated"
 
 
-def extract_esg(security_code: str | None = None) -> dict:
-    """Read ESG data points from annual reports and sustainability reports,
-    and record which years have a sustainability report."""
-    from .corporate_actions import _document_pages
+def _is_sustainability(d) -> bool:
+    title = (d.get("title") if isinstance(d, dict) else d.title_cn) or ""
+    return bool(SUSTAINABILITY_RE.search(title)) and "摘要" not in title
+
+
+def parse_esg_job(job: dict, reader):
+    """The reading half of :func:`extract_esg` (v2.1.1, finding 114; run in worker processes).
+
+    A sustainability, CSR or ESG report is about nothing else, so it is read whole. An annual report is read only on
+    the pages of its environmental and social sections (``esg`` in :data:`ashare.reportreader.SECTIONS`); when none
+    is found the reader falls back to the whole report, as before."""
+    if _is_sustainability(job):
+        from .corporate_actions import _document_pages
+        reader.fallback_full = True
+        return parse_esg_text(_document_pages(Path(job["path"])))
+    return parse_esg_text(reader.pages("text", ["esg"]))
+
+
+def extract_esg(security_code: str | None = None, again: bool = False, progress=None) -> dict:
+    """Read ESG data points from annual reports and sustainability reports, and record which years have a
+    sustainability report.
+
+    v2.1.1 (finding 114): progress, resume and parallel reading as the other extractors (:mod:`ashare.extractstate`),
+    and annual reports are read on their environmental and social pages only. v2.0.9 read every page of 304
+    documents in 6,940 seconds and started again from the beginning when stopped."""
+    from .extractstate import run
     init_db()
     session = SessionLocal()
     totals = {"documents": 0, "sustainability_reports": 0, "values": 0, "inserted": 0, "updated": 0, "errors": []}
@@ -140,32 +162,42 @@ def extract_esg(security_code: str | None = None) -> dict:
         q = session.query(Disclosure, Company).join(Company, Disclosure.company_id == Company.id)
         if security_code:
             q = q.filter(Company.security_code == str(security_code).zfill(6))
-        for d, c in q.all():
-            is_sr = bool(SUSTAINABILITY_RE.search(d.title_cn or "")) and "摘要" not in (d.title_cn or "")
+        rows = []
+        for d, c in q.order_by(Company.security_code, Disclosure.announcement_date, Disclosure.id).all():
+            is_sr = _is_sustainability(d)
             if not (is_sr or d.kind == "annual_report"):
                 continue
             period = _period(d)
             if not period:
                 continue
-            try:
-                src = d.source or "CNINFO"
-                if is_sr:
+            if is_sr:
+                # the title row needs no reading, so it is written for every report, read before or not
+                try:
                     totals["sustainability_reports"] += 1
-                    totals[_upsert(session, c.id, d.id, period, "sustainability_report_published", 1.0, src,
-                                   d.document_url or d.local_path, None, d.title_cn, "TITLE", 0.9, d.title_cn)] += 1
-                if d.local_path and Path(d.local_path).exists():
-                    vals = parse_esg_text(_document_pages(Path(d.local_path)))
-                    totals["documents"] += 1
-                    for v in vals:
-                        totals["values"] += 1
-                        totals[_upsert(session, c.id, d.id, period, v["item"], v["value"], src,
-                                       d.local_path or d.document_url, v["page"], v["raw"],
-                                       "PDF_TEXT_HEURISTIC", calibrated_confidence("esg", v["confidence"]), v.get("value_text"))] += 1
-                session.commit()
-            except Exception as exc:
-                session.rollback()
-                totals["errors"].append({"disclosure_id": d.id, "error": repr(exc)})
-        return totals
+                    totals[_upsert(session, c.id, d.id, period, "sustainability_report_published", 1.0,
+                                   d.source or "CNINFO", d.document_url or d.local_path, None, d.title_cn, "TITLE",
+                                   0.9, d.title_cn)] += 1
+                    session.commit()
+                except Exception as exc:
+                    session.rollback()
+                    totals["errors"].append({"disclosure_id": d.id, "error": repr(exc)})
+            if d.local_path:
+                rows.append((d, c))
+
+        def handle(d, c, vals):
+            period = _period(d)
+            if not period:
+                return None
+            totals["documents"] += 1
+            src = d.source or "CNINFO"
+            for v in vals:
+                totals["values"] += 1
+                totals[_upsert(session, c.id, d.id, period, v["item"], v["value"], src,
+                               d.local_path or d.document_url, v["page"], v["raw"], "PDF_TEXT_HEURISTIC",
+                               calibrated_confidence("esg", v["confidence"]), v.get("value_text"))] += 1
+            return "READ" if vals else "EMPTY"
+
+        return run("esg", rows, handle, totals, again, progress, session, parse="ashare.esg:parse_esg_job")
     finally:
         session.close()
 

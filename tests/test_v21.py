@@ -419,7 +419,9 @@ def test_parallel_and_serial_extraction_write_the_same_facts(company, tmp_path, 
 
 def test_results_come_back_in_job_order_whatever_finishes_first(tmp_path):
     from ashare.parallel import imap
-    jobs = [{"id": i, "path": str(tmp_path / "none.pdf"), "delay": 0.4 if i == 0 else 0.0} for i in range(6)]
+    # one company's documents (v2.1.1: the order is kept within a company, test_v211 covers different companies)
+    jobs = [{"id": i, "path": str(tmp_path / "none.pdf"), "delay": 0.4 if i == 0 else 0.0, "group": 1}
+            for i in range(6)]
     got = [r["id"] for r in imap("parallel_helpers:slow_job", jobs, n_workers=3)]
     assert got == list(range(6))
 

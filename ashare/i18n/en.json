@@ -366,6 +366,8 @@
  "action.people.human-capital.field.period.label": "Period",
  "action.people.human-capital.label": "R&D and workforce",
  "action.people.human-capital.note": "R&D intensity and capitalisation, R&D staff, workforce by function and education, patents.",
+ "action.people_esg.extract-esg.field.again.hint": "Normally reports already read by this version are skipped, so a stopped run continues where it stopped.",
+ "action.people_esg.extract-esg.field.again.label": "Read reports again",
  "action.people_esg.extract-esg.field.security_code.hint": "Leave blank to run for every company.",
  "action.people_esg.extract-esg.field.security_code.label": "Security code",
  "action.people_esg.extract-esg.label": "Extract ESG from reports",

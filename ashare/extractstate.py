@@ -21,6 +21,7 @@ VERSIONS = {
     "subsidiaries": "subsidiaries-1",
     "roster": "roster-1",
     "guidance": "guidance-1",            # v2.1: earnings forecasts and flash reports (plan E2)
+    "esg": "esg-2",                      # v2.1.1: resume, progress, environmental and social pages (finding 114)
 }
 
 
@@ -103,11 +104,13 @@ def run(extractor: str, rows, handle, totals: dict, again: bool = False, progres
                     prog.step()
                     continue
                 jobs.append({"id": d.id, "path": str(path), "title": d.title_cn, "kind": d.kind,
-                             "announcement_date": d.announcement_date})
+                             "announcement_date": d.announcement_date, "group": c.id})
                 by_id[d.id] = (d, c)
-            from .parallel import imap
+            from .parallel import imap, Slowest
+            slow = Slowest()
             for res in imap(parse, jobs, check=check_cancel):
                 d, c = by_id[res["id"]]
+                slow.add(res, f"{c.security_code} {d.title_cn or ''}")
                 if res.get("error"):
                     failed(d, res["error"])
                 else:
@@ -121,6 +124,8 @@ def run(extractor: str, rows, handle, totals: dict, again: bool = False, progres
                     except Exception as exc:
                         failed(d, exc)
                 prog.step()
+            if slow.report():
+                totals["slowest"] = slow.report()
             return totals
         for d, c in todo:
             reader = None

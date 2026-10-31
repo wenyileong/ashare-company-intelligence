@@ -626,32 +626,51 @@ def sustainability_mandate(security_code: str, fiscal_year: int) -> dict:
 
 # --- trading calendar and suspensions ---------------------------------------------
 
+#: The mainland exchanges keep one calendar (the same holidays and make-up days), so their bars are pooled.
+MAINLAND_EXCHANGES = ("SSE", "SZSE", "BSE")
+
+
 def build_trading_calendar(min_share: float = 0.5, min_securities: int = 2) -> dict:
-    """Derive trading days from stored daily bars: a weekday is open on an
-    exchange when at least ``min_share`` of the securities with bars around
-    then traded (and at least ``min_securities``). Imported calendars are kept."""
+    """Derive trading days from stored daily bars: a weekday is open when at least ``min_share`` of the securities
+    with bars around then traded (and at least ``min_securities``). Imported calendars are kept.
+
+    v2.1.1 (finding 115): the Shanghai, Shenzhen and Beijing exchanges share one calendar, so their bars are pooled
+    and the days are written for all three. v2.0.9 derived days only for the exchange whose companies had bars
+    (SZSE in the log), and suspensions of Shanghai companies, which look up SSE days, then found no open days."""
     init_db()
     s = SessionLocal()
     try:
         counts = defaultdict(lambda: defaultdict(set))
+        seen = set()
         for code_ex, d, cid in (s.query(Company.exchange, MarketBar.trade_date, MarketBar.company_id)
                                 .join(Company, MarketBar.company_id == Company.id)):
-            counts[code_ex][d].add(cid)
+            ex = (code_ex or "").upper()
+            seen.add(ex)
+            counts["MAINLAND" if ex in MAINLAND_EXCHANGES else ex][d].add(cid)
         added = 0
-        for ex, days in counts.items():
+        written, open_days = set(), set()
+        for pool, days in counts.items():
+            targets = MAINLAND_EXCHANGES if pool == "MAINLAND" else (pool,)
             universe = len({c for ids in days.values() for c in ids})
             for d, ids in days.items():
                 if len(ids) < min(min_securities, universe) or len(ids) < min_share * universe:
                     continue
-                row = s.query(TradingDay).filter_by(exchange=ex, trade_date=d).one_or_none()
-                if row is None:
-                    s.add(TradingDay(exchange=ex, trade_date=d, is_open=1, source="DERIVED_FROM_BARS",
-                                     securities_trading=len(ids)))
-                    added += 1
-                elif row.source == "DERIVED_FROM_BARS":
-                    row.securities_trading = len(ids)
+                open_days.add(d)
+                for ex in targets:
+                    written.add(ex)
+                    row = s.query(TradingDay).filter_by(exchange=ex, trade_date=d).one_or_none()
+                    if row is None:
+                        s.add(TradingDay(exchange=ex, trade_date=d, is_open=1, source="DERIVED_FROM_BARS",
+                                         securities_trading=len(ids)))
+                        added += 1
+                    elif row.source == "DERIVED_FROM_BARS":
+                        row.securities_trading = len(ids)
         s.commit()
-        return {"exchanges": sorted(counts), "days_added": added}
+        out = {"exchanges": sorted(written), "days": len(open_days), "days_added": added}
+        if "MAINLAND" in counts:
+            out["bars_from"] = sorted(seen & set(MAINLAND_EXCHANGES))
+            out["note"] = "the mainland exchanges share one calendar, so the days are written for SSE, SZSE and BSE"
+        return out
     finally:
         s.close()
 

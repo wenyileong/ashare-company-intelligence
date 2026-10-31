@@ -1230,9 +1230,10 @@ def human_capital_history_cmd(security_code: str):
 
 
 @app.command("extract-esg")
-def extract_esg_cmd(security_code: str = typer.Option(None)):
-    """Read environmental and social data from annual and sustainability reports."""
-    print(extract_esg(security_code))
+def extract_esg_cmd(security_code: str = typer.Option(None), again: bool = typer.Option(False, "--again", help="Read every document again, including those already read by "
+                                                                  "this extractor version")):
+    """Read environmental and social data from annual and sustainability reports (resumable)."""
+    print(extract_esg(security_code, again, _progress))
 
 
 @app.command("import-esg-csv")

@@ -1,7 +1,7 @@
 ; NSIS installer for A-share Company Intelligence (v2.0)
 ;
 ; Build after PyInstaller has produced dist\AShareScraper\ :
-;   makensis /DVERSION=2.1.0 packaging\installer.nsi
+;   makensis /DVERSION=2.1.1 packaging\installer.nsi
 ; (build_windows.bat does this when NSIS is installed; on Linux, apt install nsis.)
 ;
 ; The installer is per-user (no administrator rights are needed). It installs
@@ -18,7 +18,7 @@ SetCompressorDictSize 64
 RequestExecutionLevel user
 
 !ifndef VERSION
-  !define VERSION "2.1.0"
+  !define VERSION "2.1.1"
 !endif
 !ifndef DIST
   !define DIST "..\dist\AShareScraper"

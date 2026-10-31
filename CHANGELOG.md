@@ -1,6 +1,23 @@
 # Change log
 
-This log records what changed in each version and the important findings behind the changes. The live-run findings are kept in full in `docs/live_run_findings_v2.0.2.md` (findings 1 to 19) `docs/live_run_findings_v2.0.3.md` (findings 20 to 34) and `docs/live_run_findings_v2.0.5.md` (findings 35 to 57, the first live runs of the v2.0.4 catalogue engine) `docs/live_run_findings_v2.0.6.md` (findings 58 to 69) and `docs/live_run_findings_v2.0.7.md` (findings 70 to 95) and `docs/live_run_findings_v2.0.8.md` (findings 96 to 111). The plan for v2.1, with its six rounds of review, is `docs/plan_v2.1.md`. Earlier versions are described in `README.md` and in section 18 of `ashare_scraper_build_plan.md`.
+This log records what changed in each version and the important findings behind the changes. The live-run findings are kept in full in `docs/live_run_findings_v2.0.2.md` (findings 1 to 19) `docs/live_run_findings_v2.0.3.md` (findings 20 to 34) and `docs/live_run_findings_v2.0.5.md` (findings 35 to 57, the first live runs of the v2.0.4 catalogue engine) `docs/live_run_findings_v2.0.6.md` (findings 58 to 69) and `docs/live_run_findings_v2.0.7.md` (findings 70 to 95) and `docs/live_run_findings_v2.0.8.md` (findings 96 to 111) and `docs/live_run_findings_v2.0.9.md` (findings 112 to 117). The plan for v2.1, with its six rounds of review, is `docs/plan_v2.1.md`. Earlier versions are described in `README.md` and in section 18 of `ashare_scraper_build_plan.md`.
+
+## v2.1.1 (31 October 2026)
+
+**Aim:** close the faults found in the rest of the author's v2.0.9 log (`docs/live_run_findings_v2.0.9.md`, findings 112 to 117). The log's other lines repeat findings v2.1.0 already closes (9, 104, 106 and 109).
+
+**After upgrading:** as for v2.1.0. Then "Build the trading calendar" and "Extract ESG from reports" once more; ESG extraction reads every report again, because its version is new (esg-2).
+
+- **Parallel reading ordered by company (finding 113).**
+  - One report in the v2.0.9 run took about an hour and a half. v2.1.0 wrote parallel results in one order, so such a report would have held back every later result and, once the window filled, left the other workers idle.
+  - Results are now kept in order only within a company, whose later report may supersede an earlier one. Only documents still being read count against the window.
+  - Each result records its seconds and pages, and a run's summary names its slowest documents (`slowest`) when they took more than two minutes.
+- **ESG extraction (finding 114).** It had not been converted with the other extractors in v2.0.8. It read every page of 304 documents in 6,940 s and started again from the beginning when stopped.
+  - It now has progress, resume, parallel reading and "Read reports again" (`--again`).
+  - An annual report is read only on its environmental and social pages (section `esg`, index version 3), or whole when they are not found; sustainability reports are read whole.
+  - Title rows for sustainability reports are written first, for every report, downloaded or not.
+- **One trading calendar for the mainland exchanges (finding 115).** The calendar was derived for each exchange from its own companies' prices, and so for Shenzhen only, since prices were stored only for Shenzhen companies. The Shanghai, Shenzhen and Beijing exchanges keep one calendar, so their prices are pooled and each day is written for all three. Suspensions of Shanghai and Beijing companies are found again. Imported calendars still override derived days.
+- **Open (finding 117).** ESG extraction found 77 values in 304 documents. Examples of reports with emissions in tables are needed before the parser can be judged.
 
 ## v2.1.0 (31 October 2026)
 

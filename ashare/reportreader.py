@@ -22,7 +22,7 @@ import json
 import re
 from pathlib import Path
 
-INDEX_VERSION = 2          # bump when SECTIONS changes, so cached indexes are rebuilt (v2.1: financial sections)
+INDEX_VERSION = 3          # bump when SECTIONS changes, so cached indexes are rebuilt (v2.1: financial; v2.1.1: esg)
 
 # section -> (heading patterns, pages after the heading page that belong to it[, pages before it])
 SECTIONS: dict[str, tuple] = {
@@ -42,6 +42,10 @@ SECTIONS: dict[str, tuple] = {
     "fin_bs": (("合并资产负债表",), 3, 1),
     "fin_is": (("合并利润表",), 3, 1),
     "fin_cf": (("合并现金流量表",), 3, 1),
+    # v2.1.1 (finding 114): the environmental and social section of an annual report (第五节 环境和社会责任 since
+    # 2021; 重要事项 earlier), where ESG extraction finds emissions, the discharge-unit status and donations
+    "esg": (("环境和社会责任", "环境信息情况", "环境信息", "重点排污单位", "排污信息", "社会责任情况",
+             "履行社会责任", "乡村振兴", "脱贫攻坚", "对外捐赠", "温室气体", "碳排放", "减碳"), 3),
 }
 # Financial extraction reads these, the R&D and workforce pages (headline employees and R&D) and the cover (period).
 FINANCIAL_SECTIONS = ("cover", "fin_key", "fin_bs", "fin_is", "fin_cf", "human_capital")

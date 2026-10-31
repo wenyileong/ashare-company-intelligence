@@ -331,7 +331,7 @@ SECTIONS = [
      "actions": [
          A("Extract R&D and workforce from reports", "extract-human-capital", [CODE_OPT(), F("again", "Read reports again", "bool", False, ("--again", None), "Normally reports already read by this version are skipped, so a stopped run continues where it stopped.")],
            "Reads the 研发投入 table, 员工情况 (functions and education) and patent counts."),
-         A("Extract ESG from reports", "extract-esg", [CODE_OPT()],
+         A("Extract ESG from reports", "extract-esg", [CODE_OPT(), F("again", "Read reports again", "bool", False, ("--again", None), "Normally reports already read by this version are skipped, so a stopped run continues where it stopped.")],
            "Reads annual reports and sustainability/ESG reports: pollutant-discharge status, emissions, GHG, "
            "donations, rural revitalisation. Catalogue disclosures with type 'all' first."),
          A("Import ESG ratings", "import-esg-ratings-csv", [CSV_FILE, SOURCE],

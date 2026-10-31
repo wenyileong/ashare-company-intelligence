@@ -146,7 +146,7 @@ def test_calendar_and_suspensions(db, company, tmp_path):
         persist_bars(comps[code], [{"trade_date": d, "open": 1, "high": 1, "low": 1, "close": 1, "volume": 1,
                                     "source": "TEST", "adjustment": "none"} for d in have])
     r = build_trading_calendar()
-    assert r["days_added"] == 5
+    assert r["days"] == 5 and r["days_added"] == 15          # v2.1.1: one calendar, written for SSE, SZSE and BSE
     sp = suspensions("600519", "2026-01-01", "2026-01-31")
     assert sp["days_without_trading"] == 3 and sp["spells"] == [{"from": "2026-01-06", "to": "2026-01-08", "trading_days": 3}]
     cal = tmp_path / "cal.csv"

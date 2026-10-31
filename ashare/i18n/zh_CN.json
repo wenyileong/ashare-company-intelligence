@@ -1467,6 +1467,14 @@
   "en_hash": "168bdd41cf",
   "zh": "研发投入占比及资本化情况、研发人员、按专业构成和教育程度划分的员工、专利。"
  },
+ "action.people_esg.extract-esg.field.again.hint": {
+  "en_hash": "93e93f4859",
+  "zh": "通常会跳过本版本已读取的报告，停止后再次运行将从中断处继续。"
+ },
+ "action.people_esg.extract-esg.field.again.label": {
+  "en_hash": "d1257059f1",
+  "zh": "重新读取报告"
+ },
  "action.people_esg.extract-esg.field.security_code.hint": {
   "en_hash": "7bb1962600",
   "zh": "留空则对全部公司运行。"
