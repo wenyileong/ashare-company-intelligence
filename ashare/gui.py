@@ -144,6 +144,9 @@ SECTIONS = [
              F("refresh", "Fetch finished days again", "bool", False, ("--refresh", None),
                "Whole market: by default days already finished are skipped, so a rerun carries on where the last "
                "one stopped. Tick to fetch them again."),
+             F("refresh_days", "Days to fetch again", "integer", "30", "--refresh-days",
+               "With 'Fetch finished days again': only the last N days of the period (0 = every day). A full "
+               "refresh of ten months takes about thirteen hours."),
          ], "Start with one company to check the connection, then widen. Progress appears below as it runs, and "
             "Stop ends it safely; running it again carries on from the first unfinished day. Each day's count is "
             "checked against CNINFO's total, and days that fall short or fail are listed at the end."),
@@ -573,6 +576,44 @@ SECTIONS = [
     {"id": "review", "group": "Check", "title": "Review", "intro": "", "actions": []},
     {"id": "operations", "group": "Check", "title": "Operations", "intro": "", "actions": []},
 
+    {"id": "files", "group": "Check", "title": "Files",
+     "intro": "Downloaded documents are kept under the names the database and the provenance records use. Here you "
+              "can see them by company, kind and year, copy a set out under readable names, and find and tidy files "
+              "no record needs. Nothing is removed unless you tick 'Apply'.",
+     "actions": [
+         A("Files summary", "files-summary", [],
+           "Documents on disk by kind and by year, with their size, and the market-data, export and log folders."),
+         A("List files", "files-list", [
+             CODE_OPT("Leave blank for every company (the first 500 are listed)."),
+             F("kind", "Kind", "choice:,annual_report,interim_report,quarterly_report,sustainability_report,"
+               "earnings_forecast_or_flash", "", "--kind"),
+             F("year", "Year", "text", "", "--year", "Optional, e.g. 2025"),
+         ], "Each file with a readable name, its date, size and place, and the extractors that have read it."),
+         A("Export readable copies", "files-export", [
+             CODE_OPT("Leave blank for every company."),
+             F("kind", "Kind", "choice:,annual_report,interim_report,quarterly_report,sustainability_report,"
+               "earnings_forecast_or_flash", "", "--kind"),
+             F("year_from", "From year", "text", "", "--year-from", "Optional, e.g. 2021"),
+             F("year_to", "To year", "text", "", "--year-to", "Optional, e.g. 2025"),
+             F("out", "Folder", "folder", "exports/files", "--out"),
+         ], "Copies the chosen documents into folders by company and year, named '<code> <date> <title>', with "
+            "an index (index.html and index.csv) giving each copy's source address. The originals are unchanged."),
+         A("Check files", "files-check", [],
+           "Files no record names, records whose file is missing, one file under several records, and summaries "
+           "or English versions downloaded by earlier versions."),
+         A("Tidy files", "files-tidy", [
+             F("what", "Remove", "choice:unnamed,summaries_english,kind", "unnamed", "--what",
+               "unnamed: files no record names; summaries_english: report summaries and English versions; kind: "
+               "every document of one kind."),
+             F("kind", "Kind (for 'kind')", "choice:,annual_report,interim_report,quarterly_report,"
+               "sustainability_report,earnings_forecast_or_flash", "", "--kind"),
+             CODE_OPT("Leave blank for every company."),
+             F("apply", "Apply", "bool", False, ("--apply", None),
+               "Unticked, only shows what would be removed. Ticked, removes the files, clears their place in the "
+               "database (a later run downloads them again if needed) and lists every removal in logs/."),
+         ], "Preview first, then tick 'Apply'."),
+     ]},
+
     {"id": "selftest", "group": "Check", "title": "Self-test",
      "intro": "Confirms that each public source (CNINFO, SSE, SZSE and the price feed) still answers in the shape "
               "this program expects. Run it on first use and whenever a collection step returns nothing.",
@@ -970,9 +1011,15 @@ class App(tk.Tk):
     # -- layout -------------------------------------------------------------
     def _build(self):
         P = PALETTE
-        side = ttk.Frame(self, style="Side.TFrame", width=224)
-        side.pack(side="left", fill="y")
-        side.pack_propagate(False)
+        outer = ttk.Frame(self, style="Side.TFrame", width=224)
+        outer.pack(side="left", fill="y")
+        outer.pack_propagate(False)
+        # v2.1.2 (author's request): the panel scrolls when the window is too short for it; the version and folder
+        # line stays at the foot
+        self.side_folder = tk.Label(outer, text="", bg=P["side"], fg=P["muted"], font=self.f_small,
+                                    anchor="w", justify="left", wraplength=200)
+        self.side_folder.pack(side="bottom", fill="x", padx=18, pady=(0, 6))
+        side = self._side_scroll(outer)
         tk.Label(side, text="A-share", justify="left", bg=P["side"], fg=P["accent"],
                  font=self.f_card, anchor="w").pack(fill="x", padx=18, pady=(18, 0))
         tk.Label(side, text="Company Intelligence", justify="left", bg=P["side"], fg=P["fg"],
@@ -1005,9 +1052,7 @@ class App(tk.Tk):
             lbl.bind("<Enter>", lambda e, w=lbl: w.configure(bg=P["sel"]) if w is not self._current_nav() else None)
             lbl.bind("<Leave>", lambda e, w=lbl: w.configure(bg=P["side"]) if w is not self._current_nav() else None)
             self.nav[sec["id"]] = lbl
-        self.side_folder = tk.Label(side, text="", bg=P["side"], fg=P["muted"], font=self.f_small,
-                                    anchor="w", justify="left", wraplength=200)
-        self.side_folder.pack(side="bottom", fill="x", padx=18, pady=(0, 6))
+        tk.Frame(side, height=8, bg=P["side"]).pack(fill="x")
         self._update_folder_label()
 
         right = ttk.Frame(self)
@@ -1046,6 +1091,76 @@ class App(tk.Tk):
         self.log.pack(fill="both", expand=True)
         self.log.tag_configure("cmd", foreground=PALETTE["accent"], font=self.f_mono)
         self.log.tag_configure("muted", foreground=PALETTE["muted"])
+
+    def _side_scroll(self, parent):
+        """The side panel's scrolling area (v2.1.2): a thin scrollbar appears only when the sections do not fit,
+        and the mouse wheel scrolls the panel while the pointer is over it."""
+        P = PALETTE
+        box = tk.Frame(parent, bg=P["side"])
+        box.pack(side="top", fill="both", expand=True)
+        canvas = tk.Canvas(box, highlightthickness=0, bd=0, bg=P["side"], width=224)
+        sb = ttk.Scrollbar(box, orient="vertical", command=canvas.yview)
+        inner = tk.Frame(canvas, bg=P["side"])
+        win = canvas.create_window((0, 0), window=inner, anchor="nw")
+        canvas.configure(yscrollcommand=sb.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        self.side_canvas, self.side_scrollbar, self.side_inner = canvas, sb, inner
+
+        def fit(_e=None):
+            canvas.configure(scrollregion=(0, 0, inner.winfo_reqwidth(), inner.winfo_reqheight()))
+            need = inner.winfo_reqheight() > canvas.winfo_height() > 1
+            shown = bool(sb.winfo_ismapped())
+            if need and not shown:
+                sb.pack(side="right", fill="y", before=canvas)
+            elif not need and shown:
+                sb.pack_forget()
+                canvas.yview_moveto(0)
+            canvas.itemconfigure(win, width=canvas.winfo_width())
+        inner.bind("<Configure>", fit)
+        canvas.bind("<Configure>", fit)
+        self._side_fit = fit
+
+        def wheel(e):
+            if not sb.winfo_ismapped():
+                return
+            if e.num == 4:
+                canvas.yview_scroll(-2, "units")
+            elif e.num == 5:
+                canvas.yview_scroll(2, "units")
+            else:
+                canvas.yview_scroll(int(-e.delta / 120) * 2, "units")
+
+        def enter(_e):
+            for seq in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
+                canvas.bind_all(seq, wheel)
+
+        def leave(_e):
+            for seq in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
+                canvas.unbind_all(seq)
+        box.bind("<Enter>", enter)
+        box.bind("<Leave>", leave)
+        return inner
+
+    def _side_show(self, sid, retry: bool = True):
+        """Scroll the side panel so that the selected section is in view (v2.1.2). Right after the window is
+        built (or rebuilt in the other language) the panel is not laid out yet, so it is tried once more shortly."""
+        lbl = self.nav.get(sid)
+        canvas = getattr(self, "side_canvas", None)
+        if lbl is None or canvas is None:
+            return
+        self.update_idletasks()
+        if not self.side_scrollbar.winfo_ismapped():
+            if retry:
+                self.after(150, lambda: self._side_show(sid, retry=False))
+            return
+        total = max(self.side_inner.winfo_reqheight(), 1)
+        top, bottom = lbl.winfo_y(), lbl.winfo_y() + lbl.winfo_height()
+        view_top = canvas.canvasy(0)
+        view_bottom = view_top + canvas.winfo_height()
+        if top < view_top:
+            canvas.yview_moveto(top / total)
+        elif bottom > view_bottom:
+            canvas.yview_moveto((bottom - canvas.winfo_height()) / total)
 
     def _scrollable(self, parent):
         canvas = tk.Canvas(parent, highlightthickness=0, bg=PALETTE["bg"])
@@ -1425,6 +1540,7 @@ class App(tk.Tk):
             lbl.configure(bg=PALETTE["sel"] if i == sid else PALETTE["side"],
                           font=self.f_bold if i == sid else self.f_nav)
         self._current = sid
+        self._side_show(sid)
         if sid == "home":
             self._refresh_summary()
 

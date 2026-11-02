@@ -809,8 +809,12 @@ def recheck_recent(kind: str, until: str | None = None, adapter=None, progress=N
 def catalogue(since: str, until: str, kind: str = "all", download_documents: bool = False,
               refresh: bool = False, retry_shortfalls: bool = False, days: list[str] | None = None,
               progress: Callable[[str], None] | None = None, adapter=None, max_failures: int = 3,
-              recheck: bool = True) -> dict:
-    """Catalogue every company's announcements, resuming by day."""
+              recheck: bool = True, refresh_days: int | None = None) -> dict:
+    """Catalogue every company's announcements, resuming by day.
+
+    ``refresh`` fetches finished days again: every day by default, or with ``refresh_days`` only the finished days
+    within that many days of the period's end (v2.1.2, finding 122: a refresh of ten months took thirteen hours for
+    5% new rows)."""
     from .disclosures import CNInfoDisclosureAdapter, persist_announcement
     from .universe import rejection_reason
     init_db()
@@ -833,9 +837,10 @@ def catalogue(since: str, until: str, kind: str = "all", download_documents: boo
         split_companies = _companies_for_split(session)
         wanted = sorted(set(days)) if days else _days(since, until)
         if not refresh:
-            done = {r.day for r in session.query(CatalogueDay).filter(
-                CatalogueDay.kind == kind, CatalogueDay.day.in_(wanted),
-                CatalogueDay.status.in_(("DONE",) if retry_shortfalls else DONE_STATES))}
+            from .dbutil import in_chunks
+            done = {r.day for r in in_chunks(session.query(CatalogueDay).filter(
+                CatalogueDay.kind == kind,
+                CatalogueDay.status.in_(("DONE",) if retry_shortfalls else DONE_STATES)), CatalogueDay.day, wanted)}
             if recheck and wanted and wanted[-1] >= (date.fromisoformat(_china_today())
                                                      - timedelta(days=RECHECK_DAYS)).isoformat():
                 try:
@@ -846,6 +851,12 @@ def catalogue(since: str, until: str, kind: str = "all", download_documents: boo
                     _say(progress, f"  (recent totals not rechecked: {exc!r})")
                 done -= set(grown)
                 tot["days_rechecked"] = grown
+        elif refresh_days and wanted:
+            from .dbutil import in_chunks
+            horizon = (date.fromisoformat(wanted[-1]) - timedelta(days=int(refresh_days))).isoformat()
+            done = {r.day for r in in_chunks(session.query(CatalogueDay).filter(
+                CatalogueDay.kind == kind, CatalogueDay.status.in_(DONE_STATES)), CatalogueDay.day,
+                [d for d in wanted if d <= horizon])}
         else:
             done = set()
         pending = [d for d in wanted if d not in done]
@@ -982,9 +993,27 @@ def catalogue(since: str, until: str, kind: str = "all", download_documents: boo
         if tot["days_failed"]:
             _say(progress, "Failed days (run the same action again to retry only these): "
                  + ", ".join(tot["days_failed"]))
-        if download_documents and new_rows:
-            from .disclosure_pipeline import download_pending
-            tot.update(download_pending(new_rows, progress=progress, adapter=adapter))
+        if download_documents:
+            # v2.1.2 (findings 120 and 121): the documents to download are read from the database (wanted and not
+            # on disk within the catalogued dates, for 'all' and 'reports'), so a rerun downloads what an
+            # interrupted one left; and a failed download step keeps the finished catalogue.
+            from .disclosure_pipeline import download_pending, wanted_missing
+            from .disclosures import REPORT_KINDS
+            ids = set(new_rows)
+            if wanted and kind in ("all", "reports"):
+                try:
+                    ids |= set(wanted_missing(wanted[0], wanted[-1], None if kind == "all" else REPORT_KINDS))
+                except Exception as exc:
+                    _say(progress, f"  (documents left by earlier runs not looked up: {exc!r})")
+            if ids:
+                try:
+                    tot.update(download_pending(sorted(ids), progress=progress, adapter=adapter))
+                except Exception as exc:
+                    from .errors import friendly_error
+                    tot["download_error"] = repr(exc)
+                    _say(progress, "The catalogue is complete and saved, but downloading its documents failed: "
+                         + friendly_error(exc) + " Run 'Download catalogued documents' (download-documents) to "
+                         "download them; documents already on disk are skipped.")
         return tot
     finally:
         session.close()

@@ -39,7 +39,8 @@ def _say(progress: Callable[[str], None] | None, text: str) -> None:
 def catalogue_disclosures(since: str, until: str, kind: str = "reports", security_code: str | None = None,
                           download_documents: bool = False, max_pages: int = 10000,
                           progress: Callable[[str], None] | None = None, mode: str = "auto",
-                          refresh: bool = False, retry_shortfalls: bool = False) -> dict:
+                          refresh: bool = False, retry_shortfalls: bool = False,
+                          refresh_days: int | None = None) -> dict:
     """Catalogue announcements. ``mode``: 'auto' (market-wide without a code,
     per company with one), 'market' or 'company'."""
     init_db()
@@ -47,7 +48,7 @@ def catalogue_disclosures(since: str, until: str, kind: str = "reports", securit
         raise ValueError(f"Unknown disclosure kind: {kind}")
     if mode == "market" or (mode == "auto" and not security_code):
         return catalogue_market(since, until, kind, download_documents, progress=progress, refresh=refresh,
-                                retry_shortfalls=retry_shortfalls)
+                                retry_shortfalls=retry_shortfalls, refresh_days=refresh_days)
     return catalogue_by_company(since, until, kind, security_code, download_documents, max_pages, progress)
 
 
@@ -96,12 +97,12 @@ def catalogue_by_company(since, until, kind="reports", security_code=None, downl
 
 def catalogue_market(since: str, until: str, kind: str = "reports", download_documents: bool = False,
                      progress: Callable[[str], None] | None = None, adapter=None, refresh: bool = False,
-                     retry_shortfalls: bool = False) -> dict:
+                     retry_shortfalls: bool = False, refresh_days: int | None = None) -> dict:
     """Catalogue every company's announcements with market-wide queries
     (v2.0.3: one query per window, resumable by day; see market_catalogue)."""
     from .market_catalogue import catalogue
     return catalogue(since, until, kind, download_documents, refresh=refresh, retry_shortfalls=retry_shortfalls,
-                     progress=progress, adapter=adapter)
+                     progress=progress, adapter=adapter, refresh_days=refresh_days)
 
 
 def _wanted(row) -> bool:
@@ -111,48 +112,142 @@ def _wanted(row) -> bool:
     return _wants_document(row.title_cn or "", row.kind or "", DOWNLOAD_KINDS_DEFAULT)
 
 
+#: v2.1.2 (finding 119): seconds a document when no download has been timed yet. v2.1 assumed 1.5 s; the author's
+#: downloads took about 5.6 s.
+DEFAULT_SECONDS = 5.0
+
+
+def _rates_file() -> Path:
+    from .config import db_path
+    return db_path().resolve().parent / "download_rates.json"
+
+
+def _read_rates() -> dict:
+    import json
+    try:
+        r = json.loads(_rates_file().read_text(encoding="utf-8"))
+        return r if isinstance(r, dict) else {}
+    except Exception:
+        return {}
+
+
+def _record_rates(seconds: float, n: int, mb_by_kind: dict) -> None:
+    """Keep the measured rate (seconds a document) and mean size by kind for the next estimate."""
+    import json
+    if n <= 0:
+        return
+    r = _read_rates()
+    r["seconds_per_document"] = round(seconds / n, 2)
+    sizes = r.get("mb_by_kind") if isinstance(r.get("mb_by_kind"), dict) else {}
+    for kind, (mb, k) in mb_by_kind.items():
+        if k:
+            sizes[kind] = round(mb / k, 2)
+    r["mb_by_kind"] = sizes
+    try:
+        _rates_file().write_text(json.dumps(r, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+
 def download_estimate(rows) -> dict:
-    mb = sum(TYPICAL_MB.get(r.kind or "", 1.0) for r in rows)
+    """Size and time of a download. v2.1.2: from the rate and sizes measured in earlier downloads, when known."""
+    rates = _read_rates()
+    sizes = rates.get("mb_by_kind") if isinstance(rates.get("mb_by_kind"), dict) else {}
+    try:
+        per = float(rates.get("seconds_per_document") or DEFAULT_SECONDS)
+    except (TypeError, ValueError):
+        per = DEFAULT_SECONDS
+    mb = 0.0
+    for r in rows:
+        k = r.kind or ""
+        try:
+            mb += float(sizes.get(k) or TYPICAL_MB.get(k, 1.0))
+        except (TypeError, ValueError):
+            mb += TYPICAL_MB.get(k, 1.0)
     n = len(rows)
-    return {"documents": n, "approx_gb": round(mb / 1024, 1), "approx_hours": round(n * 1.5 / 3600, 1)}
+    return {"documents": n, "approx_gb": round(mb / 1024, 1), "approx_hours": round(n * per / 3600, 1),
+            "seconds_each": per, "measured": "seconds_per_document" in rates}
 
 
 def download_pending(ids: list[int] | None = None, kinds: tuple[str, ...] | None = None,
                      progress: Callable[[str], None] | None = None, adapter=None) -> dict:
-    """Download catalogued documents not yet on disk (given ids, or all of some kinds)."""
+    """Download catalogued documents not yet on disk (given ids, or all of some kinds).
+
+    v2.1.2: the IDs are queried a few hundred at a time (finding 120: a ten-month refresh queued more than SQLite
+    takes in one statement); progress gives seconds a document and the time left, and the measured rate is kept
+    for the next estimate (finding 119)."""
+    import time
+    from .dbutil import in_chunks
+    from .extractstate import Progress
     own = adapter is None
     adapter = adapter or CNInfoDisclosureAdapter()
     session = SessionLocal()
     done = failed = 0
+    t0 = time.monotonic()
+    sizes: dict = {}
     try:
         q = session.query(Disclosure).filter(Disclosure.document_url.isnot(None))
+        if kinds:
+            q = q.filter(Disclosure.kind.in_(kinds))
         if ids is not None:
             if not ids:
                 return {"downloaded": 0, "download_failed": 0}
-            q = q.filter(Disclosure.id.in_(ids))
-        if kinds:
-            q = q.filter(Disclosure.kind.in_(kinds))
-        rows = [r for r in q.order_by(Disclosure.announcement_date.desc())
-                if not (r.local_path and Path(r.local_path).exists())]
+            found = in_chunks(q, Disclosure.id, sorted(set(ids)))
+        else:
+            found = q.all()
+        found.sort(key=lambda r: (r.announcement_date or "", r.id), reverse=True)
+        rows = [r for r in found if not (r.local_path and Path(r.local_path).exists())]
         est = download_estimate(rows)
-        _say(progress, f"Downloading {est['documents']} documents: roughly {est['approx_gb']} GB and "
-                       f"{est['approx_hours']} hours at the polite rate. You can stop at any time; running the "
-                       "same action again skips files already downloaded.")
+        _say(progress, f"Downloading {est['documents']:,} documents: roughly {est['approx_gb']} GB and "
+                       f"{est['approx_hours']} hours at {est['seconds_each']:.1f} s a document"
+                       + (" (the rate of the last download)" if est["measured"] else "")
+                       + ". You can stop at any time; running the same action again skips files already downloaded.")
         companies = {c.id: c for c in session.query(Company)}
         n = len(rows)
-        for i, row in enumerate(rows, 1):
-            try:
-                store_downloaded(adapter, companies[row.company_id], row)
-                session.commit()
-                done += 1
-            except Exception as exc:
-                session.rollback()
-                failed += 1
-                _say(progress, f"  [{i}/{n}] {row.sec_code} {row.title_cn}: download failed ({exc!r})")
-            if i % 25 == 0 or i == n:
-                _say(progress, f"  [{i}/{n}] downloaded {done}" + (f", {failed} failed" if failed else ""))
+        prog = Progress(n, progress)
+        try:
+            for i, row in enumerate(rows, 1):
+                try:
+                    store_downloaded(adapter, companies[row.company_id], row)
+                    session.commit()
+                    done += 1
+                    try:
+                        mb = Path(row.local_path).stat().st_size / 1048576 if row.local_path else 0.0
+                        tot_mb, k = sizes.get(row.kind or "", (0.0, 0))
+                        sizes[row.kind or ""] = (tot_mb + mb, k + 1)
+                    except OSError:
+                        pass
+                except Exception as exc:
+                    session.rollback()
+                    failed += 1
+                    _say(progress, f"  [{i}/{n}] {row.sec_code} {row.title_cn}: download failed ({exc!r})")
+                prog.step()
+        finally:
+            _record_rates(time.monotonic() - t0, done, sizes)
         return {"downloaded": done, "download_failed": failed}
     finally:
         session.close()
         if own:
             adapter.close()
+
+
+def wanted_missing(since: str, until: str, kinds: tuple[str, ...] | None = None) -> list[int]:
+    """IDs of documents dated ``since`` to ``until`` that the extractors read (``_wanted``) and that are not on disk.
+
+    v2.1.2 (finding 121): the catalogue's download step chooses its documents from the database, not from a list
+    held in memory, so a rerun downloads what an interrupted run left."""
+    session = SessionLocal()
+    try:
+        out = []
+        for row in (session.query(Disclosure)
+                    .filter(Disclosure.document_url.isnot(None), Disclosure.announcement_date >= since,
+                            Disclosure.announcement_date <= until,
+                            *([Disclosure.kind.in_(kinds)] if kinds else []))
+                    .yield_per(2000)):
+            if row.local_path and Path(row.local_path).exists():
+                continue
+            if _wanted(row):
+                out.append(row.id)
+        return out
+    finally:
+        session.close()

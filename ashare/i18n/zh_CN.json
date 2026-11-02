@@ -683,6 +683,14 @@
   "en_hash": "51b5aa0882",
   "zh": "重新获取已完成的日期"
  },
+ "action.disclosures.catalogue-disclosures.field.refresh_days.hint": {
+  "en_hash": "5bc5ca96d6",
+  "zh": "与“重新获取已完成的日期”同用：仅重新获取期间内最后 N 天（0 = 全部日期）。重新获取十个月的全部日期约需十三小时。"
+ },
+ "action.disclosures.catalogue-disclosures.field.refresh_days.label": {
+  "en_hash": "cb76e33d66",
+  "zh": "重新获取的天数"
+ },
  "action.disclosures.catalogue-disclosures.field.security_code.hint": {
   "en_hash": "91884edb67",
   "zh": "留空 = 全市场：每个期间进行一次全市场检索，公告密集日分段检索，避免遗漏。"
@@ -818,6 +826,126 @@
  "action.disclosures.search-disclosures.label": {
   "en_hash": "3a0a093b66",
   "zh": "按标题查找公告"
+ },
+ "action.files.files-check.label": {
+  "en_hash": "4fe284aa84",
+  "zh": "检查文件"
+ },
+ "action.files.files-check.note": {
+  "en_hash": "f71540fcef",
+  "zh": "列示无记录对应的文件、文件缺失的记录、同一文件对应多条记录的情况，以及早期版本下载的摘要或英文版。"
+ },
+ "action.files.files-export.field.kind.label": {
+  "en_hash": "e00ac23f2a",
+  "zh": "类别"
+ },
+ "action.files.files-export.field.out.label": {
+  "en_hash": "30baa24967",
+  "zh": "文件夹"
+ },
+ "action.files.files-export.field.security_code.hint": {
+  "en_hash": "94b507960c",
+  "zh": "留空则为全部公司。"
+ },
+ "action.files.files-export.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.files.files-export.field.year_from.hint": {
+  "en_hash": "223a7e9ef3",
+  "zh": "可选，例如 2021"
+ },
+ "action.files.files-export.field.year_from.label": {
+  "en_hash": "a5bbd447f8",
+  "zh": "起始年度"
+ },
+ "action.files.files-export.field.year_to.hint": {
+  "en_hash": "59de32adf7",
+  "zh": "可选，例如 2025"
+ },
+ "action.files.files-export.field.year_to.label": {
+  "en_hash": "bf120d9485",
+  "zh": "截止年度"
+ },
+ "action.files.files-export.label": {
+  "en_hash": "7fc165962b",
+  "zh": "导出易读副本"
+ },
+ "action.files.files-export.note": {
+  "en_hash": "3937333bb9",
+  "zh": "将所选文件按公司和年度复制到各文件夹，文件名为“<代码> <日期> <标题>”，并附索引（index.html 和 index.csv）列明每份副本的来源地址。原文件不作改动。"
+ },
+ "action.files.files-list.field.kind.label": {
+  "en_hash": "e00ac23f2a",
+  "zh": "类别"
+ },
+ "action.files.files-list.field.security_code.hint": {
+  "en_hash": "99884d08fe",
+  "zh": "留空则为全部公司（列示前 500 个）。"
+ },
+ "action.files.files-list.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.files.files-list.field.year.hint": {
+  "en_hash": "59de32adf7",
+  "zh": "可选，例如 2025"
+ },
+ "action.files.files-list.field.year.label": {
+  "en_hash": "879e32326c",
+  "zh": "年度"
+ },
+ "action.files.files-list.label": {
+  "en_hash": "0f208c2c68",
+  "zh": "列示文件"
+ },
+ "action.files.files-list.note": {
+  "en_hash": "a1cd229a78",
+  "zh": "列示每个文件的易读名称、日期、大小、位置，以及已读取该文件的提取程序。"
+ },
+ "action.files.files-summary.label": {
+  "en_hash": "7ad1abdd5e",
+  "zh": "文件概况"
+ },
+ "action.files.files-summary.note": {
+  "en_hash": "309f54764e",
+  "zh": "按类别和年度列示本地文件及其大小，并列示行情数据、导出和日志文件夹。"
+ },
+ "action.files.files-tidy.field.apply.hint": {
+  "en_hash": "1a97c7061e",
+  "zh": "不勾选时仅显示将被删除的文件。勾选后删除这些文件，清除其在数据库中的位置（如需要，之后的运行会重新下载），并在 logs/ 中列明每一项删除。"
+ },
+ "action.files.files-tidy.field.apply.label": {
+  "en_hash": "cfea419c3b",
+  "zh": "执行"
+ },
+ "action.files.files-tidy.field.kind.label": {
+  "en_hash": "ebcdc1d30e",
+  "zh": "类别（用于 kind）"
+ },
+ "action.files.files-tidy.field.security_code.hint": {
+  "en_hash": "94b507960c",
+  "zh": "留空则为全部公司。"
+ },
+ "action.files.files-tidy.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.files.files-tidy.field.what.hint": {
+  "en_hash": "9b0f4d5eb2",
+  "zh": "unnamed：无记录对应的文件；summaries_english：报告摘要和英文版；kind：某一类别的全部文件。"
+ },
+ "action.files.files-tidy.field.what.label": {
+  "en_hash": "e963907dac",
+  "zh": "删除"
+ },
+ "action.files.files-tidy.label": {
+  "en_hash": "552dca6be8",
+  "zh": "整理文件"
+ },
+ "action.files.files-tidy.note": {
+  "en_hash": "7e2900f31e",
+  "zh": "请先预览，再勾选“执行”。"
  },
  "action.financials.extract-financials.field.again.hint": {
   "en_hash": "02a847293c",
@@ -2446,6 +2574,14 @@
  "section.disclosures.title": {
   "en_hash": "26dfc22b1a",
   "zh": "公告"
+ },
+ "section.files.intro": {
+  "en_hash": "6175b052f3",
+  "zh": "已下载的文件以数据库和来源记录所用的名称保存。在此可按公司、类别和年度查看文件，以易读的名称复制一组文件，并查找和整理不再被任何记录使用的文件。除非勾选“执行”，否则不会删除任何文件。"
+ },
+ "section.files.title": {
+  "en_hash": "6ce6c512ea",
+  "zh": "文件"
  },
  "section.financials.intro": {
   "en_hash": "e015f50806",

@@ -555,8 +555,124 @@ def extract_path(path: Path, title: str, ann: str | None, reader=None) -> list[d
                                                          "CF": "CASH_FLOW"}[it["statement"]],
                 "page": it["page"], "method": "PDF_STATEMENT_TABLE", "context": CHART_VERSION,
                 "confidence": record_confidence(it, 0.65), "extraction_note": extraction_note(it)})
-        return reconcile_readings(facts)
+        return repair_leading_digits(reconcile_readings(facts))
     return []
+
+
+# --- v2.1.2 (finding 129): a leading digit dropped from a balance-sheet total ---------------------------------------
+
+#: figure -> the components that confirm it, and the sign of the balance residual that a dropped digit in it gives
+_CONFIRM = {
+    "equity": (("equity_parent", "minority_interests"), 1),
+    "total_liabilities": (("total_current_liabilities", "total_non_current_liabilities"), 1),
+    "total_assets": (("total_current_assets", "total_non_current_assets"), -1),
+}
+
+
+def _single_digit_power(x: float, tol: float) -> tuple[int, int] | None:
+    """(d, k) when ``x`` is d × 10^k (d from 1 to 9) within ``tol``."""
+    import math
+    if x <= 0:
+        return None
+    k = int(math.floor(math.log10(x)))
+    for kk in (k, k - 1):
+        if kk < 0:
+            continue
+        d = round(x / 10 ** kk)
+        if 1 <= d <= 9 and abs(x - d * 10 ** kk) <= tol:
+            return d, kk
+    return None
+
+
+def repair_leading_digits(facts: list[dict]) -> list[dict]:
+    """Restore a balance-sheet total read without its first digit, when the document's own figures prove it.
+
+    In the author's v2.1 run, 108 of about 120 failed balance sheets were out by exactly 10, 20 or 30 billion yuan: an
+    eleven-digit total read without its first digit. When assets minus liabilities minus equity is exactly d × 10^k,
+    a figure below 10^k is restored by adding it only if a second identity confirms which figure it is (equity:
+    parent plus minority equity; liabilities: current plus non-current; assets: likewise). The reading stays in
+    ``raw_value``, the note says what was done, and the confidence is lowered. Otherwise nothing is changed."""
+    import json
+    groups: dict = {}
+    for f in facts:
+        if f.get("metric") in ("total_assets", "total_liabilities", "equity", "equity_parent", "minority_interests",
+                               "total_current_liabilities", "total_non_current_liabilities",
+                               "total_current_assets", "total_non_current_assets"):
+            key = (f.get("period"), f.get("period_type"), f.get("method"), f.get("consolidation_scope"))
+            groups.setdefault(key, {}).setdefault(f["metric"], f)
+    for g in groups.values():
+        if not all(m in g and g[m].get("value") is not None for m in ("total_assets", "total_liabilities", "equity")):
+            continue
+        a, l, e = (float(g[m]["value"]) for m in ("total_assets", "total_liabilities", "equity"))
+        r = a - l - e
+        if abs(r) <= max(abs(a) * 0.005, 1000.0):
+            continue                                     # it balances
+        exact = max(abs(a) * 1e-6, 10.0)
+        dk = _single_digit_power(abs(r), exact)
+        if dk is None:
+            continue
+        _, k = dk
+        sign = 1 if r > 0 else -1
+        confirmed = []
+        for metric, (parts, needs) in _CONFIRM.items():
+            if needs != sign:
+                continue
+            old = float(g[metric]["value"])
+            if not 0 <= old < 10 ** k:                   # the figure must be short of the dropped place
+                continue
+            new = old + abs(r)
+            if all(p in g and g[p].get("value") is not None for p in parts):
+                total = sum(float(g[p]["value"]) for p in parts)
+            elif metric == "equity" and "equity_parent" in g and g["equity_parent"].get("value") is not None \
+                    and "minority_interests" not in g:
+                total = float(g["equity_parent"]["value"])
+            else:
+                continue
+            if abs(total - new) <= max(abs(new) * 0.005, 1000.0) and abs(total - old) > max(abs(old) * 0.005, 1000.0):
+                confirmed.append((metric, old, new))
+        if len(confirmed) != 1:
+            continue
+        metric, old, new = confirmed[0]
+        f = g[metric]
+        f["value"] = new
+        f["confidence"] = round((f.get("confidence") or 0.6) * 0.8, 3)
+        try:
+            note = json.loads(f["extraction_note"]) if f.get("extraction_note") else {}
+            if not isinstance(note, dict):
+                note = {"note": note}
+        except (TypeError, ValueError):
+            note = {"note": f.get("extraction_note")}
+        note.update({"repair": "LEADING_DIGIT_RESTORED", "read_value": old,
+                     "confirmed_by": "+".join(_CONFIRM[metric][0])})
+        f["extraction_note"] = json.dumps(note, ensure_ascii=False, default=str)
+    return facts
+
+
+def balance_check_summary(errors: list[dict]) -> dict:
+    """Failed balance sheets by pattern: differences of a single digit times a power of ten (a dropped digit), and
+    the others."""
+    out = {"round_difference": 0, "other_difference": 0}
+    for e in errors:
+        r = abs(e.get("residual") or 0.0)
+        exact = max(abs(e.get("assets") or 0.0) * 1e-6, 10.0)
+        out["round_difference" if _single_digit_power(r, exact) else "other_difference"] += 1
+    return out
+
+
+def write_balance_check(errors: list[dict], path: str | Path) -> Path:
+    import csv
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    cols = ["company_id", "code", "reporting_period", "disclosure_id", "assets", "liabilities", "equity", "residual",
+            "tolerance", "pattern"]
+    with p.open("w", encoding="utf-8-sig", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=cols, extrasaction="ignore")
+        w.writeheader()
+        for e in errors:
+            exact = max(abs(e.get("assets") or 0.0) * 1e-6, 10.0)
+            w.writerow({**e, "pattern": "single digit x power of ten"
+                        if _single_digit_power(abs(e.get("residual") or 0.0), exact) else "other"})
+    return p
 
 
 def persist_facts(company: Company, disclosure: Disclosure, facts: Iterable[dict]) -> dict:
@@ -610,7 +726,18 @@ def persist_facts(company: Company, disclosure: Disclosure, facts: Iterable[dict
 
 
 # v2.0.6: raise when the extraction logic changes, so that documents are read again by the new version.
-EXTRACTOR_VERSION = "financials-3"   # v2.0.8: units, amounts, notices (84, 85); v2.1: read by section (101)
+EXTRACTOR_VERSION = "financials-4"   # v2.0.8: units, amounts, notices (84, 85); v2.1: read by section (101);
+#                                      v2.1.2: leading digit restored from the balance identity (129)
+
+
+_CJK_RE = re.compile(r"[\u4e00-\u9fff]")
+
+
+def not_financial(d) -> bool:
+    """Documents financial extraction leaves out with kind 'all' (v2.1.2): English versions (by kind, or a title
+    without Chinese characters) and sustainability reports."""
+    kind, title = d.kind or "", d.title_cn or ""
+    return kind.endswith("_english") or kind == "sustainability_report" or (bool(title) and not _CJK_RE.search(title))
 
 
 def _duration(seconds: float) -> str:
@@ -658,6 +785,12 @@ def extract_financials(security_code: str | None = None, kind: str = "reports", 
         elif kind != "all":
             q = q.filter(Disclosure.kind == _KIND_ALIASES.get(kind, kind))
         rows = q.order_by(Company.security_code, Disclosure.announcement_date, Disclosure.id).all()
+        if kind == "all":
+            # v2.1.2 (finding 126): English versions and sustainability reports give no figures to these readers,
+            # and the longest of them took up to ten minutes each
+            kept = [(d, c) for d, c in rows if not not_financial(d)]
+            totals["not_financial"] = len(rows) - len(kept)
+            rows = kept
         if limit:
             kept, per = [], {}
             for d, c in rows:
@@ -739,14 +872,15 @@ def _remove_facts(session, disclosure_ids: list[int], keep: set | None = None) -
     from .models import ReviewItem
     if not disclosure_ids:
         return 0
-    rows = session.query(FinancialFact).filter(FinancialFact.disclosure_id.in_(disclosure_ids),
-                                                FinancialFact.extraction_method.in_(_PDF_METHODS)).all()
+    from .dbutil import in_chunks, delete_in_chunks
+    rows = in_chunks(session.query(FinancialFact).filter(FinancialFact.extraction_method.in_(_PDF_METHODS)),
+                     FinancialFact.disclosure_id, disclosure_ids)
     gone = [r for r in rows if keep is None
             or (r.reporting_period, r.period_type, r.metric, r.extraction_method) not in keep]
     if gone:
         ids = [r.id for r in gone]
-        session.query(ReviewItem).filter(ReviewItem.table_name == "financial_facts",
-                                         ReviewItem.row_id.in_(ids)).delete(synchronize_session=False)
+        delete_in_chunks(session.query(ReviewItem).filter(ReviewItem.table_name == "financial_facts"),
+                         ReviewItem.row_id, ids)
         for r in gone:
             session.delete(r)
     return len(gone)

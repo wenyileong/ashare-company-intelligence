@@ -93,9 +93,36 @@ _NEEDS_UNIVERSE = {
 }
 
 
+def _why_no_report_data(security_code: str, action: str) -> str:
+    """Why a company has no data read from its reports (v2.1.2, finding 127): none catalogued, none downloaded, or
+    downloaded and read with nothing found."""
+    from .models import SessionLocal, Company, Disclosure
+    from .disclosures import REPORT_KINDS
+    s = SessionLocal()
+    try:
+        c = s.query(Company).filter_by(security_code=str(security_code).zfill(6)).first()
+        if c is None:
+            return ""
+        reps = s.query(Disclosure.local_path).filter(Disclosure.company_id == c.id,
+                                                     Disclosure.kind.in_(REPORT_KINDS)).all()
+        if not reps:
+            return (" No periodic report is catalogued for this company: catalogue announcements (kind 'reports') "
+                    "and download them first.")
+        if not any(p for (p,) in reps):
+            return (f" No periodic report is downloaded for this company ({len(reps):,} catalogued): run 'Download "
+                    f"catalogued documents', then '{action}'.")
+        return f" Reports are downloaded; if '{action}' has run, they give none."
+    except Exception:
+        return ""
+    finally:
+        s.close()
+
+
 def _progress(text: str) -> None:
     """Progress lines, flushed at once so the desktop output shows them live."""
     import sys
+    if sys.stdout is None:
+        return
     sys.stdout.write(text + "\n")
     try:
         sys.stdout.flush()
@@ -256,6 +283,8 @@ def catalogue_disclosures_cmd(
                                                                   "separately (slow; the v2.0 method)"),
     refresh: bool = typer.Option(False, "--refresh", help="Whole market: fetch again days already finished "
                                                           "(by default a rerun carries on where the last one stopped)"),
+    refresh_days: int = typer.Option(30, "--refresh-days", help="With --refresh: fetch again only the finished days "
+                                                                "in the last N days of the period (0 = every day)"),
     retry_shortfalls: bool = typer.Option(False, "--retry-shortfalls",
                                           help="Whole market: fetch again days recorded as short of CNINFO's total"),
 ):
@@ -270,6 +299,7 @@ def catalogue_disclosures_cmd(
         since=since, until=until, kind=kind, security_code=security_code,
         download_documents=download_documents, max_pages=max_pages, progress=_progress,
         mode="company" if per_company else "auto", refresh=refresh, retry_shortfalls=retry_shortfalls,
+        refresh_days=refresh_days or None,
     )
     _report_catalogue(result)
 
@@ -461,10 +491,25 @@ def validate_financials_cmd(
     """Internal accounting checks on extracted financial values (flags only)."""
     init_db()
     result = validate_financials(security_code=security_code)
+    errors = result.pop("errors", [])
     print(result)
-    if result["errors"]:
-        print(f"[yellow]Balance-sheet exceptions: {len(result['errors'])}[/yellow]")
-        for error in result["errors"][:20]:
+    if errors:
+        # v2.1.2 (finding 129): a summary by pattern and a CSV, instead of every row
+        from pathlib import Path
+        from .financials import balance_check_summary, write_balance_check
+        s = SessionLocal()
+        try:
+            codes = {c.id: c.security_code for c in s.query(Company.id, Company.security_code)}
+        finally:
+            s.close()
+        for e in errors:
+            e["code"] = codes.get(e.get("company_id"))
+        summ = balance_check_summary(errors)
+        path = write_balance_check(errors, Path("exports") / "balance_check.csv")
+        print(f"[yellow]Balance-sheet exceptions: {len(errors):,}: {summ['round_difference']:,} out by a single digit "
+              f"times a power of ten (a figure read without its first digit), {summ['other_difference']:,} "
+              f"otherwise. Every row: {path}[/yellow]")
+        for error in errors[:5]:
             print(error)
 
 @app.command("show-financials")
@@ -772,7 +817,7 @@ def validate_all_cmd(security_code: str = typer.Option(None)):
 def inspect_tables_cmd(disclosure_id: int = typer.Argument(None, help="Document ID (or give --code)"),
                        code: str = typer.Option(None, help="Security code: the latest downloaded periodic report"),
                        year: int = typer.Option(None, help="With --code: the report for this fiscal year"),
-                       table: str = typer.Option("top10", help="top10, segments or control"),
+                       table: str = typer.Option("top10", help="top10, segments, control or balance_sheet"),
                        out: str = typer.Option(None, help="Output file (default: exports/inspect_<ID>_<table>.txt)")):
     """Write what the parsers made of one table in one report, line by line, to a text file (v2.1).
 
@@ -1130,7 +1175,7 @@ def segments_cmd(security_code: str, period: str = typer.Option(None), dimension
     if "error" in r:
         print(r["error"]); return
     if not r["dimensions"]:
-        print("No segment data."); return
+        print("No segment data." + _why_no_report_data(security_code, "Extract segments from reports")); return
     for dim, v in r["dimensions"].items():
         extra = f", overseas share {v['regional']['overseas_share']:.1%}" if v.get("regional") else ""
         hhi = f"HHI {v['hhi']:.3f}, effective segments {v['effective_segments']:.1f}" if v.get("hhi") else ""
@@ -1165,7 +1210,7 @@ def subsidiaries_cmd(security_code: str, as_of: str = typer.Option(None), date: 
     if "error" in r:
         print(r["error"]); return
     if not r["entities"]:
-        print("No subsidiary data."); return
+        print("No subsidiary data." + _why_no_report_data(security_code, "Extract subsidiaries from reports")); return
     _table(r["entities"], ["name", "relationship", "pct", "direct", "indirect", "jurisdiction", "registered",
                            "business", "acquired_by"], title=f"{r['code']} group structure at {r['date']}")
     print(r["summary"])
@@ -1216,7 +1261,8 @@ def human_capital_cmd(security_code: str, period: str = typer.Option(None), as_o
     if "error" in r:
         print(r["error"]); return
     if not r["values"]:
-        print("No R&D or workforce data."); return
+        print("No R&D or workforce data." + _why_no_report_data(security_code, "Extract R&D and workforce from reports"))
+        return
     _table([{"item": k, "label": HC_ITEMS[k][2], "value": x, "unit": HC_ITEMS[k][1],
              "page": r["provenance"].get(k, {}).get("page"), "method": r["provenance"].get(k, {}).get("method")}
             for k, x in r["values"].items()], title=f"{r['code']} {r['period']}")
@@ -1380,12 +1426,72 @@ def parsers_cmd():
 
 # --- v1.5: review workflow, document checks and charts ---------------------------
 
+@app.command("files-summary")
+def files_summary_cmd():
+    """Downloaded documents by kind and year, with their size, and the other folders (v2.1.2)."""
+    from .files import files_summary
+    r = files_summary()
+    print(f"{r['documents']:,} documents on disk, {r['mb']:,.1f} MB"
+          + (f"; {r['missing']:,} records whose file is missing (see 'files-check')" if r["missing"] else ""))
+    mb = lambda x: f"{x:,.1f}"                         # noqa: E731
+    if r["documents"]:
+        _table([{**x, "mb": mb(x["mb"])} for x in r["by_kind"]], ["kind", "files", "mb"], title="By kind")
+        _table([{**x, "mb": mb(x["mb"])} for x in r["by_year"]], ["year", "files", "mb"], title="By year")
+    _table([{"folder": k, "path": v["folder"], "files": v["files"], "mb": mb(v["mb"])} for k, v in r["folders"].items()],
+           ["folder", "path", "files", "mb"], title="Other folders")
+
+
+@app.command("files-list")
+def files_list_cmd(security_code: str = typer.Option(None, "--security-code", "--code"),
+                   kind: str = typer.Option(None, help="annual_report, interim_report, quarterly_report, ..."),
+                   year: str = typer.Option(None), limit: int = typer.Option(500)):
+    """Downloaded documents with readable names and the extractors that read them (v2.1.2)."""
+    from .files import files_list
+    rows = files_list(security_code or None, kind or None, year or None, limit)
+    if not rows:
+        print("No downloaded document matches.")
+        return
+    _table(rows, ["id", "code", "date", "kind", "name", "kb", "read_by", "path"], title=f"{len(rows):,} file(s)")
+
+
+@app.command("files-export")
+def files_export_cmd(out: str = typer.Option("exports/files", "--out"),
+                     security_code: str = typer.Option(None, "--security-code", "--code"),
+                     kind: str = typer.Option(None), year: str = typer.Option(None),
+                     year_from: str = typer.Option(None, "--year-from"), year_to: str = typer.Option(None, "--year-to")):
+    """Copy downloaded documents under readable names, by company and year, with an index (v2.1.2)."""
+    from .files import export_files
+    print(export_files(out, security_code or None, kind or None, year or None, year_from or None, year_to or None))
+
+
+@app.command("files-check")
+def files_check_cmd():
+    """Files no record names, records whose file is missing, shared files, summaries and English versions."""
+    from .files import check_files
+    r = check_files()
+    ex = r.pop("examples")
+    print(r)
+    for k, v in ex.items():
+        if v:
+            print(f"  {k}: {v[:5]}")
+
+
+@app.command("files-tidy")
+def files_tidy_cmd(what: str = typer.Option("unnamed", "--what", help="unnamed, summaries_english or kind"),
+                   kind: str = typer.Option(None, help="With --what kind: the kind to remove"),
+                   security_code: str = typer.Option(None, "--security-code", "--code"),
+                   apply: bool = typer.Option(False, "--apply", help="Remove the files (otherwise only a preview)")):
+    """Remove a chosen class of downloaded files; a preview unless --apply (v2.1.2)."""
+    from .files import tidy_files
+    print(tidy_files(what, apply, kind or None, security_code or None))
+
+
 @app.command("scan-documents")
 def scan_documents_cmd(code: str = typer.Option(None, "--security-code", "--code", help="One company (default: all)"),
                        recheck: bool = typer.Option(False, "--recheck", help="Check again documents already checked")):
     """Find downloaded PDFs without a text layer (scanned), which no parser can read."""
     from .layout import scan_documents
-    r = scan_documents(code, recheck)
+    r = scan_documents(code, recheck, progress=_progress)
     print({k: v for k, v in r.items() if k != "scanned"})
     if r["scanned"]:
         _table(r["scanned"], title="Scanned or partly scanned documents (enter values manually or import them)")

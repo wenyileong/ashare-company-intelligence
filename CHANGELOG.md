@@ -1,6 +1,47 @@
 # Change log
 
-This log records what changed in each version and the important findings behind the changes. The live-run findings are kept in full in `docs/live_run_findings_v2.0.2.md` (findings 1 to 19) `docs/live_run_findings_v2.0.3.md` (findings 20 to 34) and `docs/live_run_findings_v2.0.5.md` (findings 35 to 57, the first live runs of the v2.0.4 catalogue engine) `docs/live_run_findings_v2.0.6.md` (findings 58 to 69) and `docs/live_run_findings_v2.0.7.md` (findings 70 to 95) and `docs/live_run_findings_v2.0.8.md` (findings 96 to 111) and `docs/live_run_findings_v2.0.9.md` (findings 112 to 117). The plan for v2.1, with its six rounds of review, is `docs/plan_v2.1.md`. Earlier versions are described in `README.md` and in section 18 of `ashare_scraper_build_plan.md`.
+This log records what changed in each version and the important findings behind the changes. The live-run findings are kept in full in `docs/live_run_findings_v2.0.2.md` (findings 1 to 19) `docs/live_run_findings_v2.0.3.md` (findings 20 to 34) and `docs/live_run_findings_v2.0.5.md` (findings 35 to 57, the first live runs of the v2.0.4 catalogue engine) `docs/live_run_findings_v2.0.6.md` (findings 58 to 69) and `docs/live_run_findings_v2.0.7.md` (findings 70 to 95) and `docs/live_run_findings_v2.0.8.md` (findings 96 to 111) and `docs/live_run_findings_v2.0.9.md` (findings 112 to 117) and `docs/live_run_findings_v2.1.md` (findings 118 to 131). The plan for v2.1, with its six rounds of review, is `docs/plan_v2.1.md`. Earlier versions are described in `README.md` and in section 18 of `ashare_scraper_build_plan.md`.
+
+## v2.1.2 (2 November 2026)
+
+**Aim:** fix what the author's v2.1 and v2.1.1 logs showed (`docs/live_run_findings_v2.1.md`, findings 118 to 131), and add a scrollable side panel, a Files page and the paper the software accompanies. The plan, with the interference check of each fix, is `docs/plan_v2.1.2.md`.
+
+**After upgrading:**
+1. "Extract figures from reports" (kind reports). Every report is read again (financials-4), including those that failed under v2.1.1.
+2. "Read top-10 shareholders", "Read controlling shareholder and actual controller" (control-3) and "Read guidance".
+3. "Run all checks", then "Check balance sheets".
+
+- **Parallel reading in the desktop program (finding 124).**
+  - About one document in 25 failed with "'NoneType' object has no attribute 'write'": 894 in financial extraction, 34 in top-10, 8 in ESG, and the 201 guidance documents that failed on every full run.
+  - An old progress line was written by the worker processes, which have no console in the desktop program. The workers now silence it and have a null device for missing streams, and the line is never written without a console.
+- **Downloads (findings 119 to 121).**
+  - `IN (...)` queries over ID lists are run 500 values at a time. A ten-month refresh had failed after thirteen hours with "too many SQL variables".
+  - The catalogue's download step chooses from the database the wanted documents of its dates not yet on disk, so a rerun downloads what an interrupted one left.
+  - A failed download step no longer fails the finished catalogue.
+  - Progress gives seconds a document and the time left, and the estimate uses the rate and sizes measured in the last download (5 s a document until then; v2.1 assumed 1.5 s).
+- **Refresh window (finding 122).** `--refresh` fetches again only the last 30 days of the period by default (`--refresh-days`, 0 for every day).
+- **Scanned-page check (finding 125).**
+  - Pages are counted from the fast page text, in worker processes, with progress.
+  - Each document is saved as it is checked; v2.1.1 saved nothing when stopped.
+- **Financial extraction with "kind all" (finding 126).** English versions and sustainability reports are left out and counted (`not_financial`).
+- **Balance sheets (finding 129).**
+  - A total read without its first digit is restored when the balance identity is out by exactly a single digit times a power of ten and a second identity in the same document confirms the figure (parent plus minority equity, or current plus non-current liabilities or assets).
+  - The reading is kept in `raw_value`, the note records the repair, and the confidence is lowered.
+  - `inspect-tables --table balance_sheet` shows the numbers on each line. "Check balance sheets" prints a summary by pattern and writes `exports/balance_check.csv`.
+  - Version financials-4.
+- **Controllers (finding 128).**
+  - Names wrapped within a table cell are rejoined; the legal representative between the pieces, and pieces of the header, are no longer taken as controllers.
+  - Grouping by controller counts the forms of a commission's name as one.
+  - Version control-3.
+- **Why a layer is empty (finding 127).** The topology view and the R&D, segment and subsidiary commands say whether reports or forecasts are not catalogued, not downloaded, not read, or read with nothing in the span.
+- **ESG title (finding 130).** The Chinese sustainability report is preferred over the English version.
+- **Side panel.** It scrolls when the window is too short, with a scrollbar only when needed.
+- **Files page** (and `files-summary`, `files-list`, `files-export`, `files-check`, `files-tidy`).
+  - Downloaded documents by company, kind and year, and readable copies with an index of sources.
+  - Files no record names, and missing or shared files.
+  - Tidying that previews until "Apply" is ticked, clears the paths of what it removes and logs every removal.
+- **The paper.** The README describes the SSRN paper the software accompanies, what the software does in relation to it and what it does not claim. `CITATION.cff` lists it under `references`.
+- **Open.** Top-10 agreement (finding 131), ESG yield (finding 117), and the confirmation of finding 129's cause on the author's reports.
 
 ## v2.1.1 (31 October 2026)
 

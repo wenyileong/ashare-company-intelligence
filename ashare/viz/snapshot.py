@@ -491,6 +491,49 @@ def _ownership(b: _Builder, c) -> None:
                {"observed_date": o.observation_date, "published_date": pub}, label="actual controller")
 
 
+def _why_empty(b: _Builder, layer: str, codes: list[str], default: str) -> str:
+    """Why a layer has no data for these companies (v2.1.2, finding 127): nothing downloaded, downloaded but not
+    read, or read with nothing in the span. Falls back to the general note."""
+    from ..models import Company, Disclosure, ExpectationObservation
+    from ..disclosures import REPORT_KINDS
+    try:
+        ids = [c.id for c in b.s.query(Company.id).filter(Company.security_code.in_(codes))]
+        if not ids:
+            return default
+        who = ", ".join(codes[:3]) + (" …" if len(codes) > 3 else "")
+        if layer in ("fundamentals", "capability"):
+            reps = (b.s.query(Disclosure.local_path, Disclosure.extracted_version)
+                    .filter(Disclosure.company_id.in_(ids), Disclosure.kind.in_(REPORT_KINDS)).all())
+            if not reps:
+                return (f"No periodic report is catalogued for {who}. Catalogue announcements (kind 'reports') "
+                        "and download them, then run 'Extract figures from reports'.")
+            if not any(p for p, _ in reps):
+                return (f"No periodic report is downloaded for {who} ({len(reps):,} catalogued). Run 'Download "
+                        "catalogued documents', then 'Extract figures from reports'.")
+            if not any(v for p, v in reps if p):
+                return f"Reports are downloaded for {who} but not yet read. Run 'Extract figures from reports'" + (
+                    " and 'Read R&D and workforce'." if layer == "capability" else ".")
+            return (f"Reports for {who} are read, but give no figure of this layer for {b.p['periods'][0][:4]} to "
+                    f"{b.p['periods'][-1][:4]}.")
+        if layer == "expectations" and b.p["expectations"] == "MANAGEMENT_GUIDANCE":
+            docs = (b.s.query(Disclosure.local_path)
+                    .filter(Disclosure.company_id.in_(ids), Disclosure.kind == "earnings_forecast_or_flash").all())
+            if not docs:
+                return (f"No earnings forecast or flash report is catalogued for {who}: the companies may not have "
+                        "published one (forecasts are required only in some cases). Catalogue announcements with "
+                        "kind 'all' to be sure.")
+            if not any(p for (p,) in docs):
+                return f"Earnings forecasts are catalogued for {who} but not downloaded. Run 'Read guidance'."
+            n = b.s.query(ExpectationObservation).filter(ExpectationObservation.company_id.in_(ids)).count()
+            if not n:
+                return f"Earnings forecasts for {who} were not yet read, or gave no figure. Run 'Read guidance'."
+            return (f"Guidance for {who} is read, but none of it is for {b.p['periods'][0][:4]} to "
+                    f"{b.p['periods'][-1][:4]} or published by {b.p['as_of']}.")
+    except Exception:
+        return default
+    return default
+
+
 def _coverage(b: _Builder, codes: list[str]) -> list[dict]:
     out = []
     reasons = {
@@ -512,6 +555,8 @@ def _coverage(b: _Builder, codes: list[str]) -> list[dict]:
             covered = sorted(set(covered) | {e["source"].split(":", 1)[1] for e in b.edges.values()
                                              if e["relation"] == "IN_SECTOR"})
         status = "GAP" if not obs else "COMPLETE" if len(covered) == len(codes) else "PARTIAL"
+        if status == "GAP":
+            reasons[layer.id] = _why_empty(b, layer.id, codes, reasons[layer.id])
         note = reasons[layer.id] if status == "GAP" else (
             f"{len(covered)} of {len(codes)} companies have data in this layer." if status == "PARTIAL"
             else "Every company has data in this layer.")

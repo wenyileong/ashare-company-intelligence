@@ -90,7 +90,8 @@ def cross_validate(security_code: str | None = None) -> dict:
         ids = [c.id for c in companies]
         # regenerate flags for the companies in scope
         if ids:
-            session.query(ValidationFlag).filter(ValidationFlag.company_id.in_(ids)).delete(synchronize_session=False)
+            from .dbutil import delete_in_chunks
+            delete_in_chunks(session.query(ValidationFlag), ValidationFlag.company_id, ids)
         session.flush()
 
         dates = {d.id: d.announcement_date for d in session.query(Disclosure.id, Disclosure.announcement_date)}

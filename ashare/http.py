@@ -45,10 +45,13 @@ def document_heartbeat(path=None, every: int = 25) -> None:
         _READ["t0"] = time.monotonic()
     if _READ["n"] % every == 0 and not _READ.get("quiet"):
         import sys
+        out = sys.stdout
+        if out is None:                 # v2.1.2 (finding 124): no console (a worker of the desktop program)
+            return
         rate = _READ["n"] / max(time.monotonic() - _READ["t0"], 1e-6)
-        sys.stdout.write(f"... {_READ['n']} documents read ({rate:.1f} per second)\n")
         try:
-            sys.stdout.flush()
+            out.write(f"... {_READ['n']} documents read ({rate:.1f} per second)\n")
+            out.flush()
         except Exception:
             pass
 

@@ -4,8 +4,8 @@ type: software
 title: "A-share Company Intelligence"
 abstract: "A provenance-preserving research data system for companies listed on the Shanghai and Shenzhen stock exchanges: collection from statutory disclosures, calibrated extraction, staged validation, point-in-time panels and licence-aware, optionally pseudonymised dataset releases."
 license: PolyForm-Strict-1.0.0
-version: "2.1.1"
-date-released: 2026-10-31
+version: "2.1.2"
+date-released: 2026-11-02
 authors:
   - family-names: "Leong"
     given-names: "Wen Yi"
@@ -16,3 +16,16 @@ keywords:
   - corporate disclosure
   - research data
   - point-in-time
+references:
+  - type: article
+    title: "Institutional Coordination and the Making of Corporate Value: A Nested Valuation Framework for China's A-Share Market"
+    authors:
+      - family-names: "Leong"
+        given-names: "Wen Yi"
+        orcid: "https://orcid.org/0009-0005-5691-1270"
+    date-published: 2026-06-20
+    publisher:
+      name: "SSRN"
+    doi: "10.2139/ssrn.7309399"
+    url: "https://ssrn.com/abstract=7309399"
+    license: CC-BY-NC-ND-4.0

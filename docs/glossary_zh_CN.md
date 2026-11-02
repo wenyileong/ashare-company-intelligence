@@ -212,6 +212,17 @@ These are the interface's own terms for the features of v2.1 (plan v2.1, section
 | Interface language | 界面语言 | |
 | Earnings forecast and flash report, read together | 读取业绩预告与业绩快报 | The action "Read guidance" |
 
+## 12. Terms added in v2.1.2 (proposed; the renderings stand until reviewed)
+
+| English | Chinese | Notes |
+|---|---|---|
+| Files (the page) | 文件 | As in "Download documents" (下载文件) |
+| Files summary | 文件概况 | |
+| Export readable copies | 导出易读副本 | Copies under readable names; the originals are unchanged |
+| Check files / Tidy files | 检查文件 / 整理文件 | |
+| Apply (a removal) | 执行 | Unticked, a preview only |
+| Days to fetch again | 重新获取的天数 | With "Fetch finished days again" (重新获取已完成的日期) |
+
 ## Review record
 
 | Date | Reviewer | Rows settled | Notes |

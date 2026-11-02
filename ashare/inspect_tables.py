@@ -19,7 +19,50 @@ TABLES = {
     "top10": {"sections": ["top10", "top10_tradable"], "family": "top10"},
     "segments": {"sections": ["segments"], "family": "segments"},
     "control": {"sections": ["control"], "family": None},
+    # v2.1.2 (finding 129): the consolidated balance sheet, with the numbers each line yields
+    "balance_sheet": {"sections": ["fin_bs"], "family": None},
 }
+
+_BS_TOTALS = ("total_current_assets", "total_non_current_assets", "total_assets", "total_current_liabilities",
+              "total_non_current_liabilities", "total_liabilities", "equity_parent", "minority_interests", "equity",
+              "total_liabilities_and_equity")
+
+
+def _balance_trace(pages: list[str], page_set: set[int]) -> tuple[list[tuple], list[dict], str]:
+    """Each line of the balance-sheet pages with the number tokens the reader finds in it, and the totals read."""
+    from .cas import parse_statement_items
+    from .financials import _PDF_NUM, repair_leading_digits
+    items = [it for it in parse_statement_items(pages) if it.get("statement") == "BS"]
+    totals = [it for it in items if it["metric"] in _BS_TOTALS]
+    out = []
+    for pno, page in enumerate(pages, start=1):
+        if pno - 1 not in page_set:
+            continue
+        for raw in page.splitlines():
+            line = raw.replace("　", " ").strip()
+            if not line:
+                continue
+            toks = [m.group(0).strip() for m in re.finditer(_PDF_NUM, line)]
+            hit = [it["metric"] for it in totals if it.get("page") == pno and it.get("raw_value")
+                   and str(it["raw_value"]).strip() in line]
+            decision = ("numbers: " + " | ".join(toks)) if toks else ""
+            if hit:
+                decision += ("; " if decision else "") + "read as " + ", ".join(hit)
+            out.append((pno, line, decision))
+    facts = [{"metric": it["metric"], "value": it["value"], "period": "p", "period_type": "p",
+              "method": "PDF_STATEMENT_TABLE", "consolidation_scope": None} for it in totals]
+    by = {f["metric"]: f["value"] for f in facts}
+    a, l, e = by.get("total_assets"), by.get("total_liabilities"), by.get("equity")
+    if None not in (a, l, e):
+        summary = f"assets {a:,.2f}; liabilities {l:,.2f}; equity {e:,.2f}; difference {a - l - e:,.2f}"
+        repaired = {f["metric"]: f["value"] for f in repair_leading_digits([dict(f) for f in facts])}
+        changed = [m for m in repaired if repaired[m] != by.get(m)]
+        if changed:
+            summary += "; restored from the balance identity: " + ", ".join(
+                f"{m} {by[m]:,.2f} -> {repaired[m]:,.2f}" for m in changed)
+    else:
+        summary = "totals read: " + (", ".join(f"{m} {v:,.2f}" for m, v in by.items()) or "none")
+    return out, totals, summary
 
 
 def _matching_rows(line: str, rows: list[dict], name_key: str) -> list[dict]:
@@ -131,6 +174,9 @@ def inspect_table(disclosure_id: int, table: str, out: str | Path | None = None)
                 rows = _segments_rows(pages)
                 trace = _generic_trace(pages, rows, "segment_name", page_set_v)
                 summary = f"{len(rows)} segment row(s)"
+                readings[variant] = rows
+            elif table == "balance_sheet":
+                trace, rows, summary = _balance_trace(pages, page_set_v)
                 readings[variant] = rows
             else:
                 rows, r = _control_rows(pages)

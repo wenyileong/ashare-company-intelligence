@@ -66,6 +66,20 @@ def merge_notices(state: dict | None) -> None:
 
 
 def _worker_init() -> None:
+    """Set up a worker process.
+
+    v2.1.2 (finding 124): in the desktop program the workers have no console (``sys.stdout`` and ``sys.stderr`` are
+    None), and the old progress line of :func:`ashare.http.document_heartbeat`, written once every 25 documents,
+    failed there with "'NoneType' object has no attribute 'write'", failing that document. The main process silences
+    the line during extraction; each worker has its own copy of the counter, which is now silenced too, and missing
+    streams are replaced by a null device so that no library can fail on them."""
+    import os
+    import sys
+    for name in ("stdout", "stderr"):
+        if getattr(sys, name, None) is None:
+            setattr(sys, name, open(os.devnull, "w", encoding="utf-8"))
+    from . import http
+    http._READ["quiet"] = True
     from . import pdfwarnings
     pdfwarnings.install()
 

@@ -172,7 +172,8 @@ def build_review_queue(security_code: str | None = None, low_confidence_below: f
             cq = cq.filter(Company.security_code == str(security_code).zfill(6))
         companies = cq.all()
         ids = [c.id for c in companies]
-        existing = {i.item_key: i for i in s.query(ReviewItem).filter(ReviewItem.company_id.in_(ids)).all()}
+        from .dbutil import in_chunks
+        existing = {i.item_key: i for i in in_chunks(s.query(ReviewItem), ReviewItem.company_id, ids)}
         live = set()
 
         def upsert(kind, rule, severity, company_id, table, row, field, value, confidence, details, scale):
@@ -227,7 +228,9 @@ def build_review_queue(security_code: str | None = None, low_confidence_below: f
                 item.status = "OBSOLETE"
                 totals["obsolete"] += 1
         s.commit()
-        totals["open"] = s.query(ReviewItem).filter(ReviewItem.company_id.in_(ids), ReviewItem.status == "OPEN").count()
+        from .dbutil import chunks
+        totals["open"] = sum(s.query(ReviewItem).filter(ReviewItem.company_id.in_(part), ReviewItem.status == "OPEN")
+                             .count() for part in chunks(ids))
         return totals
     finally:
         s.close()

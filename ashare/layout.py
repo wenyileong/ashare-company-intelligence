@@ -216,14 +216,9 @@ def layout_text_pages(path: str | Path) -> list[str]:
     return ["\n".join(r.text for r in rows) for rows in layout_pages_rows(path)]
 
 
-def text_layer(path: str | Path) -> dict:
-    """How much of a PDF has a text layer: FULL, PARTIAL or NONE (scanned)."""
-    from .financials import _pdf_text_pages
-    try:
-        pages = _pdf_text_pages(Path(path))
-    except Exception as exc:
-        return {"status": "UNREADABLE", "pages": 0, "pages_with_text": 0, "error": repr(exc)}
-    with_text = sum(1 for p in pages if len(re.sub(r"\s+", "", p)) >= 20)
+def classify_text_pages(pages: list[str]) -> dict:
+    """FULL, PARTIAL or NONE from the text of each page (at least 20 characters makes a page with text)."""
+    with_text = sum(1 for p in pages if len(re.sub(r"\s+", "", p or "")) >= 20)
     if not pages:
         status = "UNREADABLE"
     elif with_text == 0:
@@ -235,22 +230,68 @@ def text_layer(path: str | Path) -> dict:
     return {"status": status, "pages": len(pages), "pages_with_text": with_text}
 
 
-def scan_documents(security_code: str | None = None, recheck: bool = False) -> dict:
+def text_layer(path: str | Path) -> dict:
+    """How much of a PDF has a text layer: FULL, PARTIAL or NONE (scanned)."""
+    from .financials import _pdf_text_pages
+    try:
+        pages = _pdf_text_pages(Path(path))
+    except Exception as exc:
+        return {"status": "UNREADABLE", "pages": 0, "pages_with_text": 0, "error": repr(exc)}
+    return classify_text_pages(pages)
+
+
+def scan_job(job: dict, reader) -> dict:
+    """The reading half of :func:`scan_documents` (v2.1.2, finding 125; run in worker processes).
+
+    Pages are counted from the fast page text (pdfium), one call per page; the slow reader is used only when pdfium
+    cannot open the document."""
+    if getattr(reader, "_pdf", None) is not None and reader.n:
+        from .http import check_cancel
+        pages = []
+        for i in range(reader.n):
+            if i % 50 == 0:
+                check_cancel()
+            try:
+                pages.append(reader.fast_text(i))
+            except Exception:
+                pages.append("")
+        return classify_text_pages(pages)
+    return text_layer(job["path"])
+
+
+def scan_documents(security_code: str | None = None, recheck: bool = False, progress=None) -> dict:
     """Record whether each downloaded PDF has a text layer; list scanned ones.
 
     Scanned documents (no text layer) cannot be read by any parser. OCR is
     out of scope, so they are listed for manual entry or a licensed source.
+
+    v2.1.2 (finding 125): pages are counted from the fast page text, in worker processes when there are enough
+    documents; each document is saved as it is checked, so a stopped run keeps what it checked (v2.1.1 saved nothing
+    until the end); progress gives documents done, seconds a document and the time left.
     """
     from .models import SessionLocal, Disclosure, Company, init_db
+    from .extractstate import Progress
+    from .http import quiet_heartbeat, check_cancel
+    from .parallel import imap
     init_db()
+    say = progress or (lambda m: None)
     s = SessionLocal()
-    totals = {"checked": 0, "FULL": 0, "PARTIAL": 0, "NONE": 0, "UNREADABLE": 0, "missing": 0, "scanned": []}
+    totals = {"checked": 0, "FULL": 0, "PARTIAL": 0, "NONE": 0, "UNREADABLE": 0, "missing": 0, "errors": 0,
+              "scanned": []}
     try:
         q = s.query(Disclosure, Company).join(Company, Disclosure.company_id == Company.id).filter(
             Disclosure.local_path.isnot(None))
         if security_code:
             q = q.filter(Company.security_code == str(security_code).zfill(6))
-        for d, c in q.all():
+        jobs, by_id = [], {}
+
+        def note(d, c, status):
+            totals[status] = totals.get(status, 0) + 1
+            if status in ("NONE", "PARTIAL"):
+                totals["scanned"].append({"disclosure_id": d.id, "code": c.security_code, "title": d.title_cn,
+                                          "date": d.announcement_date, "text_layer": status})
+
+        for d, c in q.order_by(Company.security_code, Disclosure.announcement_date, Disclosure.id).all():
             path = Path(d.local_path)
             if path.suffix.lower() != ".pdf":
                 continue
@@ -258,16 +299,27 @@ def scan_documents(security_code: str | None = None, recheck: bool = False) -> d
                 totals["missing"] += 1
                 continue
             if d.text_layer and not recheck:
-                status = d.text_layer
-            else:
-                status = text_layer(path)["status"]
-                d.text_layer = status
-                totals["checked"] += 1
-            totals[status] = totals.get(status, 0) + 1
-            if status in ("NONE", "PARTIAL"):
-                totals["scanned"].append({"disclosure_id": d.id, "code": c.security_code, "title": d.title_cn,
-                                          "date": d.announcement_date, "text_layer": status})
-        s.commit()
+                note(d, c, d.text_layer)
+                continue
+            jobs.append({"id": d.id, "path": str(path), "title": d.title_cn, "group": c.id})
+            by_id[d.id] = (d, c)
+        totals["to_check"] = len(jobs)
+        say(f"{len(jobs):,} document(s) to check"
+            + (f"; {sum(totals[k] for k in ('FULL', 'PARTIAL', 'NONE', 'UNREADABLE')):,} checked before are "
+               "skipped (--recheck checks them again)" if not recheck else ""))
+        prog = Progress(len(jobs), say)
+        with quiet_heartbeat():
+            for res in imap("ashare.layout:scan_job", jobs, check=check_cancel):
+                d, c = by_id[res["id"]]
+                if res.get("error"):
+                    totals["errors"] += 1
+                else:
+                    status = res["result"]["status"]
+                    d.text_layer = status
+                    s.commit()
+                    totals["checked"] += 1
+                    note(d, c, status)
+                prog.step()
         return totals
     finally:
         s.close()

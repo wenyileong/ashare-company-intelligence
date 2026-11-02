@@ -8,7 +8,7 @@ This guide covers the desktop application and the command line. The [methods doc
 
 ### Windows installer
 
-Run `AShareScraper-2.1.1-setup.exe`. It installs for the current user (no administrator rights are needed) into `%LOCALAPPDATA%\Programs\AShareScraper` and adds Start-menu entries for the application, the command line, this guide and the uninstaller. Two options are offered:
+Run `AShareScraper-2.1.2-setup.exe`. It installs for the current user (no administrator rights are needed) into `%LOCALAPPDATA%\Programs\AShareScraper` and adds Start-menu entries for the application, the command line, this guide and the uninstaller. Two options are offered:
 
 - a desktop shortcut;
 - adding the program folder to your PATH, so that `ashare-cli` runs from any command prompt.
@@ -88,6 +88,17 @@ Each page explains what its actions do. Fields marked as optional can be left bl
 **Settings**: the interface language, the data folder, optional boards, the price source, how many documents are read at once, and the update check. Settings are locked while an action runs, and apply to the next action.
 
 The output panel at the bottom shows what each action did. **Copy** copies it, for example into a bug report. When an action fails, the output names a file in the `logs` folder that holds the full error; send that file with a bug report.
+
+### The side panel and the Files page (v2.1.2)
+
+When the window is too short for the side panel, a thin scrollbar appears beside it; the mouse wheel scrolls the panel while the pointer is over it, and the section you choose is scrolled into view.
+
+**Files** (under Check) works on the documents the program has downloaded. They are stored under the names the database and the provenance records use (`disclosures/<code>/<hash>.pdf`), which are never changed:
+- **Files summary**: documents on disk by kind and by year, with their size, and the market-data, export and log folders.
+- **List files**: one company's documents, or one kind and year, with readable names and the extractors that read them.
+- **Export readable copies**: copies a chosen set into `exports/files/<code> <name>/<year>/`, named `<code> <date> <title>.pdf`, with `index.html` and `index.csv` giving each copy's source address and database record. The originals are unchanged.
+- **Check files**: files no record names, records whose file is missing, one file under several records, and summaries or English versions earlier versions downloaded.
+- **Tidy files**: removes files no record names, summaries and English versions, or every document of one kind. It shows what it would remove until you tick **Apply**; then it removes the files, clears their place in the database (a later run downloads them again if needed) and lists every removal in `logs/tidy_<time>.csv`. A file another record still names is kept.
 
 ### Language (v2.1)
 
@@ -306,6 +317,16 @@ Neither public feed is exchange-authoritative, and their terms are yours to chec
 - **Several documents at once.** Every extraction reads several documents at the same time, by default one per processor core less one (at most eight). **Settings > Reading documents** changes the number; 1 reads one at a time. Results and progress are the same; only the program itself writes to the database.
 - **Top-10 shareholders.** A row only one of the two readings of a table found is kept if the table still passes its checks, and marked for review. Rows whose name is printed above their figures are now read. Every report is read once more after the upgrade (`top10-3`).
 - **When a table is read wrongly or not at all**, `ashare-cli inspect-tables --code 600519 --year 2025 --table top10` (or `segments`, `control`, or a document ID instead of `--code`) writes `exports/inspect_<ID>_<table>.txt`. It holds the table's pages as each reading sees them, with the parser's decision on every line: heading, header, row read, or the check that rejected it. It contains the report's own text, shareholder names included; it is yours to share or not, and it lets a fault be found without the PDF.
+
+### What v2.1.2 changed (findings 118 to 131)
+
+- **Parallel reading in the desktop program.** About one document in 25 failed with "'NoneType' object has no attribute 'write'" (finding 124). Fixed; the documents that failed were never marked as read, and the next run reads them.
+- **Balance sheets.** A total read without its first digit (out by exactly 10 or 20 billion yuan) is restored when the report's own figures confirm it, and marked as repaired (finding 129). `inspect-tables --table balance_sheet` shows the numbers the reader finds on each line of the balance sheet. "Check balance sheets" writes every failure to `exports/balance_check.csv`.
+- **Controllers.** Names wrapped within a table cell are rejoined, and the legal representative is no longer taken for a controller (finding 128).
+- **Re-reading.** Every report is read again after the upgrade (`financials-4`, `control-3`).
+- **Downloads.** Progress gives seconds a document and the time left, and the estimate uses the rate of your last download. After a catalogue, the documents to download are chosen from the database, so a rerun downloads what a stopped or failed run left (findings 119 to 121).
+- **Refreshing the catalogue.** "Fetch finished days again" now fetches only the last 30 days of the period ("Days to fetch again"; 0 for every day).
+- **Scanned pages.** "Check documents for scanned pages" is quick, shows its progress and keeps what it checked when stopped (finding 125).
 
 ### Findings as rates (v2.1)
 

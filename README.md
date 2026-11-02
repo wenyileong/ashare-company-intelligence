@@ -1,4 +1,4 @@
-# China A-share Company Intelligence v2.1.1
+# China A-share Company Intelligence v2.1.2
 
 A provenance-preserving research data system for SSE Main Board, STAR Market, SZSE Main Board and ChiNext companies. The architecture is set out in `ashare_scraper_build_plan.md`. Changes by version, and the findings behind them, are in `CHANGELOG.md`. The live-run findings are in:
 - `docs/live_run_findings_v2.0.2.md`;
@@ -6,9 +6,51 @@ A provenance-preserving research data system for SSE Main Board, STAR Market, SZ
 - `docs/live_run_findings_v2.0.5.md`;
 - `docs/live_run_findings_v2.0.6.md`;
 - `docs/live_run_findings_v2.0.7.md`;
-- `docs/live_run_findings_v2.0.8.md`.
+- `docs/live_run_findings_v2.0.8.md`;
+- `docs/live_run_findings_v2.0.9.md`;
+- `docs/live_run_findings_v2.1.md`.
 
-The register of the findings, and the visualisation plan, is `docs/plan_v2.0.8_and_visualisation.md`; the plan for v2.1 is `docs/plan_v2.1.md`.
+The register of the findings, and the visualisation plan, is `docs/plan_v2.0.8_and_visualisation.md`; the plan for v2.1 is `docs/plan_v2.1.md`, and for v2.1.2 `docs/plan_v2.1.2.md`.
+
+## The paper this software accompanies
+
+Wen Yi Leong, 'Institutional Coordination and the Making of Corporate Value: A Nested Valuation Framework for China's A-Share Market' (SSRN, 20 June 2026) <https://ssrn.com/abstract=7309399>, doi:10.2139/ssrn.7309399.
+
+SSRN's suggested citation: Leong, Wen Yi, Institutional Coordination and the Making of Corporate Value: A Nested Valuation Framework for China's A-Share Market (June 20, 2026). Available at SSRN: https://ssrn.com/abstract=7309399 or http://dx.doi.org/10.2139/ssrn.7309399. The paper was posted on 19 August 2026 (last revised 26 August 2026) and is licensed under the Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International Licence; the software is licensed separately (see *Licence*).
+
+**What the paper does.** In its own words, the paper observes that financial economics has well-developed theories of how investors price corporate fundamentals, but comparatively little to say about how those fundamentals come into being where industrial development is coordinated through sustained state and institutional action. It develops the Nested Valuation Framework (NVF), an analytical architecture linking institutional coordination, productive capability, corporate fundamentals, investor expectations and market capitalisation. Two operational concepts, Institutional Visibility and the Fractal Investment Clock, explain respectively how institutionally generated productive capability becomes incorporated into investor expectations, and why that incorporation proceeds asynchronously across sectors. The framework is illustrated, rather than tested, through three episodes in the A-share market: semiconductor industrial policy, the 'new quality productive forces' strategy and renewable energy. The paper closes by specifying the operational definitions, propositions and falsification conditions required to convert the framework into a testable research programme.
+
+**What the software does in relation to it.** The software builds the documented observations such a research programme needs, from the companies' own statutory disclosures and from other sources the researcher chooses, with the provenance of every value kept.
+- **The topology view** arranges those observations in the paper's five links: institutional coordination, productive capability, corporate fundamentals, investor expectations and market valuation.
+  - It covers a set of companies or a CSRC industry over a span of years, as of a chosen date.
+  - Every item traces to the document and page it was read from, and an empty layer is shown as a gap, not filled.
+  - The semiconductor episode (CSRC C39) is the first worked episode.
+- **Point-in-time panels** give the same observations as datasets for estimation: each value is dated by when it was published, so that a test uses only what was known at the time.
+
+**What it does not claim.**
+- It does not yet measure Institutional Visibility or the Fractal Investment Clock.
+- It does not test the paper's propositions.
+- A link in the topology view is a documented fact (a holding, a controller, a disclosure), not evidence of cause.
+- Management guidance (业绩预告, 业绩快报) is used only as a labelled proxy for investor expectations; licensed analyst forecasts can be imported and are kept apart.
+- No composite score is computed, because any weighting would be a judgement rather than an observation.
+
+**The research it can support.**
+- The institutional economics of valuation, and the relation between industrial policy and capital markets.
+- Ownership and control, including state ownership, controllers' chains and groups of companies under one controller.
+- Disclosure and corporate governance: boards, management changes, related-party transactions, pledges.
+- Event studies around announcements, corporate actions and regulatory and legal events.
+- Point-in-time panel econometrics of fundamentals, segments, R&D and workforce.
+- ESG disclosure, kept as disclosed, without a composite score.
+- Work with Chinese-language primary sources, with every value traceable to its page.
+
+v2.1.2 fixes what the v2.1 and v2.1.1 live runs showed (`docs/live_run_findings_v2.1.md`, findings 118 to 131), and adds a scrollable side panel and a Files page (`docs/plan_v2.1.2.md`):
+- **Parallel reading.** About one document in 25 failed in the desktop program's parallel reading (a progress line written where there is no console).
+- **Balance sheets.** Totals read without their first digit are restored where the report's own figures confirm it.
+- **Controllers.** Controller names wrapped within a table cell are rejoined.
+- **Downloads.** A catalogue's download step no longer fails on a long period and resumes from the database; progress and estimates are measured.
+- **The scanned-page check** is quick and resumable.
+- **Empty layers** of the topology view say why they are empty.
+- **The Files page** lists downloaded documents by company, kind and year, exports readable copies with an index, and finds and tidies files no record needs.
 
 v2.1.1 closes three faults found in the rest of the v2.0.9 live run (`docs/live_run_findings_v2.0.9.md`, findings 112 to 117). One slow report no longer holds back the other companies' reports in parallel reading, and a run names its slowest documents. ESG extraction now resumes, shows its progress and reads only the environmental and social pages of an annual report. The trading calendar is built for all three mainland exchanges from whichever exchange's prices are stored.
 

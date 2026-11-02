@@ -15,7 +15,7 @@ from pathlib import Path
 # Bump a version when its parser changes what it reads, so that a normal run re-reads every document.
 VERSIONS = {
     "top_holders": "top10-3",            # v2.1: rows found by one reading only, matched by share count (finding 98)
-    "control": "control-2",              # v2.0.8: both exchanges' layouts (findings 78 and 89)
+    "control": "control-3",              # v2.1.2: names wrapped within their cell rejoined (finding 128)
     "segments": "segments-2",            # v2.0.8: page breaks, subtotals, table kind (finding 83)
     "human_capital": "human_capital-1",
     "subsidiaries": "subsidiaries-1",

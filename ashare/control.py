@@ -348,8 +348,9 @@ def extract_top_holders(security_code: str | None = None, again: bool = False, p
                      if o.shareholder_name not in keep]
             if stale:
                 ids = [o.id for o in stale]
-                s.query(ReviewItem).filter(ReviewItem.table_name == "ownership_observations",
-                                           ReviewItem.row_id.in_(ids)).delete(synchronize_session=False)
+                from .dbutil import delete_in_chunks
+                delete_in_chunks(s.query(ReviewItem).filter(ReviewItem.table_name == "ownership_observations"),
+                                 ReviewItem.row_id, ids)
                 for o in stale:
                     s.delete(o)
                 totals["removed"] = totals.get("removed", 0) + len(stale)
@@ -560,6 +561,57 @@ def _section(lines: list[str], start: int, limit: int = 40) -> list[str]:
     return out
 
 
+_HEADING_WORDS = _CTRL_HEADINGS | {"法定代表人/单位负责人", "单位负责人或法定代表人", "是否取得其他国家或地区居留权",
+                                   "主要经营业务", "组织机构代码", "统一社会信用代码", "实际控制人名称", "控股股东名称"}
+#: how an entity's name ends (v2.1.2, finding 128): a name wrapped within its table cell is rejoined until it ends so
+_ENTITY_END = re.compile(r"(?:委员会|政府|公司|集团|局|厅|中心|办公室|银行|大学|学院|研究院|研究所|基金会|基金|计划|信托|"
+                         r"合伙企业|合伙[)）]|[)）]|部|社|院|所|会|Limited|Ltd\.?|Inc\.?|LLC|Corporation|Corp\.?|"
+                         r"PLC|plc|AG|GmbH|S\.A\.|B\.V\.|L\.P\.)$")
+_PERSON = re.compile(r"^[一-鿿·]{2,4}$")
+
+
+def _heading_fragment(token: str) -> bool:
+    """A piece of a table heading wrapped over lines ("人/单位负", "法定代表"), never a name."""
+    t = token.strip(" ：:；;，,。")
+    if "/" in t:
+        return True
+    return len(t) >= 2 and any(t in h for h in _HEADING_WORDS)
+
+
+_CONTINUES = re.compile(r"^(?:资产|国有|监督|管理|委员会|人民政府|政府|有限|股份|责任|集团|公司|控股|投资|发展|"
+                        r"（|\(|合伙|企业|中心|局|厅)")
+
+
+def _fragment_start(token: str) -> bool:
+    """Whether a token reads as the rest of a wrapped name ("资产监督管理委员会", "管理委员会", "有限公司")."""
+    return bool(_CONTINUES.match(token))
+
+
+def _repair_entity_names(tokens: list[str], rep_column: bool) -> list[str]:
+    """Rejoin entity names wrapped within their cell, dropping the legal representative between the pieces.
+
+    v2.1.2 (finding 128): in "实际控制人名称 法定代表人/单位负责人 …" tables, a name that wraps arrives on several
+    lines ("国务院国有资产监督" / "张玉卓 …" / "管理委员会"); v2.1 took each line's first word as a controller and
+    gave "国务院国有资产监督、张玉卓、管理委员会"."""
+    names: list[str] = []
+    buf = ""
+    for t in tokens:
+        if _heading_fragment(t):
+            continue
+        if rep_column and _PERSON.match(t) and not _ENTITY_END.search(t) and (buf or names):
+            continue                      # the legal representative's column
+        if buf and not _fragment_start(t) and len(buf) >= 4:
+            names.append(buf)             # a whole name without a usual ending, followed by another name
+            buf = ""
+        buf += t
+        if _ENTITY_END.search(buf):
+            names.append(buf)
+            buf = ""
+    if buf and not names:
+        names.append(buf)
+    return names
+
+
 def _names_in(body: list[str], several: bool) -> list[str]:
     """Names from a controller section, in either layout:
 
@@ -573,8 +625,12 @@ def _names_in(body: list[str], several: bool) -> list[str]:
         head = re.match(r"^(?:控股股东|实际控制人)?(?:名称|姓名)(?=\s|[:：]|$)\s*[:：]?\s*(.*)$", ln)
         if head:
             rest = head.group(1).strip()
-            if not rest or _CTRL_FIELD.match(rest) or rest.split()[0] in _CTRL_HEADINGS:
+            first = rest.split()[0] if rest else ""
+            if not rest or _CTRL_FIELD.match(rest) or first in _CTRL_HEADINGS or _heading_fragment(first):
                 # a header row: the values are on the rows below, one row per person or entity
+                entity = "名称" in ln and "姓名" not in ln
+                rep_column = bool(re.search(r"法定代表|负责人|单位负", ln))
+                tokens: list[str] = []
                 k += 1
                 while k < len(body):
                     row = body[k].strip()
@@ -583,12 +639,26 @@ def _names_in(body: list[str], several: bool) -> list[str]:
                         continue
                     if _CTRL_STOP.match(row) or re.match(r"^(?:控股股东|实际控制人)?(?:名称|姓名)(?=\s|[:：]|$)", row):
                         break
-                    name = _ctrl_name(row.split()[0])
-                    if name and name not in names:
-                        names.append(name)
-                    if not several:
-                        break
+                    tok = row.split()[0]
+                    if entity:
+                        t = _ctrl_name(tok)
+                        if t and not _heading_fragment(t):
+                            tokens.append(t)
+                        if not several and _repair_entity_names(tokens, rep_column) and \
+                                _ENTITY_END.search(_repair_entity_names(tokens, rep_column)[0]):
+                            break
+                    else:
+                        name = _ctrl_name(tok)
+                        if name and not _heading_fragment(name) and name not in names:
+                            names.append(name)
+                        if not several:
+                            break
                     k += 1
+                if entity:
+                    for name in _repair_entity_names(tokens, rep_column):
+                        name = _ctrl_name(name)
+                        if name and name not in names:
+                            names.append(name)
                 continue
             value = re.split(r"\s{2,}|\s(?=单位负责人|法定代表人|成立日期|国籍|是否取得|统一社会信用代码)", rest)[0]
             name = _ctrl_name(value)
@@ -1002,6 +1072,16 @@ def entity_profile(name_or_id: str) -> dict:
         s.close()
 
 
+def controller_key(name: str) -> str:
+    """The key under which companies are grouped by controller (v2.1.2, finding 128): the forms of a state-owned
+    assets commission's name count as one ("国务院国资委", "国务院国有资产监督管理委员会"; "湖南省国资委",
+    "湖南省人民政府国有资产监督管理委员会")."""
+    n = normalise_name(name)
+    n = n.replace("国资委", "国有资产监督管理委员会")
+    n = re.sub(r"人民政府(?=国有资产监督管理委员会)", "", n)
+    return n
+
+
 def common_controllers(as_of: str | None = None) -> list[dict]:
     """Listed companies grouped by the same actual controller (group affiliation)."""
     init_db()
@@ -1014,7 +1094,7 @@ def common_controllers(as_of: str | None = None) -> list[dict]:
     for code in codes:
         ctl = (control_at(code, as_of) or {}).get("control")
         if ctl and ctl.get("actual_controller"):
-            groups[normalise_name(ctl["actual_controller"])].add((code, ctl["actual_controller"], ctl["ownership_type"]))
+            groups[controller_key(ctl["actual_controller"])].add((code, ctl["actual_controller"], ctl["ownership_type"]))
     out = []
     for _, members in groups.items():
         if len(members) > 1:

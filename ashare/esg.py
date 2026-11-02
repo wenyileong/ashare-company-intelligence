@@ -274,6 +274,11 @@ def import_esg_ratings_csv(path: str, source: str = "CSV_IMPORT") -> dict:
         session.close()
 
 
+def _english_title(title: str | None) -> bool:
+    t = title or ""
+    return "英文" in t or "English" in t or (bool(t) and not re.search(r"[\u4e00-\u9fff]", t))
+
+
 def _published(session, row):
     if row.disclosure_id:
         d = session.get(Disclosure, row.disclosure_id)
@@ -313,10 +318,14 @@ def esg_profile(security_code: str, year: int | None = None, as_of: str | None =
         for o in obs:
             if o.reporting_period == period:
                 cur = values.get(o.item)
-                if cur is None or _published(session, o) > cur["published"]:
+                english = _english_title(o.value_text) if o.item == "sustainability_report_published" else False
+                # v2.1.2 (finding 130): the Chinese report is the title shown when a year has both
+                pub = _published(session, o)
+                if cur is None or (not english and cur["english"]) or \
+                        (english == cur["english"] and pub > cur["published"]):
                     values[o.item] = {"value": o.value, "unit": o.unit, "page": o.source_page,
                                       "method": o.extraction_method, "published": _published(session, o),
-                                      "text": o.value_text}
+                                      "text": o.value_text, "english": english}
         regs = [e for e in session.query(RegulatoryEvent).filter_by(company_id=c.id)
                 if (not as_of or (e.event_date or e.announcement_date or "") <= as_of)
                 and year and (e.event_date or e.announcement_date or "")[:4] == str(year)]
