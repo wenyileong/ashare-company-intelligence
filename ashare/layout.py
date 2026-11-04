@@ -217,12 +217,18 @@ def layout_text_pages(path: str | Path) -> list[str]:
 
 
 def classify_text_pages(pages: list[str]) -> dict:
-    """FULL, PARTIAL or NONE from the text of each page (at least 20 characters makes a page with text)."""
-    with_text = sum(1 for p in pages if len(re.sub(r"\s+", "", p or "")) >= 20)
+    """FULL, PARTIAL or NONE from the text of each page (at least 20 characters makes a page with text).
+
+    v2.2 (finding 138): a document of three pages or fewer whose pages all have text but the last is FULL. Short
+    announcements often end with a page holding only a seal or signature, which made them "partly scanned"."""
+    has = [len(re.sub(r"\s+", "", p or "")) >= 20 for p in pages]
+    with_text = sum(has)
     if not pages:
         status = "UNREADABLE"
     elif with_text == 0:
         status = "NONE"
+    elif 2 <= len(pages) <= 3 and all(has[:-1]):
+        status = "FULL"
     elif with_text < 0.8 * len(pages):
         status = "PARTIAL"
     else:

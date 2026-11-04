@@ -393,3 +393,29 @@ Semiconductors (CSRC C39) remain the first worked episode in v2.3, as in the top
 - **Documents.** Version 2.2.0, with the CHANGELOG, `docs/live_run_findings_v2.1.2.md` (findings 132 to 139), the user guide (the Visualise section) and the build plan.
 - **Chinese interface.** The glossary part 13 terms (section B11).
 - **Commit.** In the author's name only.
+
+# Build record (v2.2.0, 4 November 2026)
+
+Built with the defaults of section B12: interactive and publication outputs for the three reference views; labelled, versioned proxies (`nvf-0`); the ego map first; a pointer at each old location for one release.
+
+**Built as planned.**
+- A1 rules 1 and 2 (financials-5), A2 (control-4), A4.1 to A4.4.
+- The scaffolding of B4: `ashare/viz/view.py`, `registry.py`, `definitions.py`, `data.py`, `graph.py` (schema version 2), `series.py`, `schema.py`, `publish.py`, `pages.py`, and the viewer pages `relmap.html` and `chart.html`.
+- The three views of B5: the ego map, data coverage and guidance against outcome, each with its readiness checks.
+- The Visualise group in the desktop, with a readiness note on each view's page, and the terms of B11 in Chinese (glossary part 13).
+
+**Differences from the plan.**
+- **Commands.** Each view has its own command (`viz-ego-map`, `viz-coverage`, `viz-guidance-outcome`) with typed options, in place of one `viz build VIEW`; `viz-list` and `viz-check VIEW` are as planned. The topology view keeps its command (`topology`).
+- **Panel variables (B7).** `ctrl_group`, `ctrl_distance` and `reg_actions_12m` are built. `ctrl_type` exists already as `ownership_type`. `holder_overlap_n`, `mhhi_delta` and `interlock_n` follow with the common-ownership and market maps in v2.3, which compute them.
+- **Steps to the ultimate controller.** The ego map counts them on the control chain where one reaching the company was read, and otherwise counts the direct controller link as one step. The same rule gives `ctrl_distance`, which uses the longest path in the chain.
+- **Not built, waiting on the author's samples (v2.2.1).** A1 rule 3 (rejoining a lone digit at the source) and A3 (the quarterly top-10 layout).
+- **Scale test of B10.** It belongs with the market map (v2.3); the ego map draws at most 40 subsidiaries and 60 second-ring companies.
+
+**Interference.**
+- The topology view's code, snapshot (schema version 1) and viewer are unchanged; it is registered in the Visualise group only.
+- The new panel variables are not among the defaults, so panels built without them are unchanged.
+- "Export a chart", "Price chart with events" and the dataset explorer keep their commands; only their place in the side panel changed.
+
+**Tests.** `tests/test_v22.py` (31 tests): the Part A fixes; the ego map on a seeded database (each relation; a controller published after the date left out; persons pseudonymised; `UNRESOLVED` holders; depth 2 through a shared holder and a shared director; determinism; the relation filter); the files and manifest a view writes; coverage as of two dates; guidance paired only with the later periodic report; the registry, `viz-list`, `viz-check` and `viz-ego-map`; the relational panel variables; both interactive pages in a headless browser with no console errors; and the Visualise pages of the desktop.
+
+**Matrix.** Linux Python 3.12: 458 passed, 1 skipped (DuckDB not installed). Python 3.13: 430 passed, 28 skipped (no Tk or browser tests). PostgreSQL 16: 455 passed, 4 skipped. Windows CPython 3.12 under Wine: 452 passed, 7 skipped. The Windows build's command-line program lists the views and writes a coverage view under Wine.

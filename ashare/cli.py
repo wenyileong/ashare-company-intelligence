@@ -90,6 +90,7 @@ _NEEDS_UNIVERSE = {
     "universe-at", "security-history", "suspensions", "build-calendar", "show-company", "show-financials",
     "show-market", "profile", "report", "roster", "segments", "subsidiaries", "governance", "control",
     "esg", "peers", "industry-stats", "valuation", "event-study", "universe-stats", "validate-universe",
+    "viz-ego-map", "viz-coverage", "viz-guidance-outcome",
 }
 
 
@@ -1636,6 +1637,104 @@ def topology_cmd(codes: str = typer.Option(None, help="Comma-separated security 
     print({"folder": r["folder"], "files": [Path(f).name for f in files]})
     if viewer:
         print(f"Viewer: {Path(out) / 'topology.html'}")
+
+
+# --- v2.2: the Visualise section (plan section B4.6) ------------------------------------------------------------------
+
+def _viz_run(view_id: str, params: dict, formats: str, width: str) -> None:
+    from pathlib import Path
+    from .viz.registry import get
+    from .viz.view import readiness_line
+    from .viz.data import ParamError
+    from .viz.publish import write_view
+    init_db()
+    view = get(view_id)
+    print(readiness_line(view.readiness(params)))
+    try:
+        built = view.build(params)
+    except ParamError as exc:
+        print(f"[red]{exc}[/red]")
+        raise typer.Exit(1)
+    out = params.get("out") or f"visualise/{view.id}"
+    r = write_view(view, built, out, tuple(f.strip() for f in formats.split(",") if f.strip()), width)
+    snap = built.snapshot
+    for s in snap.get("summary", []):
+        print(f"  {s['label']}: {s['value']}")
+    for c in snap.get("coverage", []):
+        print(f"  {c['item']:<13} {c['status']:<13} {c.get('note') or ''}")
+    print({"folder": r["folder"], "files": r["files"]})
+    if (Path(out) / "view.html").exists():
+        print(f"Interactive page: {Path(out) / 'view.html'}")
+    if (Path(out) / "figures.html").exists():
+        print(f"Figures (print to PDF from the browser): {Path(out) / 'figures.html'}")
+
+
+_FORMATS = typer.Option("html,svg,csv", "--formats", help="html (interactive page), svg (figures), csv (data)")
+_WIDTH = typer.Option("page", "--width", help="Figure width: page (175 mm) or column (85 mm)")
+
+
+@app.command("viz-list")
+def viz_list_cmd():
+    """The views of the Visualise section, with whether their data are ready (v2.2)."""
+    from .viz.registry import views
+    from .viz.view import readiness_line
+    init_db()
+    for v in views():
+        print(f"{v.id:<18} {v.family:<12} {v.command():<22} {v.title}")
+        print(f"  {readiness_line(v.readiness({}))}")
+
+
+@app.command("viz-check")
+def viz_check_cmd(view: str = typer.Argument(..., help="A view: see viz-list"),
+                  code: str = typer.Option(None, "--code", help="For one company (or several, comma-separated)")):
+    """Whether a view's data are ready, and what to run if not (v2.2)."""
+    from .viz.registry import get
+    init_db()
+    try:
+        v = get(view)
+    except KeyError as exc:
+        print(f"[red]{exc.args[0]}[/red]")
+        raise typer.Exit(1)
+    rows = v.readiness({"codes": code} if code else {})
+    _table(rows, ["requirement", "status", "detail", "action"], title=f"{v.title}: data")
+
+
+@app.command("viz-ego-map")
+def viz_ego_map_cmd(code: str = typer.Option(..., "--code", help="Security code"),
+                    as_of: str = typer.Option(None, "--as-of", help="Only what was published by this date"),
+                    depth: int = typer.Option(1, "--depth", help="1, or 2 for the other companies of its holders "
+                                                                 "and directors"),
+                    relations: str = typer.Option("all", "--relations",
+                                                  help="all, control, ownership, group, board or regulators"),
+                    include_licensed: bool = typer.Option(False, "--include-licensed"),
+                    out: str = typer.Option("visualise/ego_map", "--out"), formats: str = _FORMATS,
+                    width: str = _WIDTH):
+    """Ego map (v2.2): one company and its documented relations, as known on a date."""
+    _viz_run("ego_map", {"code": code, "as_of": as_of, "depth": depth, "relations": relations,
+                         "include_licensed": include_licensed, "out": out}, formats, width)
+
+
+@app.command("viz-coverage")
+def viz_coverage_cmd(start: str = typer.Option("2021", "--start", help="First year"),
+                     end: str = typer.Option(None, "--end", help="Last year (default: last year)"),
+                     as_of: str = typer.Option(None, "--as-of"),
+                     group_by: str = typer.Option("auto", "--group-by", help="auto, board or csrc"),
+                     out: str = typer.Option("visualise/coverage", "--out"), formats: str = _FORMATS,
+                     width: str = _WIDTH):
+    """Data coverage (v2.2): which layers, groups and years have data, as known on a date."""
+    _viz_run("coverage", {"start": start, "end": end, "as_of": as_of, "group_by": group_by, "out": out},
+             formats, width)
+
+
+@app.command("viz-guidance-outcome")
+def viz_guidance_outcome_cmd(codes: str = typer.Option(None, "--codes", help="Comma-separated codes (default: all)"),
+                             start: str = typer.Option("2021", "--start"), end: str = typer.Option(None, "--end"),
+                             as_of: str = typer.Option(None, "--as-of"),
+                             out: str = typer.Option("visualise/guidance_outcome", "--out"),
+                             formats: str = _FORMATS, width: str = _WIDTH):
+    """Guidance against outcome (v2.2): forecast ranges against the profit later reported."""
+    _viz_run("guidance_outcome", {"codes": codes, "start": start, "end": end, "as_of": as_of, "out": out},
+             formats, width)
 
 
 @app.command("chart")

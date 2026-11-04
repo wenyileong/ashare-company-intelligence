@@ -223,6 +223,24 @@ These are the interface's own terms for the features of v2.1 (plan v2.1, section
 | Apply (a removal) | 执行 | Unticked, a preview only |
 | Days to fetch again | 重新获取的天数 | With "Fetch finished days again" (重新获取已完成的日期) |
 
+## 13. Terms added in v2.2 (proposed; the renderings stand until reviewed)
+
+| English | Chinese | Notes |
+|---|---|---|
+| Visualise (the group) | 可视化 | |
+| Relational maps | 关系图 | |
+| Ego map (one company at the centre) | 公司关系图 | |
+| Market map | 市场关系图 | v2.3 |
+| Common ownership | 共同持股 | v2.3 |
+| Board interlocks | 董事交叉任职 | |
+| Data coverage | 数据覆盖 | |
+| Readiness | 数据就绪情况 | Ready, partly ready, missing: 已就绪、部分就绪、缺失 |
+| Descriptive proxy | 描述性代理指标 | |
+| Publication figure | 出版用图 | |
+| Company views | 公司图表 | |
+| Econometric charts | 计量分析图表 | |
+| Guidance against outcome | 业绩预告与实际结果对照 | Covers forecasts (业绩预告) and flash reports (业绩快报) |
+
 ## Review record
 
 | Date | Reviewer | Rows settled | Notes |

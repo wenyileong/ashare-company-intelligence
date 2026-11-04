@@ -39,6 +39,8 @@ def render_tk(canvas, spec: ChartSpec, on_click=None) -> list[dict]:
             kw = dict(fill=p["fill"], outline=p["stroke"], width=1.5, dash=p.get("dash") or "")
             if p["shape"] == "diamond":
                 canvas.create_polygon(cx, cy - r - 1, cx + r + 1, cy, cx, cy + r + 1, cx - r - 1, cy, **kw)
+            elif p["shape"] == "triangle":
+                canvas.create_polygon(cx, cy - r - 1, cx + r + 1, cy + r, cx - r - 1, cy + r, **kw)
             elif p["shape"] == "square":
                 canvas.create_rectangle(cx - r, cy - r, cx + r, cy + r, **kw)
             else:

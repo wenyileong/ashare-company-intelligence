@@ -98,3 +98,60 @@ def check(snap: dict) -> list[str]:
     out: list[str] = []
     _check(snap, schema(), "snapshot", out)
     return out
+
+
+# --- v2.2: the snapshots of the Visualise section (plan section B4.3) -------------------------------------------------
+
+_COMMON = {"schema_version": {"enum": [2]}, "view": {"type": "string"}, "software": {"type": "string"},
+           "definitions": {"type": "string"}, "parameters": {"type": "object"}, "policy": {"type": "object"},
+           "evidence": {"enum": ["DOCUMENTED_FACT", "OBSERVED_ASSOCIATION", "DESCRIPTIVE_PROXY"]},
+           "coverage": {"type": "array", "items": {"type": "object"}},
+           "summary": {"type": "array", "items": {"type": "object"}},
+           "notes": {"type": "array", "items": {"type": "string"}}}
+
+
+def graph_schema() -> dict:
+    from .graph import NODE_KINDS, RELATIONS
+    node = {"type": "object", "required": ["id", "kind", "label", "flags", "masked"],
+            "properties": {"id": {"type": "string"}, "kind": {"enum": list(NODE_KINDS)},
+                           "label": {"type": "string"}, "flags": {"type": "array", "items": {"type": "string"}},
+                           "masked": {"type": "boolean"}}}
+    edge = {"type": "object", "required": ["id", "source", "target", "relation", "evidence_status", "basis", "dates"],
+            "properties": {"id": {"type": "string"}, "source": {"type": "string"}, "target": {"type": "string"},
+                           "relation": {"enum": list(RELATIONS)}, "evidence_status": {"type": "string"},
+                           "basis": {"type": "object"}, "dates": _DATES, "label": {"type": ["string", "null"]},
+                           "value": {"type": ["number", "null"]}}}
+    return {"$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/wenyileong/ashare-company-intelligence/view/graph/v2",
+            "title": "A graph view of the Visualise section", "type": "object",
+            "required": ["schema_version", "kind", "view", "parameters", "policy", "evidence", "nodes", "edges"],
+            "properties": {**_COMMON, "kind": {"enum": ["graph"]}, "relations": {"type": "object"},
+                           "nodes": {"type": "array", "items": node}, "edges": {"type": "array", "items": edge}}}
+
+
+def series_schema() -> dict:
+    table = {"type": "object", "required": ["columns", "rows", "title"],
+             "properties": {"columns": {"type": "array", "items": {"type": "string"}},
+                            "rows": {"type": "array", "items": {"type": "object"}}, "title": {"type": "string"}}}
+    return {"$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/wenyileong/ashare-company-intelligence/view/series/v2",
+            "title": "A chart view of the Visualise section", "type": "object",
+            "required": ["schema_version", "kind", "view", "parameters", "policy", "evidence", "tables"],
+            "properties": {**_COMMON, "kind": {"enum": ["series"]},
+                           "tables": {"type": "object"}},
+            "x-table": table}
+
+
+def check_view(snap: dict) -> list[str]:
+    out: list[str] = []
+    sch = graph_schema() if snap.get("kind") == "graph" else series_schema()
+    _check(snap, sch, "view", out)
+    if snap.get("kind") == "series":
+        for name, t in (snap.get("tables") or {}).items():
+            _check(t, sch["x-table"], f"view.tables.{name}", out)
+    if snap.get("kind") == "graph":
+        ids = {n["id"] for n in snap.get("nodes", [])}
+        for e in snap.get("edges", []):
+            if e["source"] not in ids or e["target"] not in ids:
+                out.append(f"edge {e['id']}: an end is not a node")
+    return out

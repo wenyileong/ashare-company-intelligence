@@ -1,6 +1,34 @@
 # Change log
 
-This log records what changed in each version and the important findings behind the changes. The live-run findings are kept in full in `docs/live_run_findings_v2.0.2.md` (findings 1 to 19) `docs/live_run_findings_v2.0.3.md` (findings 20 to 34) and `docs/live_run_findings_v2.0.5.md` (findings 35 to 57, the first live runs of the v2.0.4 catalogue engine) `docs/live_run_findings_v2.0.6.md` (findings 58 to 69) and `docs/live_run_findings_v2.0.7.md` (findings 70 to 95) and `docs/live_run_findings_v2.0.8.md` (findings 96 to 111) and `docs/live_run_findings_v2.0.9.md` (findings 112 to 117) and `docs/live_run_findings_v2.1.md` (findings 118 to 131). The plan for v2.1, with its six rounds of review, is `docs/plan_v2.1.md`. Earlier versions are described in `README.md` and in section 18 of `ashare_scraper_build_plan.md`.
+This log records what changed in each version and the important findings behind the changes. The live-run findings are kept in full in `docs/live_run_findings_v2.0.2.md` (findings 1 to 19) `docs/live_run_findings_v2.0.3.md` (findings 20 to 34) and `docs/live_run_findings_v2.0.5.md` (findings 35 to 57, the first live runs of the v2.0.4 catalogue engine) `docs/live_run_findings_v2.0.6.md` (findings 58 to 69) and `docs/live_run_findings_v2.0.7.md` (findings 70 to 95) and `docs/live_run_findings_v2.0.8.md` (findings 96 to 111) and `docs/live_run_findings_v2.0.9.md` (findings 112 to 117) and `docs/live_run_findings_v2.1.md` (findings 118 to 131) and `docs/live_run_findings_v2.1.2.md` (findings 132 to 139). The plan for v2.1, with its six rounds of review, is `docs/plan_v2.1.md`. Earlier versions are described in `README.md` and in section 18 of `ashare_scraper_build_plan.md`.
+
+## v2.2.0 (4 November 2026)
+
+**Aim:** fix what the author's v2.1.2 test plan showed (`docs/live_run_findings_v2.1.2.md`, findings 132 to 139), and gather the charts, the topology view and new relational and econometric views in a **Visualise** section with a common foundation. The plan is `docs/plan_v2.2.md`; its build record lists what differs from it.
+
+**After upgrading:**
+1. "Extract figures from reports" (financials-5) and "Read controlling shareholder and actual controller" (control-4). Every report is read again.
+2. "Check balance sheets", then "Companies with the same controller".
+3. **Visualise > Data coverage**, then **Visualise > Relational maps > Ego map** for a company with reports read.
+
+- **Balance sheets (finding 132).** A total read without its first digit is now also restored when the other reading of the same document has the complete figure, or when the statement's grand total (负债和所有者权益总计) confirms it and only one total can be short. Nothing is restored when two totals could be short. Version financials-5.
+- **Controllers (finding 133).** A legal representative's name glued to the second half of a wrapped name ("杨军资产监督管理委员会") is removed; pieces of the phrase "代表国家履行出资人职责的…" are no longer taken as names; 省政府 and 省人民政府 group as one. Version control-4.
+- **Download estimates (finding 135).** Rates are kept by kind of document, as a running mean over runs of at least 25 documents.
+- **Stop notes (finding 136).** The catalogue's note says that a rerun downloads the documents still missing once every day is finished; notes added for ESG, guidance and the scanned-page check.
+- **ESG counts (finding 137).** Unchanged title rows are counted as "unchanged", not "updated".
+- **Short documents (finding 138).** Two- and three-page documents with text on every page but the last are FULL.
+- **The Visualise section.** A new group in the side panel:
+  - **Topology** (moved from Analyse; unchanged).
+  - **Relational maps > Ego map** (`viz-ego-map`): one company at the centre, with its actual controller and control chain, top-10 holders, subsidiaries, directors and officers (under pseudonyms), the regulators that acted on it and its CSRC sector, as known on a date. Depth 2 adds the other listed companies the same holders hold and the same persons serve (board interlocks).
+  - **Company views**: "Export a chart" and "Price chart with events" (moved from Research and Datasets).
+  - **Econometric charts**: the dataset explorer (moved from Datasets) and **Guidance against outcome** (`viz-guidance-outcome`): each forecast or flash-report range against the profit in the first periodic report published after it.
+  - **Data coverage** (`viz-coverage`): the share of companies listed at each year end with data in each layer, by board or CSRC section, with the confidence of the figures and the balance of the panel.
+  - Each view's page states which data it needs and whether they are there (met, partly met, missing), with the action that fills each gap (`viz-check VIEW`). `viz-list` lists the views.
+- **What each view writes.** An offline interactive page (`view.html`), `view.json` with its JSON schema, the data as CSV, publication figures as SVG and CSV (`--width column` or `page`) with a print-ready `figures.html`, and a manifest with each file's SHA-256, the database fingerprint, the evidential status and the version of the definitions (`nvf-0`). Natural persons are pseudonymised and licensed data left out by default, as in releases.
+- **Panels.** Three optional variables: `ctrl_group` (an opaque identifier of the controller group, for fixed effects or clustering), `ctrl_distance` (steps to the ultimate controller) and `reg_actions_12m` (regulatory events in the past year). Panels without them are unchanged.
+- **Chinese interface.** The new pages and the glossary's part 13.
+- **Tests.** 458 pass on Linux Python 3.12 (one skip), 430 on 3.13 (28 skips), 455 against PostgreSQL 16 (four skips) and 452 on Windows CPython 3.12 under Wine (seven skips).
+- **Not in this version.** The quarterly top-10 layout (finding 134) and rejoining a lone digit at the source (finding 132, rule 3) wait on the author's samples and follow in v2.2.1. The market map, common ownership and sector views follow in v2.3.
 
 ## v2.1.2 (2 November 2026)
 

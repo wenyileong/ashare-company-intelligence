@@ -129,6 +129,94 @@ def network(spec: ChartSpec) -> list[dict]:
     return out
 
 
+# --- v2.2: the ego map -------------------------------------------------------------------------------------------
+
+#: the arc of the circle (degrees, clockwise from the right, y downwards) each kind of relation is drawn in
+EGO_ARCS = {"control": (235, 305), "sector": (310, 335), "holders": (340, 400), "group": (45, 135),
+            "regulators": (140, 170), "board": (175, 230)}
+KIND_COLOURS = {"company": "#0072B2", "entity": "#56B4E9", "person": "#CC79A7", "authority": "#D55E00",
+                "sector": "#009E73", "group": "#E69F00"}
+SHAPES = {"company": "square", "entity": "circle", "person": "diamond", "authority": "triangle", "sector": "square",
+          "group": "circle"}
+
+
+def ego_spec(snap: dict) -> ChartSpec:
+    """The chart specification of an ego-map snapshot (publication figure)."""
+    nodes = [{"id": n["id"], "label": n["label"], "group": n["kind"], "ring": n.get("ring") or "second",
+              "centre": bool(n.get("centre"))} for n in snap["nodes"]]
+    edges = [{"from": e["source"], "to": e["target"], "label": e.get("label"), "relation": e["relation"]}
+             for e in snap["edges"]]
+    p = snap.get("parameters", {})
+    spec = ChartSpec("ego", p.get("title") or "Ego map", [], graph={"nodes": nodes, "edges": edges},
+                     subtitle="Controller above, holders right, group below, board left; second-step companies "
+                              "on the outer ring",
+                     caption=f"Documented relations published by {p.get('as_of')}; persons under pseudonyms; "
+                             "top-10 tables list ten holders only.")
+    spec.height = 620
+    return spec
+
+
+def _short(text: str, n: int = 14) -> str:
+    return text if len(text) <= n else text[: n - 1] + "…"
+
+
+def ego(spec: ChartSpec) -> list[dict]:
+    out: list[dict] = []
+    g = spec.graph
+    nodes = g["nodes"]
+    if not nodes:
+        return out
+    cx, cy = spec.width / 2, (spec.height + 40) / 2
+    r1 = min(spec.width, spec.height - 90) / 2 * 0.55
+    r2 = r1 * 1.65
+    pos: dict[str, tuple[float, float]] = {}
+    angle: dict[str, float] = {}
+    by_ring: dict[str, list] = {}
+    for n in nodes:
+        if n.get("centre"):
+            pos[n["id"]] = (cx, cy)
+        else:
+            by_ring.setdefault(n["ring"], []).append(n)
+    for ring, (a0, a1) in EGO_ARCS.items():
+        members = sorted(by_ring.get(ring, []), key=lambda n: n["label"])
+        for i, n in enumerate(members):
+            a = a0 + (a1 - a0) * (i + 0.5) / len(members)
+            angle[n["id"]] = a
+            pos[n["id"]] = (cx + r1 * math.cos(math.radians(a)), cy + r1 * math.sin(math.radians(a)))
+    second = sorted(by_ring.get("second", []), key=lambda n: n["label"])
+    near: dict[str, list] = {}
+    for e in g["edges"]:
+        for a, b in ((e["from"], e["to"]), (e["to"], e["from"])):
+            if a in angle:
+                near.setdefault(b, []).append(angle[a])
+    placed = sorted(second, key=lambda n: (sum(near.get(n["id"], [0])) / max(len(near.get(n["id"], [0])), 1),
+                                           n["label"]))
+    for i, n in enumerate(placed):
+        a = 360 * (i + 0.5) / max(len(placed), 1) if not near.get(n["id"]) else \
+            sum(near[n["id"]]) / len(near[n["id"]]) + (i % 3 - 1) * 6
+        pos[n["id"]] = (cx + r2 * math.cos(math.radians(a)), cy + r2 * math.sin(math.radians(a)))
+    for e in g["edges"]:
+        if e["from"] in pos and e["to"] in pos:
+            (x1, y1), (x2, y2) = pos[e["from"]], pos[e["to"]]
+            dash = (4, 3) if e.get("relation") in ("SERVES_ON", "ACTS_ON") else None
+            out.append({"type": "line", "x1": x1, "y1": y1, "x2": x2, "y2": y2, "stroke": GRID if dash else "#8c959f",
+                        "width": 1, "dash": dash})
+    for n in nodes:
+        if n["id"] not in pos:
+            continue
+        x, y = pos[n["id"]]
+        col = KIND_COLOURS.get(n["group"], PALETTE[0])
+        out.append({"type": "marker", "shape": SHAPES.get(n["group"], "circle"), "cx": x, "cy": y,
+                    "r": 9 if n.get("centre") else 5, "fill": col, "stroke": "#000000" if n.get("centre") else col,
+                    "dash": None, "tip": n["label"], "meta": {}})
+        right = x >= cx
+        out.append({"type": "text", "x": x + (8 if right else -8), "y": y + 4,
+                    "text": n["label"] if n.get("centre") else _short(n["label"]),
+                    "anchor": "start" if right else "end", "size": 11 if n.get("centre") else 9, "colour": FG,
+                    "weight": "bold" if n.get("centre") else "normal"})
+    return out
+
+
 from .layers import layers  # noqa: E402  (v2.1: the NVF layered view)
 
-DIAGRAMS = {"chain": chain, "tree": tree, "network": network, "layers": layers}
+DIAGRAMS = {"chain": chain, "tree": tree, "network": network, "layers": layers, "ego": ego}

@@ -131,42 +131,66 @@ def _read_rates() -> dict:
         return {}
 
 
-def _record_rates(seconds: float, n: int, mb_by_kind: dict) -> None:
-    """Keep the measured rate (seconds a document) and mean size by kind for the next estimate."""
+#: v2.2 (finding 135): a run of fewer documents than this does not change the recorded rates
+MIN_TIMED = 25
+
+
+def _record_rates(by_kind: dict) -> None:
+    """Keep, for each kind of document, the mean seconds and size of a download, for the next estimate.
+
+    ``by_kind``: kind -> (seconds, megabytes, documents) of this run. v2.2 (finding 135): kept by kind (forecasts took
+    5.2 s a document, reports 2.7 s), as a running mean (half the old value, half the new), and only from a kind with
+    at least ``MIN_TIMED`` documents in the run, so that a run stopped after a few documents does not mislead."""
     import json
-    if n <= 0:
-        return
     r = _read_rates()
-    r["seconds_per_document"] = round(seconds / n, 2)
-    sizes = r.get("mb_by_kind") if isinstance(r.get("mb_by_kind"), dict) else {}
-    for kind, (mb, k) in mb_by_kind.items():
-        if k:
-            sizes[kind] = round(mb / k, 2)
-    r["mb_by_kind"] = sizes
+    kinds = r.get("kinds") if isinstance(r.get("kinds"), dict) else {}
+    changed = False
+    for kind, (secs, mb, n) in by_kind.items():
+        if n < MIN_TIMED:
+            continue
+        old = kinds.get(kind) if isinstance(kinds.get(kind), dict) else {}
+        s_new, mb_new = secs / n, mb / n
+        try:
+            s_val = (float(old["seconds"]) + s_new) / 2 if old.get("seconds") else s_new
+            mb_val = (float(old["mb"]) + mb_new) / 2 if old.get("mb") else mb_new
+        except (TypeError, ValueError):
+            s_val, mb_val = s_new, mb_new
+        kinds[kind] = {"seconds": round(s_val, 2), "mb": round(mb_val, 2)}
+        changed = True
+    if not changed:
+        return
+    r = {"kinds": kinds}
     try:
-        _rates_file().write_text(json.dumps(r, indent=2), encoding="utf-8")
+        _rates_file().write_text(json.dumps(r, indent=2, sort_keys=True), encoding="utf-8")
     except Exception:
         pass
 
 
 def download_estimate(rows) -> dict:
-    """Size and time of a download. v2.1.2: from the rate and sizes measured in earlier downloads, when known."""
+    """Size and time of a download: from the rates measured for each kind in earlier downloads, when known
+    (v2.1.2, by kind since v2.2), otherwise from the mean of the known kinds, otherwise from the defaults."""
     rates = _read_rates()
-    sizes = rates.get("mb_by_kind") if isinstance(rates.get("mb_by_kind"), dict) else {}
-    try:
-        per = float(rates.get("seconds_per_document") or DEFAULT_SECONDS)
-    except (TypeError, ValueError):
-        per = DEFAULT_SECONDS
-    mb = 0.0
+    kinds = rates.get("kinds") if isinstance(rates.get("kinds"), dict) else {}
+
+    def num(x):
+        try:
+            return float(x)
+        except (TypeError, ValueError):
+            return None
+    known = [num(v.get("seconds")) for v in kinds.values() if isinstance(v, dict) and num(v.get("seconds"))]
+    fallback = sum(known) / len(known) if known else DEFAULT_SECONDS
+    secs = mb = 0.0
+    measured = 0
     for r in rows:
         k = r.kind or ""
-        try:
-            mb += float(sizes.get(k) or TYPICAL_MB.get(k, 1.0))
-        except (TypeError, ValueError):
-            mb += TYPICAL_MB.get(k, 1.0)
+        v = kinds.get(k) if isinstance(kinds.get(k), dict) else {}
+        s = num(v.get("seconds"))
+        measured += s is not None
+        secs += s if s is not None else fallback
+        mb += num(v.get("mb")) or TYPICAL_MB.get(k, 1.0)
     n = len(rows)
-    return {"documents": n, "approx_gb": round(mb / 1024, 1), "approx_hours": round(n * per / 3600, 1),
-            "seconds_each": per, "measured": "seconds_per_document" in rates}
+    return {"documents": n, "approx_gb": round(mb / 1024, 1), "approx_hours": round(secs / 3600, 1),
+            "seconds_each": round(secs / n, 1) if n else fallback, "measured": bool(n) and measured == n}
 
 
 def download_pending(ids: list[int] | None = None, kinds: tuple[str, ...] | None = None,
@@ -183,8 +207,7 @@ def download_pending(ids: list[int] | None = None, kinds: tuple[str, ...] | None
     adapter = adapter or CNInfoDisclosureAdapter()
     session = SessionLocal()
     done = failed = 0
-    t0 = time.monotonic()
-    sizes: dict = {}
+    timed: dict = {}                     # kind -> (seconds, megabytes, documents)
     try:
         q = session.query(Disclosure).filter(Disclosure.document_url.isnot(None))
         if kinds:
@@ -200,30 +223,31 @@ def download_pending(ids: list[int] | None = None, kinds: tuple[str, ...] | None
         est = download_estimate(rows)
         _say(progress, f"Downloading {est['documents']:,} documents: roughly {est['approx_gb']} GB and "
                        f"{est['approx_hours']} hours at {est['seconds_each']:.1f} s a document"
-                       + (" (the rate of the last download)" if est["measured"] else "")
+                       + (" (the rates of earlier downloads)" if est["measured"] else "")
                        + ". You can stop at any time; running the same action again skips files already downloaded.")
         companies = {c.id: c for c in session.query(Company)}
         n = len(rows)
         prog = Progress(n, progress)
         try:
             for i, row in enumerate(rows, 1):
+                t_doc = time.monotonic()
                 try:
                     store_downloaded(adapter, companies[row.company_id], row)
                     session.commit()
                     done += 1
                     try:
                         mb = Path(row.local_path).stat().st_size / 1048576 if row.local_path else 0.0
-                        tot_mb, k = sizes.get(row.kind or "", (0.0, 0))
-                        sizes[row.kind or ""] = (tot_mb + mb, k + 1)
                     except OSError:
-                        pass
+                        mb = 0.0
+                    sec0, mb0, k0 = timed.get(row.kind or "", (0.0, 0.0, 0))
+                    timed[row.kind or ""] = (sec0 + time.monotonic() - t_doc, mb0 + mb, k0 + 1)
                 except Exception as exc:
                     session.rollback()
                     failed += 1
                     _say(progress, f"  [{i}/{n}] {row.sec_code} {row.title_cn}: download failed ({exc!r})")
                 prog.step()
         finally:
-            _record_rates(time.monotonic() - t0, done, sizes)
+            _record_rates(timed)
         return {"downloaded": done, "download_failed": failed}
     finally:
         session.close()

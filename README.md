@@ -1,4 +1,4 @@
-# China A-share Company Intelligence v2.1.2
+# China A-share Company Intelligence v2.2.0
 
 A provenance-preserving research data system for SSE Main Board, STAR Market, SZSE Main Board and ChiNext companies. The architecture is set out in `ashare_scraper_build_plan.md`. Changes by version, and the findings behind them, are in `CHANGELOG.md`. The live-run findings are in:
 - `docs/live_run_findings_v2.0.2.md`;
@@ -8,9 +8,10 @@ A provenance-preserving research data system for SSE Main Board, STAR Market, SZ
 - `docs/live_run_findings_v2.0.7.md`;
 - `docs/live_run_findings_v2.0.8.md`;
 - `docs/live_run_findings_v2.0.9.md`;
-- `docs/live_run_findings_v2.1.md`.
+- `docs/live_run_findings_v2.1.md`;
+- `docs/live_run_findings_v2.1.2.md`.
 
-The register of the findings, and the visualisation plan, is `docs/plan_v2.0.8_and_visualisation.md`; the plan for v2.1 is `docs/plan_v2.1.md`, and for v2.1.2 `docs/plan_v2.1.2.md`.
+The register of the findings, and the visualisation plan, is `docs/plan_v2.0.8_and_visualisation.md`; the plan for v2.1 is `docs/plan_v2.1.md`, for v2.1.2 `docs/plan_v2.1.2.md`, and for v2.2 `docs/plan_v2.2.md`.
 
 ## The paper this software accompanies
 
@@ -25,6 +26,7 @@ SSRN's suggested citation: Leong, Wen Yi, Institutional Coordination and the Mak
   - It covers a set of companies or a CSRC industry over a span of years, as of a chosen date.
   - Every item traces to the document and page it was read from, and an empty layer is shown as a gap, not filled.
   - The semiconductor episode (CSRC C39) is the first worked episode.
+- **The Visualise section** (v2.2) adds views around the framework: a company's relations (controller and chain, holders, subsidiaries, directors, regulators), the share of companies with data in each layer, and management guidance against the outcome later reported. Each view writes an offline interactive page, its data and publication figures, with a manifest. The ratios they compute are descriptive proxies, labelled and versioned (`nvf-0`), not the paper's measures.
 - **Point-in-time panels** give the same observations as datasets for estimation: each value is dated by when it was published, so that a test uses only what was known at the time.
 
 **What it does not claim.**
@@ -42,6 +44,13 @@ SSRN's suggested citation: Leong, Wen Yi, Institutional Coordination and the Mak
 - Point-in-time panel econometrics of fundamentals, segments, R&D and workforce.
 - ESG disclosure, kept as disclosed, without a composite score.
 - Work with Chinese-language primary sources, with every value traceable to its page.
+
+v2.2 fixes what the v2.1.2 test runs showed (`docs/live_run_findings_v2.1.2.md`, findings 132 to 139), and adds the **Visualise** section (`docs/plan_v2.2.md`):
+- **Balance sheets.** A total read without its first digit is also restored when the other reading of the document, or the statement's grand total, confirms it.
+- **Controllers.** A legal representative's name printed against a wrapped controller's name is removed, and the forms of a commission's name group as one.
+- **Visualise.** The topology view, the company charts and the dataset explorer move under one heading, with three new views: the ego map (one company's relations as known on a date), data coverage, and guidance against outcome. Each page says which data the view needs and whether they are there. Every view writes an offline interactive page, its data as JSON and CSV, publication figures (SVG) and a manifest.
+- **Panels.** Optional relational variables: controller group, steps to the ultimate controller, regulatory events in the past year.
+- **Smaller fixes.** Download estimates by kind of document, clearer stop notes, unchanged ESG rows counted as such, and short announcements no longer marked as partly scanned.
 
 v2.1.2 fixes what the v2.1 and v2.1.1 live runs showed (`docs/live_run_findings_v2.1.md`, findings 118 to 131), and adds a scrollable side panel and a Files page (`docs/plan_v2.1.2.md`):
 - **Parallel reading.** About one document in 25 failed in the desktop program's parallel reading (a progress line written where there is no console).

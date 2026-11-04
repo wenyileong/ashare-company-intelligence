@@ -527,12 +527,80 @@ def _top10(kind):
     return get
 
 
+def _relational(kind):
+    """v2.2 (plan section B7): relational variables, from the control readings and regulatory events published by the
+    row's cut-off."""
+    def get(ctx):
+        from .control import control_at, controller_key
+        if kind == "reg_actions":
+            from .models import SessionLocal, Company, RegulatoryEvent
+            end = min(ctx.measure_date, ctx.cutoff)
+            start = (date.fromisoformat(end) - timedelta(days=365)).isoformat()
+            s = SessionLocal()
+            try:
+                c = s.query(Company).filter_by(security_code=ctx.code).first()
+                if c is None:
+                    return None, None, None, None
+                n = sum(1 for e in s.query(RegulatoryEvent).filter(RegulatoryEvent.company_id == c.id)
+                        if start < (e.event_date or e.announcement_date or "") <= end
+                        and (e.announcement_date or e.event_date or "") <= ctx.cutoff)
+            finally:
+                s.close()
+            return float(n), None, "MEDIUM", None
+        key = ("ctl", ctx.cutoff)
+        if key not in ctx.cache:
+            ctx.cache[key] = control_at(ctx.code, min(ctx.measure_date, ctx.cutoff) if ctx.cutoff != "9999-12-31"
+                                        else ctx.measure_date)
+        r = ctx.cache[key] or {}
+        c = r.get("control") or {}
+        if kind == "group":
+            name = c.get("actual_controller")
+            if not name:
+                return None, c.get("published"), None, None
+            from .release import load_key, pseudonym
+            # an opaque identifier: the same for every company under one controller, and no name in the panel
+            return "G" + pseudonym(controller_key(name), load_key())[1:], c.get("published"), "MEDIUM", None
+        chain = r.get("chain") or []
+        if chain:
+            parents = {e["parent"] for e in chain}
+            children = {e["child"] for e in chain}
+            tops = parents - children
+            depth: dict = {}
+
+            def steps(node, seen=()):
+                if node in depth:
+                    return depth[node]
+                kids = [e["child"] for e in chain if e["parent"] == node and e["child"] not in seen]
+                depth[node] = 1 + max((steps(k, seen + (node,)) for k in kids), default=0) if kids else 0
+                return depth[node]
+            return float(max((steps(t) for t in tops), default=len(chain))), c.get("published"), "MEDIUM", None
+        if not c.get("actual_controller"):
+            return None, c.get("published"), None, None
+        same = (c.get("actual_controller") or "") == (c.get("controlling_shareholder") or "")
+        return (1.0 if same else 2.0), c.get("published"), "LOW", None
+    return get
+
+
 def _register_control():
     _var("ownership_type", "ownership type", "TEXT", "control", "CENTRAL_SOE, LOCAL_SOE, PRIVATE, FOREIGN, COLLECTIVE, "
          "NO_CONTROLLER or UNKNOWN, from the actual controller", "", "control_observations",
          "latest report published by the cut-off", getter=_control("ownership_type"))
     _var("soe", "state-owned (1/0)", "DUMMY", "control", "actual controller is a central or local state body", "",
          "control_observations", getter=_control("soe"))
+    _var("ctrl_group", "controller group", "TEXT", "relational", "an opaque identifier shared by every company "
+         "under the same actual controller (the forms of a state-owned assets commission's name count as one); "
+         "for fixed effects or clustering", "", "control_observations",
+         "latest report published by the cut-off", getter=_relational("group"),
+         confidence="names are never written: the identifier is a keyed hash, as pseudonyms in releases")
+    _var("ctrl_distance", "steps to the ultimate controller", "COUNT", "relational", "links on the longest path from "
+         "the ultimate controller to the company in the control chain; without a chain, 1 when the actual "
+         "controller is the controlling shareholder and 2 otherwise (class LOW)", "", "control_edges, "
+         "control_observations", "latest report published by the cut-off", getter=_relational("distance"),
+         confidence="MEDIUM from a chain; LOW from the controller and controlling shareholder alone. Network "
+                    "observations are not independent: use clustered or network-robust standard errors")
+    _var("reg_actions_12m", "regulatory events in the past year", "COUNT", "relational", "regulatory events "
+         "(any kind) concerning the company in the twelve months to the row's date", "", "regulatory_events",
+         "events published by the cut-off", getter=_relational("reg_actions"))
     _var("top10_pct", "top-10 holders' combined stake", "RATIO", "ownership", "sum of the top-10 holders' stakes", "",
          "ownership_observations (top-10 tables)", getter=_top10("sum"))
     _var("top_holder_pledged", "largest holder's pledged share", "RATIO", "ownership",

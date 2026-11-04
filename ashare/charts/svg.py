@@ -52,6 +52,10 @@ def render_svg(spec: ChartSpec) -> str:
                 shape = (f'<polygon points="{_n(cx)},{_n(cy - r - 1)} {_n(cx + r + 1)},{_n(cy)} {_n(cx)},{_n(cy + r + 1)} '
                          f'{_n(cx - r - 1)},{_n(cy)}" {attrs}>')
                 close = "</polygon>"
+            elif p["shape"] == "triangle":            # v2.2: authorities in the ego map
+                shape = (f'<polygon points="{_n(cx)},{_n(cy - r - 1)} {_n(cx + r + 1)},{_n(cy + r)} '
+                         f'{_n(cx - r - 1)},{_n(cy + r)}" {attrs}>')
+                close = "</polygon>"
             elif p["shape"] == "square":
                 shape = f'<rect x="{_n(cx - r)}" y="{_n(cy - r)}" width="{_n(2 * r)}" height="{_n(2 * r)}" {attrs}>'
                 close = "</rect>"

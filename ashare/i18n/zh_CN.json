@@ -293,7 +293,7 @@
  },
  "action.board.interlocks.label": {
   "en_hash": "90a06389eb",
-  "zh": "董事兼任关系"
+  "zh": "董事交叉任职"
  },
  "action.board.interlocks.note": {
   "en_hash": "411c03b20e",
@@ -438,6 +438,86 @@
  "action.company.timeline.label": {
   "en_hash": "018514a3d5",
   "zh": "时间线"
+ },
+ "action.company_views.chart.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.company_views.chart.field.kind.label": {
+  "en_hash": "66c7734789",
+  "zh": "图表"
+ },
+ "action.company_views.chart.field.metrics.label": {
+  "en_hash": "b5e2d31cc2",
+  "zh": "指标（财务数据）"
+ },
+ "action.company_views.chart.field.out.hint": {
+  "en_hash": "6b84ea2c04",
+  "zh": "不含扩展名的文件名"
+ },
+ "action.company_views.chart.field.out.label": {
+  "en_hash": "f313a0b181",
+  "zh": "另存为"
+ },
+ "action.company_views.chart.label": {
+  "en_hash": "65cf77d0d5",
+  "zh": "导出图表"
+ },
+ "action.company_views.chart.note": {
+  "en_hash": "db9b382e2f",
+  "zh": "输出 SVG（用于论文及演示文稿）及与图表数据完全一致的 CSV；安装 matplotlib 时（源代码安装）另输出 PNG。"
+ },
+ "action.company_views.price-chart.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.company_views.price-chart.field.code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.company_views.price-chart.label": {
+  "en_hash": "eebaa33e5b",
+  "zh": "带事件标注的价格图"
+ },
+ "action.company_views.price-chart.note": {
+  "en_hash": "207a0da083",
+  "zh": "复权收盘价，并标注分红、监管、管理层变动及上市相关事件。"
+ },
+ "action.coverage.viz-coverage.field.as_of.hint": {
+  "en_hash": "4211f4e59e",
+  "zh": "留空则为今日。"
+ },
+ "action.coverage.viz-coverage.field.as_of.label": {
+  "en_hash": "3011562209",
+  "zh": "披露截至"
+ },
+ "action.coverage.viz-coverage.field.end.label": {
+  "en_hash": "bf120d9485",
+  "zh": "截止年度"
+ },
+ "action.coverage.viz-coverage.field.group_by.hint": {
+  "en_hash": "27ab83c34e",
+  "zh": "auto：已导入行业分类时按证监会行业门类分组，否则按板块分组。"
+ },
+ "action.coverage.viz-coverage.field.group_by.label": {
+  "en_hash": "ae9629f4eb",
+  "zh": "分组"
+ },
+ "action.coverage.viz-coverage.field.out.label": {
+  "en_hash": "30baa24967",
+  "zh": "文件夹"
+ },
+ "action.coverage.viz-coverage.field.start.label": {
+  "en_hash": "a5bbd447f8",
+  "zh": "起始年度"
+ },
+ "action.coverage.viz-coverage.label": {
+  "en_hash": "becd0ef491",
+  "zh": "数据覆盖"
+ },
+ "action.coverage.viz-coverage.note": {
+  "en_hash": "c7b4270227",
+  "zh": "以某一日期已披露的信息为准，哪些层、分组和年度有数据：各层有数据的上市公司占比、财务数据的置信度及面板的平衡情况（上市、退市、有财务数据的公司）。"
  },
  "action.datasets.adjustment-factors.field.security_code.hint": {
   "en_hash": "7bb1962600",
@@ -610,30 +690,6 @@
  "action.datasets.panel-variables.label": {
   "en_hash": "1e8cc8f51b",
   "zh": "列出面板数据变量"
- },
- "action.datasets.price-chart.field.code.hint": {
-  "en_hash": "f5ead96f3b",
-  "zh": "六位数字，例如 600519。"
- },
- "action.datasets.price-chart.field.code.label": {
-  "en_hash": "f6a8a2fbae",
-  "zh": "证券代码"
- },
- "action.datasets.price-chart.label": {
-  "en_hash": "eebaa33e5b",
-  "zh": "带事件标注的价格图"
- },
- "action.datasets.price-chart.note": {
-  "en_hash": "207a0da083",
-  "zh": "复权收盘价，并标注分红、监管、管理层变动及上市相关事件。"
- },
- "action.datasets.version.label": {
-  "en_hash": "29be9326ad",
-  "zh": "打开数据集浏览器"
- },
- "action.datasets.version.note": {
-  "en_hash": "37cdcdd963",
-  "zh": "任一面板数据的直方图、分年度分布、带拟合线的散点图、覆盖率及相关系数。"
  },
  "action.disclosures.catalogue-days.field.by_day.hint": {
   "en_hash": "da941bbc05",
@@ -826,6 +882,50 @@
  "action.disclosures.search-disclosures.label": {
   "en_hash": "3a0a093b66",
   "zh": "按标题查找公告"
+ },
+ "action.econometric.version.label": {
+  "en_hash": "29be9326ad",
+  "zh": "打开数据集浏览器"
+ },
+ "action.econometric.version.note": {
+  "en_hash": "37cdcdd963",
+  "zh": "任一面板数据的直方图、分年度分布、带拟合线的散点图、覆盖率及相关系数。"
+ },
+ "action.econometric.viz-guidance-outcome.field.as_of.hint": {
+  "en_hash": "4211f4e59e",
+  "zh": "留空则为今日。"
+ },
+ "action.econometric.viz-guidance-outcome.field.as_of.label": {
+  "en_hash": "3011562209",
+  "zh": "披露截至"
+ },
+ "action.econometric.viz-guidance-outcome.field.codes.hint": {
+  "en_hash": "c1ad04882d",
+  "zh": "以逗号分隔的代码；留空则为全部公司。"
+ },
+ "action.econometric.viz-guidance-outcome.field.codes.label": {
+  "en_hash": "9dba7ad7c5",
+  "zh": "公司"
+ },
+ "action.econometric.viz-guidance-outcome.field.end.label": {
+  "en_hash": "bf120d9485",
+  "zh": "截止年度"
+ },
+ "action.econometric.viz-guidance-outcome.field.out.label": {
+  "en_hash": "30baa24967",
+  "zh": "文件夹"
+ },
+ "action.econometric.viz-guidance-outcome.field.start.label": {
+  "en_hash": "a5bbd447f8",
+  "zh": "起始年度"
+ },
+ "action.econometric.viz-guidance-outcome.label": {
+  "en_hash": "2f63976c55",
+  "zh": "业绩预告与实际结果对照"
+ },
+ "action.econometric.viz-guidance-outcome.note": {
+  "en_hash": "5c9b3e672b",
+  "zh": "将每份业绩预告或业绩快报的区间与其后定期报告披露的利润相对照：实际结果落入区间的频率，以及与区间中点的偏差幅度。"
  },
  "action.files.files-check.label": {
   "en_hash": "4fe284aa84",
@@ -1763,33 +1863,45 @@
   "en_hash": "50cb854d59",
   "zh": "显示监管事项"
  },
- "action.research.chart.field.code.label": {
+ "action.relational.viz-ego-map.field.as_of.hint": {
+  "en_hash": "ee030e962a",
+  "zh": "仅使用该日期前已披露的信息（留空则为今日）。"
+ },
+ "action.relational.viz-ego-map.field.as_of.label": {
+  "en_hash": "3011562209",
+  "zh": "披露截至"
+ },
+ "action.relational.viz-ego-map.field.code.hint": {
+  "en_hash": "f5ead96f3b",
+  "zh": "六位数字，例如 600519。"
+ },
+ "action.relational.viz-ego-map.field.code.label": {
   "en_hash": "f6a8a2fbae",
   "zh": "证券代码"
  },
- "action.research.chart.field.kind.label": {
-  "en_hash": "66c7734789",
-  "zh": "图表"
+ "action.relational.viz-ego-map.field.depth.hint": {
+  "en_hash": "8e28d2e6b1",
+  "zh": "1：仅本公司的关系；2：另含其股东持有的其他公司及其董事、高级管理人员任职的其他公司。"
  },
- "action.research.chart.field.metrics.label": {
-  "en_hash": "b5e2d31cc2",
-  "zh": "指标（财务数据）"
+ "action.relational.viz-ego-map.field.depth.label": {
+  "en_hash": "df0e298e35",
+  "zh": "层级"
  },
- "action.research.chart.field.out.hint": {
-  "en_hash": "6b84ea2c04",
-  "zh": "不含扩展名的文件名"
+ "action.relational.viz-ego-map.field.out.label": {
+  "en_hash": "30baa24967",
+  "zh": "文件夹"
  },
- "action.research.chart.field.out.label": {
-  "en_hash": "f313a0b181",
-  "zh": "另存为"
+ "action.relational.viz-ego-map.field.relations.label": {
+  "en_hash": "6519fe11ef",
+  "zh": "关系类别"
  },
- "action.research.chart.label": {
-  "en_hash": "65cf77d0d5",
-  "zh": "导出图表"
+ "action.relational.viz-ego-map.label": {
+  "en_hash": "dfeaa30648",
+  "zh": "公司关系图"
  },
- "action.research.chart.note": {
-  "en_hash": "db9b382e2f",
-  "zh": "输出 SVG（用于论文及演示文稿）及与图表数据完全一致的 CSV；安装 matplotlib 时（源代码安装）另输出 PNG。"
+ "action.relational.viz-ego-map.note": {
+  "en_hash": "64ae87b70a",
+  "zh": "以一家公司为中心：其实际控制人及控制链、前十名股东、子公司、董事、监事和高级管理人员、对其采取措施的监管机构及其所属行业，以某一日期已披露的信息为准。层级 2 另显示相同股东持有的其他公司及相同人员任职的其他公司。"
  },
  "action.research.export.field.out.label": {
   "en_hash": "30baa24967",
@@ -2527,6 +2639,10 @@
   "en_hash": "04aac4c041",
   "zh": "采集"
  },
+ "group.visualise": {
+  "en_hash": "32abefa089",
+  "zh": "可视化"
+ },
  "section.accuracy.intro": {
   "en_hash": "ee3614b003",
   "zh": "以一组经您手工核对数值的报告（“标准语料库”）为基准，衡量从文件中读取数据的准确程度。评估结果决定所提取数值的置信度。"
@@ -2559,9 +2675,25 @@
   "en_hash": "7a1994999d",
   "zh": "公司"
  },
+ "section.company_views.intro": {
+  "en_hash": "02a17c674b",
+  "zh": "单一公司的图表：财务数据、分部、研发与人员、校验发现、带事件标注的股价。每张图均以 SVG 格式输出，可用于论文和演示文稿，并附与图中数据完全一致的 CSV。"
+ },
+ "section.company_views.title": {
+  "en_hash": "6997031998",
+  "zh": "公司图表"
+ },
+ "section.coverage.intro": {
+  "en_hash": "4149549c03",
+  "zh": "数据能够支持和不能支持的分析：按分组和年度列示各层有数据的上市公司占比、数据的置信度及面板的平衡情况。这是方法部分所需的图，也可指引下一步应采集哪些数据。"
+ },
+ "section.coverage.title": {
+  "en_hash": "becd0ef491",
+  "zh": "数据覆盖"
+ },
  "section.datasets.intro": {
-  "en_hash": "feaae65bd9",
-  "zh": "无前视偏差的研究面板数据、估值及事件研究。每份面板数据均附变量说明手册及清单，便于说明及重建数据集。"
+  "en_hash": "fcd98ad13c",
+  "zh": "无前视偏差的研究面板数据、估值与事件研究。每个面板均附变量说明手册和清单，便于说明和重建数据集。图表和数据集浏览器现位于“可视化”之下。"
  },
  "section.datasets.title": {
   "en_hash": "93a7f22476",
@@ -2574,6 +2706,14 @@
  "section.disclosures.title": {
   "en_hash": "26dfc22b1a",
   "zh": "公告"
+ },
+ "section.econometric.intro": {
+  "en_hash": "ef68c7fd3b",
+  "zh": "任一面板数据的分布、散点图和覆盖情况，以及检验其他视图所依赖之代理指标的视图。"
+ },
+ "section.econometric.title": {
+  "en_hash": "4f6538856f",
+  "zh": "计量分析图表"
  },
  "section.files.intro": {
   "en_hash": "6175b052f3",
@@ -2663,9 +2803,17 @@
   "en_hash": "778e54bd80",
   "zh": "监管与法律"
  },
+ "section.relational.intro": {
+  "en_hash": "dd582efc2e",
+  "zh": "以某一日期已披露的信息为准，谁控制、持有公司股份或在其董事会任职，以及哪些监管机构对其采取了措施。每条关联均为有文件依据的事实；自然人以化名显示。"
+ },
+ "section.relational.title": {
+  "en_hash": "6328cac13c",
+  "zh": "关系图"
+ },
  "section.research.intro": {
-  "en_hash": "84febe0a34",
-  "zh": "在文件中检索，将任何数据追溯至来源页，并生成可复现的输出。"
+  "en_hash": "165289810b",
+  "zh": "在文件中检索，将任一数据追溯至其来源页，并生成可复现的结果。图表现位于“可视化”之下。"
  },
  "section.research.title": {
   "en_hash": "be601df25e",
@@ -3298,5 +3446,57 @@
  "ui.win.variable": {
   "en_hash": "19de69cb60",
   "zh": "变量"
+ },
+ "viz.data": {
+  "en_hash": "ea46d10522",
+  "zh": "数据就绪情况：{parts}"
+ },
+ "viz.req.control": {
+  "en_hash": "49ca30dfe0",
+  "zh": "实际控制人"
+ },
+ "viz.req.figures": {
+  "en_hash": "656f835d62",
+  "zh": "定期报告中的财务数据"
+ },
+ "viz.req.guidance": {
+  "en_hash": "0dd13d8e99",
+  "zh": "业绩预告与业绩快报"
+ },
+ "viz.req.holders": {
+  "en_hash": "5f7c10b9c8",
+  "zh": "前十名股东"
+ },
+ "viz.req.industry": {
+  "en_hash": "2e2814c61a",
+  "zh": "行业分类"
+ },
+ "viz.req.regulatory": {
+  "en_hash": "c06236fbdc",
+  "zh": "监管事项"
+ },
+ "viz.req.roster": {
+  "en_hash": "76b4a190d2",
+  "zh": "董事、监事和高级管理人员"
+ },
+ "viz.req.subsidiaries": {
+  "en_hash": "5119dc94dd",
+  "zh": "子公司"
+ },
+ "viz.run_hint": {
+  "en_hash": "0d701440ff",
+  "zh": "（请运行“{action}”）"
+ },
+ "viz.status.met": {
+  "en_hash": "75c0533730",
+  "zh": "已就绪"
+ },
+ "viz.status.missing": {
+  "en_hash": "5a013c4950",
+  "zh": "缺失"
+ },
+ "viz.status.partly": {
+  "en_hash": "59196feec4",
+  "zh": "部分就绪"
  }
 }

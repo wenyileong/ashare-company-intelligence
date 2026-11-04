@@ -582,6 +582,12 @@ _CONTINUES = re.compile(r"^(?:资产|国有|监督|管理|委员会|人民政府
                         r"（|\(|合伙|企业|中心|局|厅)")
 
 
+#: v2.2 (finding 133): what can follow a legal representative's name glued to the rest of a wrapped entity name; only
+#: pieces that cannot begin a name
+_GLUED_REST = re.compile(r"^(?:资产监督|资产|监督管理|管理委员会|委员会|有限责任|有限公司|股份有限|责任公司)")
+_PHRASE = re.compile(r"代表|履行|出资人|职责|作为|通过")
+
+
 def _fragment_start(token: str) -> bool:
     """Whether a token reads as the rest of a wrapped name ("资产监督管理委员会", "管理委员会", "有限公司")."""
     return bool(_CONTINUES.match(token))
@@ -600,6 +606,14 @@ def _repair_entity_names(tokens: list[str], rep_column: bool) -> list[str]:
             continue
         if rep_column and _PERSON.match(t) and not _ENTITY_END.search(t) and (buf or names):
             continue                      # the legal representative's column
+        if rep_column and buf and not _fragment_start(t):
+            # v2.2 (finding 133): the legal representative printed on the same line as the rest of the wrapped name,
+            # with no space ("杨军资产监督管理委员会", "张玉卓管理委员会")
+            for n in (2, 3):
+                if len(t) > n + 1 and _PERSON.match(t[:n]) and not re.search(r"[省市县区州盟旗]$", t[:n]) \
+                        and _GLUED_REST.match(t[n:]):
+                    t = t[n:]
+                    break
         if buf and not _fragment_start(t) and len(buf) >= 4:
             names.append(buf)             # a whole name without a usual ending, followed by another name
             buf = ""
@@ -609,6 +623,9 @@ def _repair_entity_names(tokens: list[str], rep_column: bool) -> list[str]:
             buf = ""
     if buf and not names:
         names.append(buf)
+    if any(_ENTITY_END.search(x) for x in names):
+        # v2.2: the start of a phrase ("代表国家履行出资人(职责的)…") beside a whole entity name is not a controller
+        names = [x for x in names if _ENTITY_END.search(x) or not _PHRASE.search(x)]
     return names
 
 
@@ -1078,7 +1095,7 @@ def controller_key(name: str) -> str:
     "湖南省人民政府国有资产监督管理委员会")."""
     n = normalise_name(name)
     n = n.replace("国资委", "国有资产监督管理委员会")
-    n = re.sub(r"人民政府(?=国有资产监督管理委员会)", "", n)
+    n = re.sub(r"(?:人民)?政府(?=国有资产监督管理委员会)", "", n)      # v2.2: 省政府 and 省人民政府 alike
     return n
 
 

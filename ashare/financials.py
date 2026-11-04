@@ -584,55 +584,86 @@ def _single_digit_power(x: float, tol: float) -> tuple[int, int] | None:
     return None
 
 
+def _close(x: float, y: float) -> bool:
+    return abs(x - y) <= max(abs(y) * 0.005, 1000.0)
+
+
 def repair_leading_digits(facts: list[dict]) -> list[dict]:
     """Restore a balance-sheet total read without its first digit, when the document's own figures prove it.
 
     In the author's v2.1 run, 108 of about 120 failed balance sheets were out by exactly 10, 20 or 30 billion yuan: an
     eleven-digit total read without its first digit. When assets minus liabilities minus equity is exactly d × 10^k,
-    a figure below 10^k is restored by adding it only if a second identity confirms which figure it is (equity:
-    parent plus minority equity; liabilities: current plus non-current; assets: likewise). The reading stays in
-    ``raw_value``, the note says what was done, and the confidence is lowered. Otherwise nothing is changed."""
+    a figure below 10^k (the only figures that can have lost a digit at that place) is restored by adding the gap,
+    if one of these confirms which figure it is:
+
+    * its parts in the same reading (v2.1.2): equity, parent plus minority equity; liabilities and assets, current
+      plus non-current;
+    * the other reading of the same document and period (v2.2, finding 132): the key-figures reading and the
+      statement reading are independent, and when one has the complete figure, it decides;
+    * the statement's own grand total (v2.2): "负债和所有者权益总计" agrees with total assets (or, for assets short,
+      with liabilities plus equity), and only one total is short of the place.
+
+    The reading stays in ``raw_value``, the note says what was done and which confirmation was used, and the
+    confidence is lowered. Otherwise nothing is changed, and the balance check still fails."""
     import json
+    wanted = ("total_assets", "total_liabilities", "equity", "equity_parent", "minority_interests",
+              "total_current_liabilities", "total_non_current_liabilities", "total_current_assets",
+              "total_non_current_assets", "total_liabilities_and_equity")
     groups: dict = {}
     for f in facts:
-        if f.get("metric") in ("total_assets", "total_liabilities", "equity", "equity_parent", "minority_interests",
-                               "total_current_liabilities", "total_non_current_liabilities",
-                               "total_current_assets", "total_non_current_assets"):
-            key = (f.get("period"), f.get("period_type"), f.get("method"), f.get("consolidation_scope"))
+        if f.get("metric") in wanted:
+            key = (f.get("period"), f.get("period_type"), f.get("consolidation_scope"), f.get("method"))
             groups.setdefault(key, {}).setdefault(f["metric"], f)
-    for g in groups.values():
-        if not all(m in g and g[m].get("value") is not None for m in ("total_assets", "total_liabilities", "equity")):
+
+    def val(g, m):
+        f = g.get(m)
+        return None if f is None or f.get("value") is None else float(f["value"])
+
+    # the statement reading first, so that the key-figures reading can be confirmed from it
+    order = sorted(groups, key=lambda k: (k[3] != "PDF_STATEMENT_TABLE", str(k)))
+    for key in order:
+        g = groups[key]
+        a, l, e = val(g, "total_assets"), val(g, "total_liabilities"), val(g, "equity")
+        if None in (a, l, e):
             continue
-        a, l, e = (float(g[m]["value"]) for m in ("total_assets", "total_liabilities", "equity"))
         r = a - l - e
         if abs(r) <= max(abs(a) * 0.005, 1000.0):
             continue                                     # it balances
-        exact = max(abs(a) * 1e-6, 10.0)
-        dk = _single_digit_power(abs(r), exact)
+        dk = _single_digit_power(abs(r), max(abs(a) * 1e-6, 10.0))
         if dk is None:
             continue
         _, k = dk
         sign = 1 if r > 0 else -1
+        candidates = [m for m, (_, needs) in _CONFIRM.items() if needs == sign and 0 <= val(g, m) < 10 ** k]
+        others = [groups[o] for o in groups if o[:3] == key[:3] and o != key]
         confirmed = []
-        for metric, (parts, needs) in _CONFIRM.items():
-            if needs != sign:
-                continue
-            old = float(g[metric]["value"])
-            if not 0 <= old < 10 ** k:                   # the figure must be short of the dropped place
-                continue
+        for metric in candidates:
+            old = val(g, metric)
             new = old + abs(r)
-            if all(p in g and g[p].get("value") is not None for p in parts):
-                total = sum(float(g[p]["value"]) for p in parts)
-            elif metric == "equity" and "equity_parent" in g and g["equity_parent"].get("value") is not None \
-                    and "minority_interests" not in g:
-                total = float(g["equity_parent"]["value"])
-            else:
-                continue
-            if abs(total - new) <= max(abs(new) * 0.005, 1000.0) and abs(total - old) > max(abs(old) * 0.005, 1000.0):
-                confirmed.append((metric, old, new))
+            parts = _CONFIRM[metric][0]
+            how = None
+            if all(val(g, p) is not None for p in parts):
+                total = sum(val(g, p) for p in parts)
+                if _close(total, new) and not _close(total, old):
+                    how = "+".join(parts)
+            elif metric == "equity" and val(g, "equity_parent") is not None and "minority_interests" not in g:
+                if _close(val(g, "equity_parent"), new) and not _close(val(g, "equity_parent"), old):
+                    how = "equity_parent"
+            if how is None:
+                for o in others:
+                    ov = val(o, metric)
+                    if ov is not None and _close(ov, new) and not _close(ov, old):
+                        how = "other reading (" + str(o[metric].get("method")) + ")"
+                        break
+            if how is None and len(candidates) == 1 and val(g, "total_liabilities_and_equity") is not None:
+                tle = val(g, "total_liabilities_and_equity")
+                if (sign > 0 and _close(tle, a)) or (sign < 0 and _close(tle, l + e)):
+                    how = "total_liabilities_and_equity"
+            if how:
+                confirmed.append((metric, old, new, how))
         if len(confirmed) != 1:
             continue
-        metric, old, new = confirmed[0]
+        metric, old, new, how = confirmed[0]
         f = g[metric]
         f["value"] = new
         f["confidence"] = round((f.get("confidence") or 0.6) * 0.8, 3)
@@ -642,8 +673,7 @@ def repair_leading_digits(facts: list[dict]) -> list[dict]:
                 note = {"note": note}
         except (TypeError, ValueError):
             note = {"note": f.get("extraction_note")}
-        note.update({"repair": "LEADING_DIGIT_RESTORED", "read_value": old,
-                     "confirmed_by": "+".join(_CONFIRM[metric][0])})
+        note.update({"repair": "LEADING_DIGIT_RESTORED", "read_value": old, "confirmed_by": how})
         f["extraction_note"] = json.dumps(note, ensure_ascii=False, default=str)
     return facts
 
@@ -726,8 +756,9 @@ def persist_facts(company: Company, disclosure: Disclosure, facts: Iterable[dict
 
 
 # v2.0.6: raise when the extraction logic changes, so that documents are read again by the new version.
-EXTRACTOR_VERSION = "financials-4"   # v2.0.8: units, amounts, notices (84, 85); v2.1: read by section (101);
-#                                      v2.1.2: leading digit restored from the balance identity (129)
+EXTRACTOR_VERSION = "financials-5"   # v2.0.8: units, amounts, notices (84, 85); v2.1: read by section (101);
+#                                      v2.1.2: leading digit restored from the balance identity (129);
+#                                      v2.2: confirmed across readings and by the grand total (132)
 
 
 _CJK_RE = re.compile(r"[\u4e00-\u9fff]")

@@ -71,6 +71,18 @@ def A(label, command, fields=(), note="", after=None):
     return {"label": label, "command": command, "fields": list(fields), "note": note, "after": after}
 
 
+def _view_action(view_id: str) -> dict:
+    """A desktop action for a view of the Visualise section (v2.2), from its declaration in the registry: the form
+    fields, the command and the intro come from the view, so the desktop and the command line always agree."""
+    from .viz.registry import get
+    v = get(view_id)
+    fields = [F(p["key"], p["label"], p["kind"], p["default"], p["flag"], p.get("hint") or "", p.get("required", False))
+              for p in v.params]
+    act = A(v.title, v.command(), fields, v.intro, after="open_view")
+    act["view"] = v.id
+    return act
+
+
 SECTIONS = [
     {"id": "home", "group": "", "title": "Getting started", "intro": "", "actions": []},
 
@@ -418,7 +430,8 @@ SECTIONS = [
 
     {"id": "datasets", "group": "Analyse", "title": "Datasets",
      "intro": "Research panels without look-ahead, valuation, and event studies. Every panel comes with a codebook "
-              "and a manifest, so the dataset can be described and rebuilt.",
+              "and a manifest, so the dataset can be described and rebuilt. Charts and the dataset explorer are now "
+              "under Visualise.",
      "actions": [
          A("Build a panel", "build-panel", [
              F("variables", "Variables", "text", "", "--variables",
@@ -446,17 +459,12 @@ SECTIONS = [
          A("List panel variables", "panel-variables", [
              F("group", "Group", "choice:,financial,derived,ratio,market,governance,human_capital,segments,"
                "ownership,index,listing,industry,regulatory", "", "--group")]),
-         A("Open the dataset explorer", "version", [],
-           "Histograms, distributions by year, scatter plots with a fitted line, coverage and correlations of any "
-           "panel.", after="explore"),
          A("Price-adjustment factors", "adjustment-factors", [CODE_OPT()],
            "Computed from recorded dividends, bonus and capitalisation issues and rights issues, and compared with "
            "provider-adjusted prices."),
          A("Market value and valuation ratios", "market-snapshots", [
              CODE_OPT(), F("frequency", "Frequency", "choice:month,day", "month", "--frequency")],
            "Market cap, P/E, P/B, P/S and EV at each month end, from information published by then."),
-         A("Price chart with events", "price-chart", [CODE_REQ],
-           "Adjusted closes with dividends, regulatory, management and listing events marked."),
          A("Event study", "event-study", [
              F("events", "Events", "text", "corporate_actions:CASH_DIVIDEND", None,
                "table:TYPE (corporate_actions, regulatory, management, listing) or a CSV of code,date",
@@ -470,7 +478,71 @@ SECTIONS = [
            "command line). Writes per-event CARs, the average with t-statistic, and a chart."),
      ]},
 
-    {"id": "topology", "group": "Analyse", "title": "Topology",
+    {"id": "validate", "group": "Analyse", "title": "Validate",
+     "intro": "Checks the data without changing it: accounting identities, capital reconciliation, figures that "
+              "differ between reports (restatements), ownership consistency, and conflicts between sources.",
+     "actions": [
+         A("Run all checks", "validate-all", [CODE_OPT()],
+           "Also links related events (e.g. an investigation and its penalty). Re-run after adding data."),
+         A("Show findings", "show-flags", [
+             CODE_OPT(""), F("severity", "Severity", "choice:,ERROR,WARN,INFO", "", "--severity"),
+             F("rule", "Rule", "text", "", "--rule", "Optional, e.g. SEGMENT_SUM_MISMATCH: lists that rule's rows"),
+             F("details", "List every finding", "bool", False, ("--details", None),
+               "Off: a count by rule and the companies with most findings."),
+             F("export", "Export to CSV", "text", "", "--export", "Optional file name, e.g. exports/findings.csv")],
+           "Starts with a summary; a company, a rule or 'List every finding' shows the rows, with company codes."),
+     ]},
+
+    {"id": "research", "group": "Analyse", "title": "Research",
+     "intro": "Search inside documents, trace any figure back to its source page, and produce reproducible outputs. "
+              "Charts are now under Visualise.",
+     "actions": [
+         A("Index documents for search", "index-documents", [CODE_OPT()],
+           "Reads the text of downloaded documents once, so they can be searched."),
+         A("Search inside documents", "search-documents", [
+             F("query", "Text", "text", "", None, "e.g. 资金占用 or 保留意见", required=True), CODE_OPT("")]),
+         A("Trace a figure to its source", "trace", [
+             F("table", "Table", "choice:financial_facts,corporate_actions,regulatory_events,ownership_observations,"
+               "capital_structure_observations,market_bars", "financial_facts", None),
+             F("row_id", "Row id", "text", "", None, "The id shown in lists and exports.", required=True)],
+           "Shows document, page, raw text, method and checks the file's hash."),
+         A("Read-only query (SQL)", "query", [
+             F("sql", "SQL", "text", "SELECT security_code, short_name_cn FROM companies LIMIT 20", None, required=True),
+             F("out", "Save to", "text", "", "--out", "Optional file name, e.g. exports/result.csv")],
+           "Every query is logged with a fingerprint of the data, so results can be reproduced."),
+         A("Export tables to CSV", "export", [
+             F("table", "Table", "choice:" + TABLES, "all", None), F("out", "Folder", "folder", "exports", "--out-dir"),
+             CODE_OPT("")], "UTF-8 CSV that opens directly in Excel.", after="open_folder"),
+         A("Create a dataset release", "release", [
+             F("formats", "Formats", "choice:csv,sqlite;csv" + (";csv,sqlite,parquet" if _PARQUET else ""),
+               "csv,sqlite", "--formats", "Parquet is offered where the pyarrow package is installed."), CODE_OPT(""),
+             F("pseudonymise", "Pseudonymise personal names", "bool", False, ("--pseudonymise", None),
+               "Directors, officers and natural-person shareholders become stable identifiers (P…)."),
+             F("coarsen", "Ages in five-year bands", "bool", False, ("--coarsen", None),
+               "With pseudonymisation."),
+             F("drop_free_text", "Drop titles and other free text", "bool", False, ("--drop-free-text", None),
+               "With pseudonymisation: the strictest setting."),
+             F("include_licensed", "Include licensed data", "bool", False, ("--include-licensed", None),
+               "Only for your own use: vendor data may not be redistributed."),
+             F("author", "Author (for the citation)", "text", "", "--author")],
+           "A dated folder with CSVs, a database snapshot, a data-quality report, CITATION.cff and a manifest of "
+           "file hashes. Licensed data (vendor ratings, Shenwan industries, unlabelled CSV imports) are left out "
+           "unless you tick the box; the manifest records what was left out.", after="open_folder"),
+         A("Data-quality report", "quality-report", [
+             F("out", "Folder", "folder", "reports/quality", "--out-dir")],
+           "Coverage by layer, board and year, parser precision, review results, flag rates and known gaps.",
+           after="open_folder"),
+         A("Show licence classes", "licences", [],
+           "Rows per table by licence class and source label. Imports are treated as licensed until tagged."),
+         A("Tag a source's licence", "set-licence", [
+             F("source", "Source label", "text", "CSV_IMPORT", None, required=True),
+             F("licence", "Licence class", "choice:PUBLIC_DISCLOSURE,PUBLIC_FEED,DERIVED,MANUAL,LICENSED", "MANUAL",
+               None)],
+           "For example, tag your own hand-coded CSV as MANUAL so that it is included in releases."),
+     ]},
+
+    # --- v2.2: the Visualise section (plan section B4.7); the view pages are generated from the registry ---------------
+    {"id": "topology", "group": "Visualise", "title": "Topology",
      "intro": "The NVF layers for a set of companies over a span of years: institutional coordination, productive "
               "capability, corporate fundamentals, investor expectations and market valuation, with the documents "
               "behind each item and the gaps where a layer has no data. Every line is a documented fact; a line is "
@@ -504,40 +576,15 @@ SECTIONS = [
            "a manifest.", after="open_topology"),
      ]},
 
-    {"id": "validate", "group": "Analyse", "title": "Validate",
-     "intro": "Checks the data without changing it: accounting identities, capital reconciliation, figures that "
-              "differ between reports (restatements), ownership consistency, and conflicts between sources.",
-     "actions": [
-         A("Run all checks", "validate-all", [CODE_OPT()],
-           "Also links related events (e.g. an investigation and its penalty). Re-run after adding data."),
-         A("Show findings", "show-flags", [
-             CODE_OPT(""), F("severity", "Severity", "choice:,ERROR,WARN,INFO", "", "--severity"),
-             F("rule", "Rule", "text", "", "--rule", "Optional, e.g. SEGMENT_SUM_MISMATCH: lists that rule's rows"),
-             F("details", "List every finding", "bool", False, ("--details", None),
-               "Off: a count by rule and the companies with most findings."),
-             F("export", "Export to CSV", "text", "", "--export", "Optional file name, e.g. exports/findings.csv")],
-           "Starts with a summary; a company, a rule or 'List every finding' shows the rows, with company codes."),
-     ]},
+    {"id": "relational", "group": "Visualise", "title": "Relational maps",
+     "intro": "Who controls, holds, owns and sits on the boards of a company, and which regulators acted on it, as "
+              "known on a date. Every link is a documented fact; natural persons are shown under pseudonyms.",
+     "actions": [_view_action("ego_map")]},
 
-    {"id": "research", "group": "Analyse", "title": "Research",
-     "intro": "Search inside documents, trace any figure back to its source page, and produce reproducible outputs.",
+    {"id": "company_views", "group": "Visualise", "title": "Company views",
+     "intro": "Charts of one company: financial figures, segments, R&D and workforce, findings, prices with "
+              "events. Each is written as SVG for papers and slides, with a CSV of exactly the plotted data.",
      "actions": [
-         A("Index documents for search", "index-documents", [CODE_OPT()],
-           "Reads the text of downloaded documents once, so they can be searched."),
-         A("Search inside documents", "search-documents", [
-             F("query", "Text", "text", "", None, "e.g. 资金占用 or 保留意见", required=True), CODE_OPT("")]),
-         A("Trace a figure to its source", "trace", [
-             F("table", "Table", "choice:financial_facts,corporate_actions,regulatory_events,ownership_observations,"
-               "capital_structure_observations,market_bars", "financial_facts", None),
-             F("row_id", "Row id", "text", "", None, "The id shown in lists and exports.", required=True)],
-           "Shows document, page, raw text, method and checks the file's hash."),
-         A("Read-only query (SQL)", "query", [
-             F("sql", "SQL", "text", "SELECT security_code, short_name_cn FROM companies LIMIT 20", None, required=True),
-             F("out", "Save to", "text", "", "--out", "Optional file name, e.g. exports/result.csv")],
-           "Every query is logged with a fingerprint of the data, so results can be reproduced."),
-         A("Export tables to CSV", "export", [
-             F("table", "Table", "choice:" + TABLES, "all", None), F("out", "Folder", "folder", "exports", "--out-dir"),
-             CODE_OPT("")], "UTF-8 CSV that opens directly in Excel.", after="open_folder"),
          A("Export a chart", "chart", [
              F("kind", "Chart", "choice:financials,segments,history,flags", "financials", None),
              F("code", "Security code", "code", "600519", "--code"),
@@ -545,33 +592,25 @@ SECTIONS = [
              F("out", "Save as", "text", "charts/chart", "--out", "Name without extension")],
            "Writes an SVG (for papers and slides) and a CSV of exactly the plotted data; PNG too when "
            "matplotlib is installed (source installations).", after="open_folder"),
-         A("Create a dataset release", "release", [
-             F("formats", "Formats", "choice:csv,sqlite;csv" + (";csv,sqlite,parquet" if _PARQUET else ""),
-               "csv,sqlite", "--formats", "Parquet is offered where the pyarrow package is installed."), CODE_OPT(""),
-             F("pseudonymise", "Pseudonymise personal names", "bool", False, ("--pseudonymise", None),
-               "Directors, officers and natural-person shareholders become stable identifiers (P…)."),
-             F("coarsen", "Ages in five-year bands", "bool", False, ("--coarsen", None),
-               "With pseudonymisation."),
-             F("drop_free_text", "Drop titles and other free text", "bool", False, ("--drop-free-text", None),
-               "With pseudonymisation: the strictest setting."),
-             F("include_licensed", "Include licensed data", "bool", False, ("--include-licensed", None),
-               "Only for your own use: vendor data may not be redistributed."),
-             F("author", "Author (for the citation)", "text", "", "--author")],
-           "A dated folder with CSVs, a database snapshot, a data-quality report, CITATION.cff and a manifest of "
-           "file hashes. Licensed data (vendor ratings, Shenwan industries, unlabelled CSV imports) are left out "
-           "unless you tick the box; the manifest records what was left out.", after="open_folder"),
-         A("Data-quality report", "quality-report", [
-             F("out", "Folder", "folder", "reports/quality", "--out-dir")],
-           "Coverage by layer, board and year, parser precision, review results, flag rates and known gaps.",
-           after="open_folder"),
-         A("Show licence classes", "licences", [],
-           "Rows per table by licence class and source label. Imports are treated as licensed until tagged."),
-         A("Tag a source's licence", "set-licence", [
-             F("source", "Source label", "text", "CSV_IMPORT", None, required=True),
-             F("licence", "Licence class", "choice:PUBLIC_DISCLOSURE,PUBLIC_FEED,DERIVED,MANUAL,LICENSED", "MANUAL",
-               None)],
-           "For example, tag your own hand-coded CSV as MANUAL so that it is included in releases."),
+         A("Price chart with events", "price-chart", [CODE_REQ],
+           "Adjusted closes with dividends, regulatory, management and listing events marked."),
      ]},
+
+    {"id": "econometric", "group": "Visualise", "title": "Econometric charts",
+     "intro": "Distributions, scatter plots and coverage of any panel, and views that test the proxies the other "
+              "views rely on.",
+     "actions": [
+         A("Open the dataset explorer", "version", [],
+           "Histograms, distributions by year, scatter plots with a fitted line, coverage and correlations of any "
+           "panel.", after="explore"),
+         _view_action("guidance_outcome"),
+     ]},
+
+    {"id": "coverage", "group": "Visualise", "title": "Data coverage",
+     "intro": "What the data can and cannot support: the share of listed companies with data in each layer, by "
+              "group and year, the confidence of the figures and the panel's balance. The figure a methods section "
+              "needs, and a guide to what to collect next.",
+     "actions": [_view_action("coverage")]},
 
     {"id": "review", "group": "Check", "title": "Review", "intro": "", "actions": []},
     {"id": "operations", "group": "Check", "title": "Operations", "intro": "", "actions": []},
@@ -708,6 +747,30 @@ def _assign_keys():
 _assign_keys()
 
 
+def readiness_text(rows: list[dict]) -> str:
+    """A view's readiness in the interface language (v2.2): each requirement with ready, partly or missing, and the
+    action to run where it is not ready."""
+    labels = {
+        "financial figures from periodic reports": tr("viz.req.figures", "financial figures from periodic reports"),
+        "management guidance": tr("viz.req.guidance", "management guidance"),
+        "controllers": tr("viz.req.control", "controllers"),
+        "top-10 shareholders": tr("viz.req.holders", "top-10 shareholders"),
+        "subsidiaries": tr("viz.req.subsidiaries", "subsidiaries"),
+        "directors and officers": tr("viz.req.roster", "directors and officers"),
+        "regulatory events": tr("viz.req.regulatory", "regulatory events"),
+        "industry classification": tr("viz.req.industry", "industry classification"),
+    }
+    status = {"MET": tr("viz.status.met", "ready"), "PARTLY": tr("viz.status.partly", "partly ready"),
+              "MISSING": tr("viz.status.missing", "missing")}
+    parts = []
+    for r in rows:
+        part = f"{labels.get(r['requirement'], r['requirement'])}: {status[r['status']]}"
+        if r["status"] != "MET" and r.get("action"):
+            part += tr("viz.run_hint", " (run '{action}')").format(action=r["action"])
+        parts.append(part)
+    return tr("viz.data", "Data: {parts}").format(parts="; ".join(parts)) if parts else ""
+
+
 def build_argv(command: str, fields: list, values: dict) -> list[str]:
     """Translate form values into CLI arguments (pure; unit-tested)."""
     argv = [command]
@@ -822,7 +885,9 @@ class _Tee(io.StringIO):
 
 # v2.0.6 (finding 51): what running a stopped command again does, said only where it is true.
 RESUME_NOTES = {
-    "catalogue-disclosures": "running it again resumes with the first unfinished day",
+    # v2.2 (finding 136): a stop during the download step, when every day is finished
+    "catalogue-disclosures": "running it again resumes with the first unfinished day, or, when every day is "
+                             "finished, downloads the documents still missing",
     "recatalogue-busy-days": "running it again resumes with the first unfinished day",
     "download-documents": "running it again downloads only the documents still missing",
     "extract-financials": "documents read so far are saved; running it again continues with the rest",
@@ -835,6 +900,9 @@ RESUME_NOTES = {
     "extract-management": "annual reports read so far are saved; running it again continues with the rest",
     "update-universe": "quote-list pages fetched today are kept; running it again continues",
     "job-run": "running the job again resumes where it stopped",
+    "extract-esg": "reports read so far are saved; running it again continues with the rest",
+    "read-guidance": "documents read so far are saved; running it again continues with the rest",
+    "scan-documents": "documents checked so far are saved; running it again checks the rest",
 }
 
 
@@ -946,6 +1014,7 @@ class App(tk.Tk):
         self.out_queue: queue.Queue = queue.Queue()
         self.busy = False
         self.run_buttons: list[ttk.Button] = []
+        self._readiness_labels: list = []
         self.pages: dict[str, ttk.Frame] = {}
         self.nav: dict[str, tk.Label] = {}
         self._fonts()
@@ -1141,6 +1210,18 @@ class App(tk.Tk):
         box.bind("<Leave>", leave)
         return inner
 
+    def _refresh_readiness(self, sid):
+        """Fill the readiness lines of the view cards on the page shown (v2.2)."""
+        page = self.pages.get(sid)
+        for lbl, view_id in getattr(self, "_readiness_labels", []):
+            try:
+                if page is None or not str(lbl).startswith(str(page)):
+                    continue
+                from .viz.registry import get
+                lbl.configure(text=readiness_text(get(view_id).readiness({})))
+            except Exception:
+                pass
+
     def _side_show(self, sid, retry: bool = True):
         """Scroll the side panel so that the selected section is in view (v2.1.2). Right after the window is
         built (or rebuilt in the other language) the panel is not laid out yet, so it is tried once more shortly."""
@@ -1238,6 +1319,11 @@ class App(tk.Tk):
         if action["note"]:
             ttk.Label(body, text=action_note(action), style="CardMuted.TLabel", wraplength=700,
                       justify="left").pack(anchor="w", pady=(2, 0))
+        if action.get("view"):
+            # v2.2 (plan section B4.7): whether the view's data are ready, refreshed each time the page is shown
+            lbl = ttk.Label(body, text="", style="CardMuted.TLabel", wraplength=700, justify="left")
+            lbl.pack(anchor="w", pady=(4, 0))
+            self._readiness_labels.append((lbl, action["view"]))
         if action["fields"]:
             grid = tk.Frame(body, bg=P["card"])
             grid.pack(fill="x", pady=(10, 0))
@@ -1524,6 +1610,7 @@ class App(tk.Tk):
                 continue                          # chart, review and explorer windows stay open
             w.destroy()
         self.run_buttons, self.settings_widgets, self._forms = [], [], {}
+        self._readiness_labels = []
         self.pages, self.nav = {}, {}
         self._fonts()
         self._style()
@@ -1541,6 +1628,7 @@ class App(tk.Tk):
                           font=self.f_bold if i == sid else self.f_nav)
         self._current = sid
         self._side_show(sid)
+        self._refresh_readiness(sid)
         if sid == "home":
             self._refresh_summary()
 
@@ -1690,6 +1778,11 @@ class App(tk.Tk):
             panel = (self.folder / "panels" / f"{vals.get('name') or 'panel'}.csv") if action["command"] == "build-panel" \
                 else None
             ExplorerWindow(self, str(panel) if panel and panel.exists() else None)
+        if code == 0 and action.get("after") == "open_view":
+            m = re.search(r"Interactive page:\s*(.+\.html)", out)
+            if m:
+                page = Path(m.group(1).strip())
+                webbrowser.open((page if page.is_absolute() else self.folder / page).resolve().as_uri())
         if code == 0 and action.get("after") == "open_topology":
             m = re.search(r"Viewer:\s*(.+\.html)", out)
             if m:

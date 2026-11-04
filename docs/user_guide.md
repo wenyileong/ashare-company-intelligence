@@ -8,7 +8,7 @@ This guide covers the desktop application and the command line. The [methods doc
 
 ### Windows installer
 
-Run `AShareScraper-2.1.2-setup.exe`. It installs for the current user (no administrator rights are needed) into `%LOCALAPPDATA%\Programs\AShareScraper` and adds Start-menu entries for the application, the command line, this guide and the uninstaller. Two options are offered:
+Run `AShareScraper-2.2.0-setup.exe`. It installs for the current user (no administrator rights are needed) into `%LOCALAPPDATA%\Programs\AShareScraper` and adds Start-menu entries for the application, the command line, this guide and the uninstaller. Two options are offered:
 
 - a desktop shortcut;
 - adding the program folder to your PATH, so that `ashare-cli` runs from any command prompt.
@@ -73,10 +73,19 @@ Each page explains what its actions do. Fields marked as optional can be left bl
 **Analyse** turns the database into results:
 
 - **Company**: an integrated profile and an HTML report for one company, with charts.
-- **Datasets**: research panels (company-year, company-quarter or company-date) with a codebook, and event studies. The dataset explorer opens a built panel with summaries, correlations and charts.
-- **Topology** (v2.1): the five NVF layers for a set of companies over a span of years, as a layered chart and an interactive view in the browser (section 7, "The topology view").
+- **Datasets**: research panels (company-year, company-quarter or company-date) with a codebook, and event studies.
 - **Validate**: all validation stages, with findings by rule and, since v2.1, as rates of what was checked.
-- **Research**: full-text search, provenance traces, logged read-only SQL queries, exports, charts, dataset releases, the data-quality report and licence classes.
+- **Research**: full-text search, provenance traces, logged read-only SQL queries, exports, dataset releases, the data-quality report and licence classes.
+
+**Visualise** (v2.2) draws the data (section 7, "The Visualise section"):
+
+- **Topology**: the five NVF layers for a set of companies over a span of years, as a layered chart and an interactive view in the browser (section 7, "The topology view").
+- **Relational maps**: the ego map, one company's relations as known on a date.
+- **Company views**: charts of one company (moved from Research), and the price chart with events (moved from Datasets).
+- **Econometric charts**: the dataset explorer (moved from Datasets) and guidance against outcome.
+- **Data coverage**: which layers, groups and years have data.
+
+The pages the charts left say where they went, for this release.
 
 **Check** keeps the data trustworthy:
 
@@ -350,6 +359,48 @@ Neither public feed is exchange-authoritative, and their terms are yours to chec
 It shows the layered chart in the chart window and opens `topology.html` in your browser. That page works offline: it has the data and its libraries inside it, and can be sent to someone else. It offers a 3D view (layers, companies and years as the three axes), a 2D slice, filters, charts of revenue and profit, the coverage table, and an inspector that shows each item's document, page, method and confidence. Computers without 3D graphics in the browser get the 2D slice. The folder also holds `observations.csv` (exactly what is shown), `edges.csv`, `snapshot.json` with its schema, `layers.svg` and `layers.csv`, and a manifest.
 
 **Expectations.** "Read guidance" (`read-guidance`) reads earnings forecasts (业绩预告) and flash reports (业绩快报) for their ranges, prior-year figures and changes. It downloads those announcements first, since a catalogue run downloads only reports; catalogue with kind `all` before. Guidance is the company's own disclosed estimate: a proxy for expectations, labelled as such, not investors' expectations. Analyst forecasts can be imported from a file you are licensed to use (`import-analyst-forecasts-csv FILE --licence "…"`); they are kept apart from guidance, never mixed in one series, and left out of releases unless you include licensed data.
+
+### The Visualise section (v2.2)
+
+Every view in the section works in the same way.
+- **Readiness.** Its page states the data it needs and whether they are there: met, partly met (with counts) or missing, with the action that fills each gap. The command line gives the same with `viz-check VIEW --code CODE`; `viz-list` lists the views.
+- **As published by** (`--as-of`) keeps only what was published by that date.
+- **Output.** A folder (under `visualise/` by default) with:
+  - `view.html`, an interactive page that works offline and opens in your browser;
+  - `view.json` and `view.schema.json`, the view's data and its schema;
+  - the data as CSV (`nodes.csv` and `edges.csv` for a map; one file a table for a chart);
+  - publication figures as SVG with their CSV (`figure_*.svg`, `figure_*.csv`), sized for a column (85 mm) or a page (175 mm) with `--width`, and `figures.html`, which prints them to PDF from the browser with their captions;
+  - `manifest.json`: each file's SHA-256, the database fingerprint, the parameters, the evidential status and the version of the definitions.
+- **Privacy and licences.** Natural persons are shown under the same pseudonyms as in a pseudonymised release; licensed data are left out. A map is not written if a person's name would be shown.
+- **Evidence.** Each view states what its links are: a documented fact (a document states it) or an observed association (two documented values compared). Neither is evidence of cause.
+
+**Ego map** (`viz-ego-map --code 600519`). One company at the centre and, around it:
+- the actual controller and the control chain, with stakes;
+- the top-10 holders (a name not resolved to an entity is marked `UNRESOLVED`; top-10 tables list ten holders only);
+- subsidiaries and associates (the 40 largest stakes);
+- directors and officers listed in a roster published within 450 days before the date;
+- the regulators that acted on it, with the number of events;
+- its CSRC sector.
+
+`--depth 2` adds the other listed companies the same holders hold and the same persons serve (board interlocks), up to 60. `--relations` keeps one kind (control, ownership, group, board or regulators). The summary gives the steps to the ultimate controller.
+
+**Data coverage** (`viz-coverage --start 2021 --end 2025`). For each year, the share of the companies listed at the year end that have data in each layer (fundamentals, capability, expectations, valuation, ownership, control, institutional), by board or CSRC section (`--group-by`), with the confidence classes of the figures and the balance of the panel. Use it before a panel, to see where the data are thin.
+
+**Guidance against outcome** (`viz-guidance-outcome --start 2021 --end 2025`). Each earnings forecast or flash-report range for net profit attributable, against the profit in the first periodic report published after it: whether the outcome falls within the range, and the error of the midpoint. Figures read from the forecast or flash report itself never count as the outcome. Forecasts and flash reports are kept apart, since flash reports are near-final.
+
+**Relational variables in panels.** `build-panel` accepts three optional variables, each dated by publication:
+- `ctrl_group`: an opaque identifier shared by every company under one actual controller, for fixed effects or clustering. No name is written.
+- `ctrl_distance`: steps from the ultimate controller to the company in the control chain.
+- `reg_actions_12m`: regulatory events in the twelve months to the row's date.
+
+Network observations are not independent: use clustered or network-robust standard errors.
+
+### What v2.2 changed (findings 132 to 139)
+
+- **Balance sheets.** A total read without its first digit is also restored when the other reading of the document has the complete figure, or when the statement's grand total confirms it (finding 132).
+- **Controllers.** A legal representative's name printed against a wrapped controller's name is removed, and 省政府 and 省人民政府 group as one (finding 133).
+- **Re-reading.** Every report is read again after the upgrade (`financials-5`, `control-4`).
+- **Download estimates** are kept by kind of document (finding 135). **ESG** runs count unchanged rows as "unchanged" (finding 137). **Short announcements** are no longer marked as partly scanned (finding 138).
 
 ### PDF reader messages (v2.0.3)
 

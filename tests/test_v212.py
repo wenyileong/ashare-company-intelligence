@@ -62,14 +62,16 @@ def test_downloads_take_any_number_of_ids(company, tmp_path):
 
 
 def test_the_estimate_uses_the_rate_of_the_last_download(company, tmp_path):
+    # v2.2 (finding 135): rates are kept by kind, and only from runs of 25 documents or more (test_v22 covers it);
+    # this test now checks the v2.1.2 behaviour that remains: a measured rate is used, a damaged file is ignored
     from ashare import disclosure_pipeline as dp
-    for i in range(3):
-        add_disclosure(company, f"{2022 + i}年年度报告", f"{2023 + i}-03-30", None, ann_id=f"A{i}")
+    for i in range(25):
+        add_disclosure(company, f"{2000 + i}年年度报告", f"{2001 + i}-03-30", None, ann_id=f"A{i}")
     dp.download_pending(None, ("annual_report",), adapter=_adapter())
     rates = json.loads(dp._rates_file().read_text(encoding="utf-8"))
-    assert "seconds_per_document" in rates and "annual_report" in rates["mb_by_kind"]
+    assert "annual_report" in rates["kinds"]
     rows = [SimpleNamespace(kind="annual_report")] * 3600
-    rates["seconds_per_document"] = 6.0
+    rates["kinds"]["annual_report"]["seconds"] = 6.0
     dp._rates_file().write_text(json.dumps(rates), encoding="utf-8")
     est = dp.download_estimate(rows)
     assert est["approx_hours"] == 6.0 and est["measured"] is True
@@ -342,7 +344,7 @@ def test_forms_of_a_commission_name_are_grouped_as_one():
 
 def test_the_control_version_is_new():
     from ashare.extractstate import VERSIONS
-    assert VERSIONS["control"] == "control-3"
+    assert VERSIONS["control"] not in ("control-1", "control-2")       # v2.2 moved it on to control-4
 
 
 # --- 8. why a layer is empty (finding 127) -------------------------------------------------------------------------

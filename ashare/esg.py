@@ -119,6 +119,9 @@ def _upsert(session, company_id, disclosure_id, period, item, value, source, doc
     row = session.query(EsgObservation).filter_by(company_id=company_id, reporting_period=period, item=item,
                                                   source=source, disclosure_id=disclosure_id).one_or_none()
     created = row is None
+    if not created and (row.value, row.value_text, row.source_document, row.source_page, row.raw_value,
+                        row.extraction_method, row.confidence) == (value, text, doc, page, raw, method, conf):
+        return "unchanged"          # v2.2 (finding 137): nothing differs, so nothing is written or counted as updated
     if created:
         row = EsgObservation(company_id=company_id, reporting_period=period, item=item, source=source,
                              disclosure_id=disclosure_id, pillar=ITEMS[item][0], extraction_method=method)
@@ -157,7 +160,8 @@ def extract_esg(security_code: str | None = None, again: bool = False, progress=
     from .extractstate import run
     init_db()
     session = SessionLocal()
-    totals = {"documents": 0, "sustainability_reports": 0, "values": 0, "inserted": 0, "updated": 0, "errors": []}
+    totals = {"documents": 0, "sustainability_reports": 0, "values": 0, "inserted": 0, "updated": 0, "unchanged": 0,
+              "errors": []}
     try:
         q = session.query(Disclosure, Company).join(Company, Disclosure.company_id == Company.id)
         if security_code:
