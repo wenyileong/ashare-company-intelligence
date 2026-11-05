@@ -438,3 +438,17 @@ def test_the_visualise_pages_hold_the_views_and_their_commands_exist():
                                {"requirement": "holders", "status": "MISSING", "detail": "none",
                                 "action": "Read top-10 shareholders from reports"}])
     assert "controllers" in text and "Read top-10 shareholders from reports" in text
+
+
+def test_the_citation_file_names_the_licence_in_a_form_zenodo_accepts():
+    """Zenodo reads CITATION.cff when it archives a GitHub release; a "license" that is not an SPDX identifier makes
+    the file invalid and the archiving fail (the PolyForm Strict licence has none), so it is given by its address."""
+    import re
+    cff = (Path(__file__).resolve().parents[1] / "CITATION.cff").read_text(encoding="utf-8")
+    assert not re.search(r"^license:\s*PolyForm-Strict", cff, re.M)
+    assert 'license-url: "https://polyformproject.org/licenses/strict/1.0.0"' in cff
+    try:
+        from cffconvert.cli.create_citation import create_citation
+    except ImportError:
+        return
+    create_citation(str(Path(__file__).resolve().parents[1] / "CITATION.cff"), None).validate()
