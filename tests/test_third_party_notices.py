@@ -69,4 +69,7 @@ def test_licence_is_polyform_strict_unchanged():
     assert "Licensor: Leong, Wen Yi" in head and "THIRD_PARTY_NOTICES.txt" in head
     assert body.startswith("# PolyForm Strict License 1.0.0")
     assert hashlib.sha256(body.encode("utf-8")).hexdigest() == "9eb48619fbc193ab7bb327b090cfcc703000265b83e670f81f231d0b1c43c56e"
-    assert "license: PolyForm-Strict-1.0.0" in (ROOT / "CITATION.cff").read_text(encoding="utf-8")
+    # v2.2.0: the licence has no SPDX identifier, so CITATION.cff gives it by its address (Zenodo rejects the file
+    # otherwise)
+    assert 'license-url: "https://polyformproject.org/licenses/strict/1.0.0"' in \
+        (ROOT / "CITATION.cff").read_text(encoding="utf-8")
