@@ -11,8 +11,13 @@
 ; The data folder (Documents\AShareScraper) is never touched by installing,
 ; upgrading or uninstalling.
 
-; 64-bit installer: the programs are 64-bit, so 32-bit Windows is not supported anyway
-Target amd64-unicode
+; 64-bit installer where this NSIS has the 64-bit stubs (the Linux packages do); otherwise (the official Windows
+; build, as on GitHub's runners) a 32-bit Unicode installer, which installs the same 64-bit programs
+!if /FileExists "${NSISDIR}/Stubs/lzma_solid-amd64-unicode"
+  Target amd64-unicode
+!else
+  Unicode true
+!endif
 SetCompressor /SOLID lzma
 SetCompressorDictSize 64
 RequestExecutionLevel user

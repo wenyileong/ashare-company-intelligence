@@ -12,6 +12,26 @@ import os
 from PyInstaller.utils.hooks import collect_submodules, collect_dynamic_libs, collect_data_files
 
 ROOT = os.path.abspath(os.path.join(SPECPATH, ".."))
+# v2.2.0: make the package importable for the hooks below even when it is not installed (GitHub's runners), and
+# collect its data files from the source tree, so the build does not depend on how PyInstaller finds the package.
+import sys
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
+
+def _package_files(sub, include_py_files=False):
+    base = os.path.join(ROOT, "ashare", *sub.split("/"))
+    out = []
+    for folder, dirs, files in os.walk(base):
+        dirs[:] = [d for d in dirs if d != "__pycache__"]
+        for name in files:
+            if name.endswith((".pyc", ".pyo")) or (name.endswith(".py") and not include_py_files):
+                continue
+            src = os.path.join(folder, name)
+            out.append((src, os.path.dirname(os.path.relpath(src, ROOT))))
+    if not out:
+        raise SystemExit(f"no files found under {base}")
+    return out
 ICON = os.path.join(SPECPATH, "ashare.ico")
 icon = ICON if os.path.exists(ICON) else None
 
@@ -26,11 +46,11 @@ hidden = (
 pdfium_bins = collect_dynamic_libs("pypdfium2_raw")
 pdfium_data = collect_data_files("pypdfium2_raw") + collect_data_files("pypdfium2")
 # v2.0: Alembic loads the migration scripts from files, so they ship as source.
-migrations = collect_data_files("ashare", subdir="migrations", include_py_files=True)
+migrations = _package_files("migrations", include_py_files=True)
 # v2.1: the offline topology viewer's page, script, style sheet and bundled libraries (with their licences)
-viewer = collect_data_files("ashare", subdir="viz/viewer")
+viewer = _package_files("viz/viewer")
 # v2.1: the interface catalogues (English and Simplified Chinese)
-viewer += collect_data_files("ashare", subdir="i18n")
+viewer += _package_files("i18n")
 hidden += collect_submodules("alembic", filter=lambda n: not n.startswith("alembic.testing")) + ["mako.template"]
 
 # Size: rich needs pygments only for the Python lexer (help formatting).
