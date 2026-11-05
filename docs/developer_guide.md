@@ -138,3 +138,7 @@ PyInstaller does not cross-compile: build the Windows programs on Windows (a Win
 5. Run the tests on SQLite and PostgreSQL, and the offline self-test.
 6. Build and sign the installer and the portable zips, and write `SHA256SUMS.txt` for the downloads.
 7. Create the GitHub release for the tag `vX.Y.Z`, attach the downloads, `LICENSE.md`, `THIRD_PARTY_NOTICES.txt` and `SHA256SUMS.txt`, and publish the update JSON if one is used.
+8. Zenodo (v2.2.0). Publishing the GitHub release makes Zenodo archive it under the concept DOI 10.5281/zenodo.23982987, reading `CITATION.cff` from the tagged commit.
+   - The file must validate (`cffconvert --validate`); a test checks this, and an invalid file makes the archiving fail.
+   - The PolyForm Strict licence has no SPDX identifier, so `CITATION.cff` gives it as `license-url`, and Zenodo gives the new record its default licence (CC BY 4.0).
+   - After each release, edit the new version's record on Zenodo: remove CC BY 4.0, then add a custom licence titled "PolyForm Strict License 1.0.0" with the link <https://polyformproject.org/licenses/strict/1.0.0>.

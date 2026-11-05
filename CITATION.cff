@@ -7,6 +7,8 @@ abstract: "A provenance-preserving research data system for companies listed on 
 # be an SPDX identifier, and Zenodo rejects the file otherwise).
 license-url: "https://polyformproject.org/licenses/strict/1.0.0"
 version: "2.2.0"
+doi: "10.5281/zenodo.23982987"
+repository-code: "https://github.com/wenyileong/ashare-company-intelligence"
 date-released: "2026-11-05"
 authors:
   - family-names: "Leong"
