@@ -51,3 +51,11 @@ These are the author's requirements for the build after v2.2.0, whatever its ver
 - The figures written for publication are byte-identical before and after interactive use.
 - Each new bundled library is listed in the notices.
 - The larger pages are timed.
+
+## R2. The fixes from the v2.2.0 live run
+
+Findings 140 to 146 in `docs/live_run_findings_v2.2.md`, with the highest priority on:
+- 145, a data folder that can be moved without losing the links to the documents;
+- 144, progress and resume for the whole-market price download.
+
+The quarterly top-10 layout (finding 134) and the source rejoining of balance-sheet digits (finding 132, rule 3) still wait on the author's `inspect-tables` samples.
