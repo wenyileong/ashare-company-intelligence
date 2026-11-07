@@ -493,7 +493,7 @@ Built scaffolding first, as planned: each feature added its tables (migration 00
 - **Releases.** The new tables are left out of releases (`OPERATIONAL`, `INTERNAL_TABLES`).
 
 **Tests.**
-- `tests/test_v23.py`: 50 tests across every part.
+- `tests/test_v23.py`: 49 tests across every part.
 - Linux Python 3.12: 506 passed, 4 skipped; with every switch off, the earlier suite passes (456 passed, 4 skipped).
 - Python 3.13: 470 passed, 38 skipped (no Tk).
 - PostgreSQL 16: 499 passed, 11 skipped (the data-folder moves need a SQLite file).
