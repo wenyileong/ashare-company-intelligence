@@ -1,0 +1,5 @@
+{
+  "version": "nominees-1",
+  "note": "Holders that hold for others (nominee or custody accounts), left out when companies are linked by shared holders (v2.3.0, plan B8): two companies are not linked because both have Stock Connect investors. Names are compared after removing spaces and full-width brackets.",
+  "names": ["香港中央结算有限公司", "香港中央结算(代理人)有限公司", "HKSCC NOMINEES LIMITED", "HONG KONG SECURITIES CLEARING COMPANY LIMITED"]
+}

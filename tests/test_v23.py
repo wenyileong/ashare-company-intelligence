@@ -826,3 +826,87 @@ def test_gleif_accepts_exact_credit_codes_and_offers_names_for_review(db, monkey
     assert gleif.decide(cands[0]["id"], False)["status"] == "REJECTED"
     again = gleif.match_entities(names=True, client=client)
     assert again["looked_up"] == 1 and again["candidates"] == 0 and again["errors"] == 0   # not offered again
+
+
+# --- B8: ownership and board network measures -------------------------------------------------------------------
+
+def test_mhhi_delta_matches_a_hand_computation():
+    from ashare.network_measures import mhhi_delta
+    # two firms of equal size, one holder with 10% of each: as if merged, ΔMHHI = 2 × 0.5 × 0.5 × 10,000 = 5,000
+    assert mhhi_delta({1: .5, 2: .5}, {1: {"h": 10.0}, 2: {"h": 10.0}}) == pytest.approx(5000.0)
+    # three firms; holder a in 1 and 2, holder b only in 3
+    shares, hold = {1: .5, 2: .3, 3: .2}, {1: {"a": 10.0, "x": 30.0}, 2: {"a": 5.0}, 3: {"b": 20.0}}
+    expect = (.5 * .3 * (10 * 5) / (10 ** 2 + 30 ** 2) + .3 * .5 * (5 * 10) / 5 ** 2) * 10000
+    assert mhhi_delta(shares, hold) == pytest.approx(expect)
+    assert mhhi_delta({1: 1.0}, {1: {"a": 1.0}}) is None
+
+
+def test_holder_and_board_links_exclude_nominees_and_follow_the_date(rel):
+    from ashare.models import SessionLocal, Company, OwnershipObservation, Disclosure
+    from ashare.network_measures import holder_network, interlock_network
+    s = SessionLocal()
+    a = s.query(Company).filter_by(security_code="600519").one()
+    b = s.query(Company).filter_by(security_code="000001").one()
+    d = s.query(Disclosure).filter_by(announcement_id="AR23").one()
+    s.add(OwnershipObservation(company_id=a.id, disclosure_id=d.id, observation_date="2023-12-31",
+                               shareholder_name="香港中央结算有限公司", ownership_pct=6.0, rank=4, source="PDF",
+                               extraction_method="PDF_TABLE"))
+    s.commit()
+    links = holder_network(s, "2024-06-30")
+    assert links[a.id] == {b.id} and links[b.id] == {a.id}            # the fund, not the nominee
+    assert holder_network(s, "2024-03-01") == {}                      # 600519's table not yet published
+    assert interlock_network(s, "2024-06-30")[a.id] == {b.id}
+    s.close()
+
+
+def test_the_network_panel_variables(rel):
+    from ashare.panel import build_panel
+    p = build_panel(["holder_overlap_n", "interlock_n", "mhhi_delta"], unit="year", start="2024-01-01",
+                    end="2024-12-31", codes=["600519", "000001"], align="pit", pit_day="06-30")
+    by = {r["code"]: r for r in p["rows"]}
+    assert by["600519"]["holder_overlap_n"] == 1.0 and by["000001"]["interlock_n"] == 1.0
+    assert by["600519"]["mhhi_delta"] is None                       # no revenue read: no market shares
+
+
+# --- B9: watchlists ------------------------------------------------------------------------------------------------
+
+def test_a_watchlist_records_a_baseline_then_reports_only_new_items(db, company, monkeypatch):
+    from ashare.models import SessionLocal, Disclosure, ControlObservation
+    from ashare.watch import add_watchlist, run_watchlists, alerts
+    from ashare.features import FeatureOff
+    s = SessionLocal()
+    s.add(Disclosure(company_id=company.id, announcement_id="W1", title_cn="2024年年度业绩预告",
+                     kind="earnings_forecast_or_flash", announcement_date="2025-01-20"))
+    s.add(ControlObservation(company_id=company.id, observation_date="2023-12-31", actual_controller="甲",
+                             source="PDF"))
+    s.commit()
+    s.close()
+    add_watchlist("mine", "600519,600519", "guidance,controller_change")
+    first = run_watchlists()
+    assert first["new"] == [] and alerts() == []                       # the baseline is not reported
+    s = SessionLocal()
+    s.add(Disclosure(company_id=company.id, announcement_id="W2", title_cn="2025年半年度业绩预告",
+                     kind="earnings_forecast_or_flash", announcement_date="2025-07-10"))
+    s.add(ControlObservation(company_id=company.id, observation_date="2024-12-31", actual_controller="乙",
+                             source="PDF"))
+    s.commit()
+    s.close()
+    again = run_watchlists()
+    assert sorted(x["kind"] for x in again["new"]) == ["controller_change", "guidance"]
+    assert len(alerts(mark_seen=True)) == 2 and alerts() == []
+    assert run_watchlists()["new"] == []
+    with pytest.raises(ValueError):
+        add_watchlist("bad", "600519", "everything")
+    monkeypatch.setenv("ASHARE_FEATURES", "watchlists=off")
+    with pytest.raises(FeatureOff):
+        run_watchlists()
+
+
+def test_trusted_timestamps_are_a_scaffold_that_refuses_to_run(monkeypatch, tmp_path):
+    from ashare.timestamps import timestamp_manifest, NotAvailable
+    from ashare.features import FeatureOff
+    with pytest.raises(FeatureOff):
+        timestamp_manifest(tmp_path / "manifest.json")
+    monkeypatch.setenv("ASHARE_FEATURES", "timestamps=on")
+    with pytest.raises(NotAvailable):
+        timestamp_manifest(tmp_path / "manifest.json")

@@ -392,6 +392,16 @@ def daily_update(until: str | None = None, prices: bool = True, extract: bool = 
         if codes:
             j = create_job("extract", {}, codes)
             out["extract"] = run_job(j, progress)
+    # v2.3.0 (B9): the watchlists, when they are on; a failure here never fails the update
+    try:
+        from .features import enabled
+        if enabled("watchlists"):
+            from .watch import run_watchlists
+            out["watchlists"] = run_watchlists()
+            if progress and out["watchlists"]["new"]:
+                progress(f"Watchlists: {len(out['watchlists']['new'])} new item(s); see Operations > Alerts")
+    except Exception as exc:                                          # noqa: BLE001
+        out["watchlists"] = {"error": repr(exc)}
     return out
 
 

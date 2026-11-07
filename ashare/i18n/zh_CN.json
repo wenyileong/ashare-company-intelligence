@@ -171,6 +171,58 @@
   "en_hash": "d69eff0e0f",
   "zh": "显示交易事项"
  },
+ "action.alerts.alerts.field.all.label": {
+  "en_hash": "975b46874f",
+  "zh": "包括已查看的"
+ },
+ "action.alerts.alerts.field.mark_seen.label": {
+  "en_hash": "c074d8af44",
+  "zh": "标记为已查看"
+ },
+ "action.alerts.alerts.label": {
+  "en_hash": "8f0fc10a77",
+  "zh": "显示提醒"
+ },
+ "action.alerts.watch-add.field.codes.hint": {
+  "en_hash": "b1e02c7c6b",
+  "zh": "以逗号分隔的代码，例如 600519,000001"
+ },
+ "action.alerts.watch-add.field.codes.label": {
+  "en_hash": "9dba7ad7c5",
+  "zh": "公司"
+ },
+ "action.alerts.watch-add.field.kinds.hint": {
+  "en_hash": "df880f31f8",
+  "zh": "可选：announcement（公告）、regulatory（监管）、guidance（业绩预告）、controller_change（控制人变更）、late_report（报告逾期）、insider（董监高买卖）"
+ },
+ "action.alerts.watch-add.field.kinds.label": {
+  "en_hash": "1f207bb143",
+  "zh": "类别"
+ },
+ "action.alerts.watch-add.field.name.label": {
+  "en_hash": "709a23220f",
+  "zh": "名称"
+ },
+ "action.alerts.watch-add.label": {
+  "en_hash": "63e3952873",
+  "zh": "创建或修改关注列表"
+ },
+ "action.alerts.watch-run.field.name.hint": {
+  "en_hash": "e9710b3e1a",
+  "zh": "留空表示全部。"
+ },
+ "action.alerts.watch-run.field.name.label": {
+  "en_hash": "48a616d996",
+  "zh": "关注列表"
+ },
+ "action.alerts.watch-run.label": {
+  "en_hash": "674e46fd7f",
+  "zh": "运行关注列表"
+ },
+ "action.alerts.watch-run.note": {
+  "en_hash": "da732733e2",
+  "zh": "列出自上次运行以来的新内容，并写出 exports/alerts.csv。"
+ },
  "action.board.common-controllers.field.as_of.hint": {
   "en_hash": "67949cb276",
   "zh": "可选，YYYY-MM-DD。"
@@ -2982,6 +3034,14 @@
  "section.actions.title": {
   "en_hash": "607ddf9b7c",
   "zh": "公司行为"
+ },
+ "section.alerts.intro": {
+  "en_hash": "10c0dba59a",
+  "zh": "指定要关注的公司及事项类型。首次运行记录已有内容；此后每次运行及每次每日更新只列出新内容。提醒仅保留在本程序内。"
+ },
+ "section.alerts.title": {
+  "en_hash": "1e46c36528",
+  "zh": "关注列表与提醒"
  },
  "section.board.intro": {
   "en_hash": "4babb27c08",

@@ -40,7 +40,7 @@ FEATURES: dict[str, Feature] = {f.name: f for f in [
     Feature("gleif", "Entity identifiers from GLEIF", False, "B7", "A network source; on when you choose."),
     Feature("network_measures", "Ownership network measures", True, "B8", "Optional panel variables."),
     Feature("watchlists", "Watchlists and alerts", True, "B9", "Alerts inside the program only."),
-    Feature("timestamps", "Trusted timestamps", False, "B10", "Needs a time-stamping authority you choose."),
+    Feature("timestamps", "Trusted timestamps", False, "B10", "Not available in v2.3.0 (scaffold only)."),
 ]}
 
 

@@ -557,6 +557,37 @@ def _timeliness(kind):
     return get
 
 
+def _network(kind):
+    """v2.3.0 (plan B8): ownership and board network measures, as known on the row's date; computed once per date
+    for every company and shared across the panel's rows."""
+    def get(ctx):
+        from .models import SessionLocal, Company
+        from . import network_measures as nm
+        shared = ctx.cache.setdefault("__shared__", {})
+        when = min(ctx.measure_date, ctx.cutoff)
+        key = ("net", kind, when)
+        if key not in shared:
+            s = SessionLocal()
+            try:
+                ids = {c.security_code: c.id for c in s.query(Company.security_code, Company.id)}
+                if kind == "holders":
+                    shared[key] = (ids, nm.holder_network(s, when))
+                elif kind == "interlocks":
+                    shared[key] = (ids, nm.interlock_network(s, when))
+                else:
+                    shared[key] = (ids, nm.industry_mhhi(s, when, int(when[:4]) - 1))
+            finally:
+                s.close()
+        ids, data = shared[key]
+        cid = ids.get(ctx.code)
+        if kind in ("holders", "interlocks"):
+            return float(len(data.get(cid, ()))), None, "MEDIUM", None
+        ind = _industry("CSRC_2012", 2)(ctx)[0]
+        v = data.get(ind) if ind else None
+        return v, None, ("LOW" if v is not None else None), None
+    return get
+
+
 def _relational(kind):
     """v2.2 (plan section B7): relational variables, from the control readings and regulatory events published by the
     row's cut-off."""
@@ -631,6 +662,20 @@ def _register_control():
     _var("reg_actions_12m", "regulatory events in the past year", "COUNT", "relational", "regulatory events "
          "(any kind) concerning the company in the twelve months to the row's date", "", "regulatory_events",
          "events published by the cut-off", getter=_relational("reg_actions"))
+    _var("holder_overlap_n", "companies sharing a top-10 holder", "COUNT", "network", "listed companies with at "
+         "least one top-10 holder in common, from each company's latest top-10 table known by the row's date; "
+         "nominee accounts (rules/nominee_holders.json) are left out", "", "ownership_observations",
+         "tables published by the cut-off", getter=_network("holders"),
+         confidence="network observations are not independent: use clustered or network-robust standard errors")
+    _var("interlock_n", "companies sharing a director or officer", "COUNT", "network", "listed companies with a "
+         "director, supervisor or senior manager in common, seen in a roster within 450 days before the row's date",
+         "", "person_roles", "rosters published by the cut-off", getter=_network("interlocks"))
+    _var("mhhi_delta", "common-ownership increment (MHHI delta) of the industry", "RATIO", "network",
+         "O'Brien and Salop's modified Herfindahl increment for the company's CSRC industry (level 2), with "
+         "revenue shares for the year before the row's date and top-10 stakes (control proportional to stake); "
+         "a lower bound, because top-10 tables omit smaller holders", "Σj Σk≠j sj sk (Σi bij bik)/(Σi bij²) × 10,000",
+         "financial_facts, ownership_observations, industry_classifications", "data published by the cut-off",
+         getter=_network("mhhi"), confidence="LOW: a lower bound from top-10 stakes")
     _var("report_delay_days", "days from year end to the annual report", "COUNT", "timeliness",
          "days from the end of the fiscal year to the first publication of the latest annual report published by the "
          "row's date", "", "disclosures", "reports published by the cut-off", getter=_timeliness("delay"))
@@ -792,6 +837,7 @@ def build_panel(variables_: list[str] | None = None, unit: str = "year", start: 
             if members is not None and code not in members:
                 continue
             cache = contexts.setdefault(code, {})
+            cache.setdefault("__shared__", contexts.setdefault("__shared__", {}))   # v2.3.0: across companies
             ctx = RowContext(code, period, cutoff, measure, unit, cache)
             if exclude_financials:
                 sec = _industry("CSRC_2012", 1)(ctx)[0]

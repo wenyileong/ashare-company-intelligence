@@ -6,6 +6,7 @@ feature has a switch checks it first (``features.require``).
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import typer
 
@@ -178,7 +179,7 @@ def register(app, _table) -> None:
         try:
             return int(str(text).strip())
         except ValueError:
-            _fail(ValueError(f"not an output number: {text!r} (the numbers are listed by 'outputs')"))
+            _fail(ValueError(f"not a whole number: {text!r}"))
 
     # --- B11: the outputs register -------------------------------------------------------------------------------
 
@@ -222,14 +223,14 @@ def register(app, _table) -> None:
     # --- B5: disclosure timeliness ---------------------------------------------------------------------------------
 
     @app.command("timeliness")
-    def timeliness_cmd(code: str = typer.Option(None, "--code", help="Blank for every company"),
-                       year: int = typer.Option(None, "--year", help="Reporting year, e.g. 2024"),
+    def timeliness_cmd(code: str = typer.Option(None, "--code", "--security-code", help="Blank for every company"),
+                       year: str = typer.Option(None, "--year", help="Reporting year, e.g. 2024"),
                        as_of: str = typer.Option(None, "--as-of", help="Only reports published by this date"),
                        out: str = typer.Option("exports/timeliness.csv", "--out")):
         """Periodic reports against their legal deadlines: days from the period end, the deadline, late or not
         (v2.3.0; the rules and their sources are in rules/disclosure_deadlines.json)."""
         from .timeliness import timeliness
-        r = _guard(timeliness, code or None, year, as_of or None, out)
+        r = _guard(timeliness, code or None, _number(year) if year else None, as_of or None, out)
         sm = r["summary"]
         print(f"{sm['reports']:,} reports; {sm['with_a_deadline']:,} with a verified deadline; {sm['late']:,} late "
               f"(rules {sm['rules']})")
@@ -245,14 +246,14 @@ def register(app, _table) -> None:
     # --- B6: directors' and officers' share dealings (experimental) -------------------------------------------
 
     @app.command("extract-insider-dealings")
-    def extract_insider_cmd(code: str = typer.Option(None, "--code", help="Blank for every company")):
+    def extract_insider_cmd(code: str = typer.Option(None, "--code", "--security-code", help="Blank for every company")):
         """Read directors', supervisors' and senior managers' share dealings from their announcements (v2.3.0;
         experimental: switch 'insider' on first)."""
         from .insider import extract_dealings
         print(_guard(extract_dealings, code or None, progress=lambda m: print(m, flush=True)))
 
     @app.command("insider-flags")
-    def insider_flags_cmd(code: str = typer.Option(None, "--code")):
+    def insider_flags_cmd(code: str = typer.Option(None, "--code", "--security-code")):
         """Each dealing with the flags of the verified rules (v2.3.0; experimental)."""
         from .insider import flags
         r = _guard(flags, code or None)
@@ -265,11 +266,12 @@ def register(app, _table) -> None:
     @app.command("gleif-match")
     def gleif_match_cmd(names: bool = typer.Option(False, "--names", help="Also look up by name (candidates for "
                                                                           "review)"),
-                        limit: int = typer.Option(None, "--limit", help="At most this many entities")):
+                        limit: str = typer.Option(None, "--limit", help="At most this many entities")):
         """Look up Legal Entity Identifiers at GLEIF: accepted when the credit code matches exactly, candidates by
         name; then GLEIF's direct and ultimate parents (v2.3.0; switch 'gleif' on first)."""
         from .gleif import match_entities
-        print(_guard(match_entities, names, limit, progress=lambda m: print(m, flush=True)))
+        print(_guard(match_entities, names, _number(limit) if limit else None,
+                     progress=lambda m: print(m, flush=True)))
 
     @app.command("gleif-candidates")
     def gleif_candidates_cmd():
@@ -286,3 +288,44 @@ def register(app, _table) -> None:
         if decision.lower() not in ("accept", "reject"):
             _fail(ValueError("the decision is 'accept' or 'reject'"))
         print(decide(_number(identifier_id), decision.lower() == "accept"))
+
+    # --- B9: watchlists and alerts -------------------------------------------------------------------------------
+
+    @app.command("watch-add")
+    def watch_add_cmd(name: str = typer.Argument(..., help="A name for the watchlist"),
+                      codes: str = typer.Option(..., "--codes", help="Comma-separated codes"),
+                      kinds: str = typer.Option("regulatory,guidance,controller_change,late_report", "--kinds",
+                                                help="announcement, regulatory, guidance, controller_change, "
+                                                     "late_report, insider")):
+        """Create or change a watchlist (v2.3.0). Its first run records what is already there."""
+        from .watch import add_watchlist
+        try:
+            print(_guard(add_watchlist, name, codes, kinds))
+        except ValueError as exc:
+            _fail(exc)
+
+    @app.command("watch-run")
+    def watch_run_cmd(name: str = typer.Argument(None, help="Blank for every watchlist"),
+                      out: str = typer.Option("exports/alerts.csv", "--out")):
+        """Run the watchlists: the new items since the last run (v2.3.0). The daily update runs them too."""
+        from .watch import run_watchlists
+        r = _guard(run_watchlists, name or None)
+        print(f"{r['watchlists']} watchlist(s); {len(r['new'])} new item(s)")
+        if r["new"]:
+            _table(r["new"][:300], ["watchlist", "kind", "code", "date", "title"], title="New")
+            import csv
+            p = Path(out)
+            p.parent.mkdir(parents=True, exist_ok=True)
+            with p.open("w", encoding="utf-8-sig", newline="") as fh:
+                w = csv.DictWriter(fh, fieldnames=["watchlist", "kind", "code", "date", "title"])
+                w.writeheader()
+                w.writerows(r["new"])
+            print(f"Written: {p}")
+
+    @app.command("alerts")
+    def alerts_cmd(all_: bool = typer.Option(False, "--all", help="Include alerts already seen"),
+                   mark_seen: bool = typer.Option(False, "--mark-seen", help="Mark the listed alerts as seen")):
+        """The alerts from the watchlists (v2.3.0)."""
+        from .watch import alerts
+        rows = alerts(not all_, mark_seen)
+        _table(rows[:500], ["id", "watchlist", "kind", "code", "date", "title"], title="Alerts")

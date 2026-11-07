@@ -680,6 +680,23 @@ SECTIONS = [
          ], "Preview first, then tick 'Apply'."),
      ]},
 
+    {"id": "alerts", "group": "Check", "title": "Watchlists & alerts",
+     "intro": "Name the companies and the kinds of item to watch. The first run records what is already there; each "
+              "later run, and each daily update, lists only what is new. Alerts stay inside the program.",
+     "actions": [
+         A("Create or change a watchlist", "watch-add", [
+             F("name", "Name", "text", "", None, required=True),
+             F("codes", "Companies", "text", "", "--codes", "Comma-separated codes, e.g. 600519,000001",
+               required=True),
+             F("kinds", "Kinds", "text", "regulatory,guidance,controller_change,late_report", "--kinds",
+               "Any of: announcement, regulatory, guidance, controller_change, late_report, insider")]),
+         A("Run the watchlists", "watch-run", [F("name", "Watchlist", "text", "", None, "Blank for every one.")],
+           "Lists what is new since the last run and writes exports/alerts.csv."),
+         A("Show alerts", "alerts", [
+             F("all", "Include seen", "bool", False, ("--all", None)),
+             F("mark_seen", "Mark as seen", "bool", False, ("--mark-seen", None))]),
+     ]},
+
     {"id": "identifiers", "group": "Check", "title": "Identifiers",
      "intro": "Legal Entity Identifiers (LEIs) from GLEIF, the public global register: matched automatically only when "
               "the register's number equals the entity's credit code, otherwise offered here to accept or reject. "
