@@ -419,8 +419,13 @@ def test_normalising_rewrites_with_a_backup_and_can_be_undone(db, company, tmp_p
     s = SessionLocal()
     assert s.get(Disclosure, did).local_path.startswith("/old/")                 # the preview changed nothing
     s.close()
-    r = normalise_paths(apply=True)
-    assert r["applied"] and r["verified"] == 1 and Path(r["backup"]).exists()
+    other = bool(os.environ.get("ASHARE_TEST_DB_URL"))
+    if other:                                            # no file to copy: the author confirms a dump was made
+        with pytest.raises(RuntimeError):
+            normalise_paths(apply=True)
+    r = normalise_paths(apply=True, confirm_other_database=other)
+    assert r["applied"] and r["verified"] == 1
+    assert (r["backup"] is None) if other else Path(r["backup"]).exists()
     s = SessionLocal()
     rel = p.relative_to(tmp_path).as_posix()
     assert s.get(Disclosure, did).local_path == rel
@@ -910,3 +915,109 @@ def test_trusted_timestamps_are_a_scaffold_that_refuses_to_run(monkeypatch, tmp_
     monkeypatch.setenv("ASHARE_FEATURES", "timestamps=on")
     with pytest.raises(NotAvailable):
         timestamp_manifest(tmp_path / "manifest.json")
+
+
+# --- Part D: the views of v2.3 --------------------------------------------------------------------------------------
+
+def test_the_market_map_links_companies_as_known_on_the_date(rel, tmp_path):
+    from ashare.viz.registry import get
+    from ashare.viz.schema import check_view
+    from ashare.viz.publish import write_view, dumps
+    view = get("market_map")
+    snap = view.build({"as_of": "2024-06-30", "key": b"k" * 32}).snapshot
+    assert check_view(snap) == []
+    rels = {e["relation"] for e in snap["edges"]}
+    assert rels == {"SHARES_HOLDER_WITH", "SHARES_DIRECTOR_WITH"}
+    assert all("张三" not in n["label"] for n in snap["nodes"])
+    assert dumps(view.build({"as_of": "2024-06-30", "key": b"k" * 32}).snapshot) == dumps(snap)
+    early = view.build({"as_of": "2024-03-01", "key": b"k" * 32}).snapshot
+    assert {e["relation"] for e in early["edges"]} <= {"SHARES_DIRECTOR_WITH"}
+    capped = view.build({"as_of": "2024-06-30", "max_holder_companies": "2", "relations": "holders",
+                         "key": b"k" * 32}).snapshot
+    assert capped["edges"] and "left out (0)" not in " ".join(capped["notes"])
+    built = view.build({"as_of": "2024-06-30", "key": b"k" * 32})
+    write_view(view, built, tmp_path / "mm", formats=("html", "svg"), width="page")
+    assert (tmp_path / "mm" / "figure_market_map_groups.svg").exists()
+
+
+def test_a_large_map_opens_with_its_groups(rel, tmp_path, monkeypatch):
+    from ashare.viz.registry import get
+    from ashare.viz.pages import write_page
+    snap = get("market_map").build({"as_of": "2024-06-30", "key": b"k" * 32}).snapshot
+    snap["parameters"]["aggregate_above"] = 1                         # force grouping on the small seed
+    write_page(snap, tmp_path / "big.html")
+
+    def steps(page):
+        page.wait_for_timeout(200)
+        m0 = page.evaluate("window.__relmap.mode()")
+        n0 = page.evaluate("window.__relmap.nodes()")
+        g = next(n["group"] for n in snap["nodes"] if n.get("degree"))
+        page.evaluate(f"window.__relmap.focus({json.dumps(g)})")
+        return m0, n0, page.evaluate("window.__relmap.nodes()")
+    errors, requests, (m0, n0, n1) = _page(tmp_path / "big.html", "window.__relmap !== undefined", steps)
+    assert errors == [] and m0 == "groups" and n0 >= 1 and n1 >= 1
+
+
+def test_common_ownership_sectors_and_timeliness_views(rel, tmp_path):
+    from ashare.viz.registry import get
+    from ashare.viz.schema import check_view
+    from ashare.viz.publish import write_view
+    co = get("common_ownership").build({"codes": "600519,000001", "start": "2023", "end": "2023",
+                                        "as_of": "2024-06-30", "key": b"k" * 32})
+    assert check_view(co.snapshot) == []
+    assert co.snapshot["tables"]["pairs"]["rows"][0]["shared_holders"] == 1
+    assert co.snapshot["tables"]["holdings"]["rows"][0]["holder"] == "某某证券投资基金"
+    assert "张三" not in json.dumps(co.snapshot, ensure_ascii=False)          # a natural person is never shown
+    with pytest.raises(Exception):
+        get("common_ownership").build({"key": b"k" * 32})
+    se = get("sectors").build({"start": "2023", "end": "2023", "as_of": "2024-06-30", "key": b"k" * 32})
+    assert check_view(se.snapshot) == [] and se.snapshot["tables"]["sectors"]["rows"]
+    tl = get("timeliness").build({"start": "2023", "end": "2023", "as_of": "2024-06-30", "key": b"k" * 32})
+    assert check_view(tl.snapshot) == []
+    for v, b in (("common_ownership", co), ("sectors", se), ("timeliness", tl)):
+        write_view(get(v), b, tmp_path / v, formats=("html", "svg", "csv"), width="column")
+        errors, requests, n = _page(tmp_path / v / "view.html", "window.__chartview !== undefined",
+                                    lambda page: page.evaluate("window.AshareInteractive.charts.length"))
+        assert errors == [] and requests == [], v
+
+
+def test_the_new_view_commands_exist_and_appear_on_the_pages():
+    pytest.importorskip("tkinter")
+    from ashare import gui
+    from ashare.cli import app
+    names = {c.name for c in app.registered_commands}
+    for cmd in ("viz-market-map", "viz-common-ownership", "viz-sectors", "viz-timeliness"):
+        assert cmd in names
+    views = {a.get("view") for s in gui.SECTIONS for a in s.get("actions", [])}
+    assert {"market_map", "common_ownership", "sectors", "timeliness"} <= views
+
+
+def test_the_largest_pages_stay_usable(tmp_path):
+    """The market map's scale (6,000 companies) and a long series (50,000 points), timed in a headless browser."""
+    import random
+    import time
+    from ashare.viz.pages import write_page
+    from ashare.charts.spec import ChartSpec, Series, Point
+    from ashare.charts.interactive import write_page as chart_page
+    rnd = random.Random(1)
+    nodes = [{"id": f"company:{i:06d}", "kind": "company", "label": f"{i:06d}", "flags": [], "masked": False,
+              "group": f"G{i % 19}", "degree": 1} for i in range(6000)]
+    edges = [{"id": f"e{i}", "source": f"company:{rnd.randrange(6000):06d}", "target": f"company:{rnd.randrange(6000):06d}",
+              "relation": "SHARES_HOLDER_WITH", "evidence_status": "DOCUMENTED_FACT", "basis": {}, "dates": {},
+              "value": 1, "label": None} for i in range(20000)]
+    snap = {"schema_version": 2, "kind": "graph", "view": "market_map", "software": "test", "definitions": "nvf-0",
+            "parameters": {"as_of": "2025-12-31", "aggregate_above": 800, "title": "scale"}, "policy": {},
+            "evidence": "DOCUMENTED_FACT", "relations": {}, "coverage": [], "nodes": nodes, "edges": edges,
+            "summary": [], "notes": []}
+    write_page(snap, tmp_path / "big.html")
+    t0 = time.monotonic()
+    errors, _, mode = _page(tmp_path / "big.html", "window.__relmap !== undefined",
+                            lambda page: page.evaluate("window.__relmap.mode()"))
+    assert errors == [] and mode == "groups" and time.monotonic() - t0 < 60
+    pts = [Point(i, rnd.random()) for i in range(50000)]
+    spec = ChartSpec("line", "long", [Series("s", pts)], x_type="number")
+    p = chart_page(spec, tmp_path)
+    t0 = time.monotonic()
+    errors, _, (shown, kept) = _page(p, "window.__interactive !== undefined", lambda page: page.evaluate(
+        "(d => [d.data.length, (d._data || d.data).length])(window.AshareInteractive.charts[0].data.datasets[0])"))
+    assert errors == [] and shown <= 2000 and kept == 50000 and time.monotonic() - t0 < 60   # thinned for display

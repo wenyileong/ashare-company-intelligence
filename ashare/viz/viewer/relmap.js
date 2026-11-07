@@ -37,8 +37,29 @@
   (snap.notes || []).forEach(function (n) { side.appendChild(el("div", n, "note")); });
 
   var byId = {}; snap.nodes.forEach(function (n) { byId[n.id] = n; });
+  // v2.3.0 (B4.4): a large map opens with its groups; a group opens its companies; "Show all companies" shows all
+  var big = p.aggregate_above && snap.nodes.length > p.aggregate_above;
+  var mode = big ? "groups" : "nodes", focus = null;
+  function grouped() {
+    var count = {}, links = {}, out = [];
+    snap.nodes.forEach(function (n) { var g = n.group || "unknown"; count[g] = (count[g] || 0) + 1; });
+    snap.edges.forEach(function (e) {
+      if (!shown[e.relation]) return;
+      var a = (byId[e.source] || {}).group || "unknown", b = (byId[e.target] || {}).group || "unknown";
+      if (a === b) return; var k = a < b ? a + "\u0001" + b : b + "\u0001" + a; links[k] = (links[k] || 0) + 1; });
+    var nodes = Object.keys(count).sort().map(function (g) {
+      return {id: "group:" + g, node: {id: "group:" + g, kind: "group", label: g + " (" + count[g] + ")",
+              group: g, flags: [], degree: count[g]}}; });
+    Object.keys(links).forEach(function (k) { var ab = k.split("\u0001");
+      out.push({source: "group:" + ab[0], target: "group:" + ab[1],
+                edge: {relation: "LINKS", label: links[k] + " link(s)", value: links[k], source: "group:" + ab[0],
+                       target: "group:" + ab[1], basis: {}, dates: {}}}); });
+    return {nodes: nodes, links: out};
+  }
   function data() {
-    var links = snap.edges.filter(function (e) { return shown[e.relation]; })
+    if (mode === "groups" && !focus) return grouped();
+    var links = snap.edges.filter(function (e) { return shown[e.relation] && (!focus
+        || (byId[e.source] || {}).group === focus || (byId[e.target] || {}).group === focus); })
       .map(function (e) { return {source: e.source, target: e.target, edge: e}; });
     var keep = {}; links.forEach(function (l) { keep[l.source] = keep[l.target] = true; });
     var nodes = snap.nodes.filter(function (n) { return keep[n.id] || n.centre; }).map(function (n) {
@@ -55,6 +76,7 @@
     if (n) {
       inspector.appendChild(el("b", n.label));
       row(t, "kind", n.kind); row(t, "code", n.code); row(t, "flags", (n.flags || []).join(", "));
+      row(t, "LEI", n.lei); row(t, "group", n.group);
       row(t, "degree", n.degree); if (n.masked) row(t, "note", "a natural person, shown under a pseudonym");
       snap.edges.filter(function (x) { return x.source === n.id || x.target === n.id; }).forEach(function (x) {
         var other = byId[x.source === n.id ? x.target : x.source];
@@ -62,7 +84,8 @@
           + (x.basis && x.basis.disclosure_id ? " · document " + x.basis.disclosure_id + (x.basis.page ? " p. " + x.basis.page : "") : ""));
       });
     } else if (e) {
-      inspector.appendChild(el("b", (byId[e.source] || {}).label + " → " + (byId[e.target] || {}).label));
+      inspector.appendChild(el("b", ((byId[e.source] || {}).label || e.source) + " → "
+                                    + ((byId[e.target] || {}).label || e.target)));
       row(t, "relation", e.relation); row(t, "detail", e.label); row(t, "value", e.value);
       row(t, "evidence", e.evidence_status); var b = e.basis || {}, d = e.dates || {};
       row(t, "document", b.disclosure_id); row(t, "page", b.page); row(t, "method", b.method);
@@ -88,7 +111,9 @@
         ctx.font = px + "px sans-serif"; ctx.fillStyle = "#1f2328"; ctx.textAlign = "center";
         ctx.fillText(o.node.label, o.x, o.y + 4 + px);
       })
-      .onNodeClick(function (o) { selected = o.id; show(o.node, null); })
+      .onNodeClick(function (o) {
+        if (o.node.kind === "group" && mode === "groups" && !focus) { focus = o.node.group; redraw(); return; }
+        selected = o.id; show(o.node, null); })
       .onLinkClick(function (l) { show(null, l.edge); });
     window.addEventListener("resize", function () { graph.width(main.clientWidth).height(main.clientHeight); });
   } else {
@@ -113,9 +138,17 @@
     zin.onclick = function () { graph.zoom(graph.zoom() * 1.5, 250); };
     zout.onclick = function () { graph.zoom(graph.zoom() / 1.5, 250); };
     [fit, near, zin, zout].forEach(function (b) { bar.appendChild(b); });
+    if (big) {
+      var gb = el("button", "Show groups"), ab = el("button", "Show all companies"); gb.type = ab.type = "button";
+      gb.onclick = function () { mode = "groups"; focus = null; redraw(); };
+      ab.onclick = function () { mode = "nodes"; focus = null; redraw(); };
+      bar.appendChild(gb); bar.appendChild(ab);
+      bar.appendChild(el("span", "Large map: groups first; click a group to open its companies", "ai-hint"));
+    }
     bar.appendChild(el("span", "Wheel or pinch to zoom · drag to pan · click a node, then 'Zoom to selected'", "ai-hint"));
     side.insertBefore(bar, side.children[1] || null);
   }
   window.__relmap = {nodes: function () { return data().nodes.length; }, links: function () { return data().links.length; },
-                     show: show, graph: graph, select: function (id) { selected = id; }};
+                     show: show, graph: graph, select: function (id) { selected = id; },
+                     mode: function () { return mode; }, focus: function (g) { focus = g; redraw(); }};
 })();

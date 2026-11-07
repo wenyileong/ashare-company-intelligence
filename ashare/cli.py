@@ -92,6 +92,7 @@ _NEEDS_UNIVERSE = {
     "show-market", "profile", "report", "roster", "segments", "subsidiaries", "governance", "control",
     "esg", "peers", "industry-stats", "valuation", "event-study", "universe-stats", "validate-universe",
     "viz-ego-map", "viz-coverage", "viz-guidance-outcome",
+    "viz-market-map", "viz-common-ownership", "viz-sectors", "viz-timeliness",      # v2.3.0
 }
 
 
@@ -1757,6 +1758,50 @@ def viz_coverage_cmd(start: str = typer.Option("2021", "--start", help="First ye
     """Data coverage (v2.2): which layers, groups and years have data, as known on a date."""
     _viz_run("coverage", {"start": start, "end": end, "as_of": as_of, "group_by": group_by, "out": out},
              formats, width)
+
+
+@app.command("viz-market-map")
+def viz_market_map_cmd(as_of: str = typer.Option(None, "--as-of"),
+                       relations: str = typer.Option("all", "--relations", help="all, controller, holders or board"),
+                       min_weight: str = typer.Option("1", "--min-weight"),
+                       max_holder_companies: str = typer.Option("50", "--max-holder-companies"),
+                       group_by: str = typer.Option("auto", "--group-by"),
+                       codes: str = typer.Option(None, "--codes", help="Blank: the whole market"),
+                       out: str = typer.Option("visualise/market_map", "--out"), formats: str = _FORMATS,
+                       width: str = _WIDTH):
+    """The market map (v2.3.0): listed companies linked by shared controllers, holders and directors."""
+    _viz_run("market_map", {"as_of": as_of, "relations": relations, "min_weight": min_weight,
+                            "max_holder_companies": max_holder_companies, "group_by": group_by, "codes": codes,
+                            "out": out}, formats, width)
+
+
+@app.command("viz-common-ownership")
+def viz_common_ownership_cmd(industry: str = typer.Option(None, "--industry", help="CSRC level-2 code, e.g. C39"),
+                             codes: str = typer.Option(None, "--codes"), start: str = typer.Option("2021", "--start"),
+                             end: str = typer.Option(None, "--end"), as_of: str = typer.Option(None, "--as-of"),
+                             out: str = typer.Option("visualise/common_ownership", "--out"),
+                             formats: str = _FORMATS, width: str = _WIDTH):
+    """Common ownership (v2.3.0): shared top-10 holders and the MHHI increment of an industry."""
+    _viz_run("common_ownership", {"industry": industry, "codes": codes, "start": start, "end": end, "as_of": as_of,
+                                  "out": out}, formats, width)
+
+
+@app.command("viz-sectors")
+def viz_sectors_cmd(start: str = typer.Option("2021", "--start"), end: str = typer.Option(None, "--end"),
+                    as_of: str = typer.Option(None, "--as-of"), group_by: str = typer.Option("auto", "--group-by"),
+                    out: str = typer.Option("visualise/sectors", "--out"), formats: str = _FORMATS,
+                    width: str = _WIDTH):
+    """Sectors (v2.3.0): coverage, margins, growth, state control, late reports and regulatory events by group."""
+    _viz_run("sectors", {"start": start, "end": end, "as_of": as_of, "group_by": group_by, "out": out}, formats, width)
+
+
+@app.command("viz-timeliness")
+def viz_timeliness_cmd(start: str = typer.Option("2021", "--start"), end: str = typer.Option(None, "--end"),
+                       as_of: str = typer.Option(None, "--as-of"),
+                       out: str = typer.Option("visualise/timeliness", "--out"), formats: str = _FORMATS,
+                       width: str = _WIDTH):
+    """Disclosure timeliness (v2.3.0): reporting delays against the legal deadlines."""
+    _viz_run("timeliness", {"start": start, "end": end, "as_of": as_of, "out": out}, formats, width)
 
 
 @app.command("viz-guidance-outcome")

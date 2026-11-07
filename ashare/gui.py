@@ -601,7 +601,7 @@ SECTIONS = [
     {"id": "relational", "group": "Visualise", "title": "Relational maps",
      "intro": "Who controls, holds, owns and sits on the boards of a company, and which regulators acted on it, as "
               "known on a date. Every link is a documented fact; natural persons are shown under pseudonyms.",
-     "actions": [_view_action("ego_map")]},
+     "actions": [_view_action("ego_map"), _view_action("market_map"), _view_action("common_ownership")]},
 
     {"id": "company_views", "group": "Visualise", "title": "Company views",
      "intro": "Charts of one company: financial figures, segments, R&D and workforce, findings, prices with "
@@ -626,6 +626,8 @@ SECTIONS = [
            "Histograms, distributions by year, scatter plots with a fitted line, coverage and correlations of any "
            "panel.", after="explore"),
          _view_action("guidance_outcome"),
+         _view_action("sectors"),
+         _view_action("timeliness"),
      ]},
 
     {"id": "coverage", "group": "Visualise", "title": "Data coverage",

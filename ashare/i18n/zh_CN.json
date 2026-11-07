@@ -1091,6 +1091,66 @@
   "en_hash": "5c9b3e672b",
   "zh": "将每份业绩预告或业绩快报的区间与其后定期报告披露的利润相对照：实际结果落入区间的频率，以及与区间中点的偏差幅度。"
  },
+ "action.econometric.viz-sectors.field.as_of.hint": {
+  "en_hash": "4211f4e59e",
+  "zh": "留空则为今日。"
+ },
+ "action.econometric.viz-sectors.field.as_of.label": {
+  "en_hash": "3011562209",
+  "zh": "披露截至"
+ },
+ "action.econometric.viz-sectors.field.end.label": {
+  "en_hash": "bf120d9485",
+  "zh": "截止年度"
+ },
+ "action.econometric.viz-sectors.field.group_by.label": {
+  "en_hash": "ae9629f4eb",
+  "zh": "分组"
+ },
+ "action.econometric.viz-sectors.field.out.label": {
+  "en_hash": "30baa24967",
+  "zh": "文件夹"
+ },
+ "action.econometric.viz-sectors.field.start.label": {
+  "en_hash": "a5bbd447f8",
+  "zh": "起始年度"
+ },
+ "action.econometric.viz-sectors.label": {
+  "en_hash": "b73f7214e5",
+  "zh": "行业"
+ },
+ "action.econometric.viz-sectors.note": {
+  "en_hash": "624ff2e020",
+  "zh": "按证监会行业门类和年度列示：数据覆盖、净利率和营业收入增长率的中位数及离散程度、国有控制、年度报告逾期以及监管事件。"
+ },
+ "action.econometric.viz-timeliness.field.as_of.hint": {
+  "en_hash": "4211f4e59e",
+  "zh": "留空则为今日。"
+ },
+ "action.econometric.viz-timeliness.field.as_of.label": {
+  "en_hash": "3011562209",
+  "zh": "披露截至"
+ },
+ "action.econometric.viz-timeliness.field.end.label": {
+  "en_hash": "bf120d9485",
+  "zh": "截止年度"
+ },
+ "action.econometric.viz-timeliness.field.out.label": {
+  "en_hash": "30baa24967",
+  "zh": "文件夹"
+ },
+ "action.econometric.viz-timeliness.field.start.label": {
+  "en_hash": "a5bbd447f8",
+  "zh": "起始年度"
+ },
+ "action.econometric.viz-timeliness.label": {
+  "en_hash": "ff91c1087c",
+  "zh": "披露及时性"
+ },
+ "action.econometric.viz-timeliness.note": {
+  "en_hash": "d692031f37",
+  "zh": "各报告期结束至报告披露的天数，与法定期限对照：按年度和类型的分布、逾期披露的比例以及逾期报告清单。"
+ },
  "action.files.files-check.label": {
   "en_hash": "4fe284aa84",
   "zh": "检查文件"
@@ -2203,6 +2263,50 @@
   "en_hash": "50cb854d59",
   "zh": "显示监管事项"
  },
+ "action.relational.viz-common-ownership.field.as_of.hint": {
+  "en_hash": "4211f4e59e",
+  "zh": "留空则为今日。"
+ },
+ "action.relational.viz-common-ownership.field.as_of.label": {
+  "en_hash": "3011562209",
+  "zh": "披露截至"
+ },
+ "action.relational.viz-common-ownership.field.codes.hint": {
+  "en_hash": "1f2c4a2925",
+  "zh": "以逗号分隔的代码。"
+ },
+ "action.relational.viz-common-ownership.field.codes.label": {
+  "en_hash": "9dba7ad7c5",
+  "zh": "公司"
+ },
+ "action.relational.viz-common-ownership.field.end.label": {
+  "en_hash": "bf120d9485",
+  "zh": "截止年度"
+ },
+ "action.relational.viz-common-ownership.field.industry.hint": {
+  "en_hash": "8176b30609",
+  "zh": "二级行业代码，例如 C39；或在下方指定公司。"
+ },
+ "action.relational.viz-common-ownership.field.industry.label": {
+  "en_hash": "cee3b5170c",
+  "zh": "证监会行业"
+ },
+ "action.relational.viz-common-ownership.field.out.label": {
+  "en_hash": "30baa24967",
+  "zh": "文件夹"
+ },
+ "action.relational.viz-common-ownership.field.start.label": {
+  "en_hash": "a5bbd447f8",
+  "zh": "起始年度"
+ },
+ "action.relational.viz-common-ownership.label": {
+  "en_hash": "a8f820d9e4",
+  "zh": "共同持股"
+ },
+ "action.relational.viz-common-ownership.note": {
+  "en_hash": "41f6bbbcc5",
+  "zh": "针对某一行业或一组公司：其共同的前十大股东、由此关联的公司对，以及按年度的修正赫芬达尔指数增量（基于前十大股东持股的下限）。"
+ },
  "action.relational.viz-ego-map.field.as_of.hint": {
   "en_hash": "ee030e962a",
   "zh": "仅使用该日期前已披露的信息（留空则为今日）。"
@@ -2242,6 +2346,54 @@
  "action.relational.viz-ego-map.note": {
   "en_hash": "64ae87b70a",
   "zh": "以一家公司为中心：其实际控制人及控制链、前十名股东、子公司、董事、监事和高级管理人员、对其采取措施的监管机构及其所属行业，以某一日期已披露的信息为准。层级 2 另显示相同股东持有的其他公司及相同人员任职的其他公司。"
+ },
+ "action.relational.viz-market-map.field.as_of.hint": {
+  "en_hash": "4211f4e59e",
+  "zh": "留空则为今日。"
+ },
+ "action.relational.viz-market-map.field.as_of.label": {
+  "en_hash": "3195c5c2ad",
+  "zh": "截至日期"
+ },
+ "action.relational.viz-market-map.field.codes.hint": {
+  "en_hash": "15477c6879",
+  "zh": "留空：全市场。"
+ },
+ "action.relational.viz-market-map.field.codes.label": {
+  "en_hash": "a64add3537",
+  "zh": "仅限这些公司"
+ },
+ "action.relational.viz-market-map.field.group_by.label": {
+  "en_hash": "ae9629f4eb",
+  "zh": "分组"
+ },
+ "action.relational.viz-market-map.field.max_holder_companies.label": {
+  "en_hash": "f1a617c695",
+  "zh": "排除出现在多于此数量表格中的股东"
+ },
+ "action.relational.viz-market-map.field.min_weight.hint": {
+  "en_hash": "4ca73f8f82",
+  "zh": "至少有这么多共同项才构成关联。"
+ },
+ "action.relational.viz-market-map.field.min_weight.label": {
+  "en_hash": "39b76ad58f",
+  "zh": "最少共同股东或人员数"
+ },
+ "action.relational.viz-market-map.field.out.label": {
+  "en_hash": "30baa24967",
+  "zh": "文件夹"
+ },
+ "action.relational.viz-market-map.field.relations.label": {
+  "en_hash": "014bcd654c",
+  "zh": "关联"
+ },
+ "action.relational.viz-market-map.label": {
+  "en_hash": "0a27a26411",
+  "zh": "市场关系图"
+ },
+ "action.relational.viz-market-map.note": {
+  "en_hash": "f0e1913205",
+  "zh": "截至某一日期的全部上市公司，按共同实际控制人、共同前十大股东和共同董监高相互关联，并按证监会行业门类或板块分组。"
  },
  "action.research.export.field.out.label": {
   "en_hash": "30baa24967",

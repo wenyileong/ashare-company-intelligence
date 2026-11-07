@@ -433,7 +433,7 @@ def test_the_visualise_pages_hold_the_views_and_their_commands_exist():
     for sid in ("topology", "relational", "company_views", "econometric", "coverage"):
         assert sid in by_id, sid
     viewish = [a for s in gui.SECTIONS for a in s.get("actions", []) if a.get("view")]
-    assert {a["view"] for a in viewish} == {"ego_map", "guidance_outcome", "coverage"}
+    assert {"ego_map", "guidance_outcome", "coverage"} <= {a["view"] for a in viewish}   # v2.3 adds four more
     for a in viewish:
         assert a["command"] in names and a["after"] == "open_view"
     text = gui.readiness_text([{"requirement": "controllers", "status": "MET", "detail": "3 rows", "action": None},

@@ -16,6 +16,7 @@ def _load() -> None:
     global _LOADED
     if not _LOADED:
         from .views import topology, coverage, ego_map, guidance_outcome  # noqa: F401  (registration)
+        from .views import market_map, common_ownership, sectors, timeliness_view  # noqa: F401  (v2.3.0)
         _LOADED = True
 
 

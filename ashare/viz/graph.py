@@ -24,6 +24,7 @@ RELATIONS = {
     "IN_SECTOR": "is classified in",
     "SHARES_HOLDER_WITH": "shares a top-10 holder with",
     "SHARES_DIRECTOR_WITH": "shares a director or officer with",
+    "SAME_CONTROLLER": "has the same actual controller as",          # v2.3.0 (market map)
 }
 
 
