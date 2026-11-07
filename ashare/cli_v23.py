@@ -218,3 +218,26 @@ def register(app, _table) -> None:
         r = scan_outputs(folder or None, apply)
         print({k: v for k, v in r.items() if k != "rows"})
         _table(r["rows"][:200], ["kind", "path", "manifest"], title="Found")
+
+    # --- B5: disclosure timeliness ---------------------------------------------------------------------------------
+
+    @app.command("timeliness")
+    def timeliness_cmd(code: str = typer.Option(None, "--code", help="Blank for every company"),
+                       year: int = typer.Option(None, "--year", help="Reporting year, e.g. 2024"),
+                       as_of: str = typer.Option(None, "--as-of", help="Only reports published by this date"),
+                       out: str = typer.Option("exports/timeliness.csv", "--out")):
+        """Periodic reports against their legal deadlines: days from the period end, the deadline, late or not
+        (v2.3.0; the rules and their sources are in rules/disclosure_deadlines.json)."""
+        from .timeliness import timeliness
+        r = _guard(timeliness, code or None, year, as_of or None, out)
+        sm = r["summary"]
+        print(f"{sm['reports']:,} reports; {sm['with_a_deadline']:,} with a verified deadline; {sm['late']:,} late "
+              f"(rules {sm['rules']})")
+        late = [x for x in r["rows"] if x["late"]]
+        if late:
+            _table(late[:200], ["code", "kind", "period", "published", "deadline", "days_late", "title"],
+                   title="Late reports")
+        if sm.get("file"):
+            print(f"Written: {sm['file']}")
+            from .outputs import record_output
+            record_output("export", sm["file"], "timeliness", {"code": code, "year": year, "as_of": as_of})

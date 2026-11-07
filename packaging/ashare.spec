@@ -51,6 +51,8 @@ migrations = _package_files("migrations", include_py_files=True)
 viewer = _package_files("viz/viewer")
 # v2.1: the interface catalogues (English and Simplified Chinese)
 viewer += _package_files("i18n")
+# v2.3: the legal rules (disclosure deadlines, and the share-dealing rules), with their sources
+viewer += _package_files("rules")
 hidden += collect_submodules("alembic", filter=lambda n: not n.startswith("alembic.testing")) + ["mako.template"]
 
 # Size: rich needs pygments only for the Python lexer (help formatting).

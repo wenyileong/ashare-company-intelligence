@@ -488,6 +488,14 @@ SECTIONS = [
      "intro": "Checks the data without changing it: accounting identities, capital reconciliation, figures that "
               "differ between reports (restatements), ownership consistency, and conflicts between sources.",
      "actions": [
+         A("Reporting timeliness", "timeliness", [
+             CODE_OPT("Leave blank for every company."),
+             F("year", "Reporting year", "text", "", "--year", "Optional, e.g. 2024"),
+             F("as_of", "As published by", "date", "", "--as-of", "Optional."),
+             F("out", "File", "text", "exports/timeliness.csv", "--out")],
+           "Each periodic report against its legal deadline (annual: four months after the year end; half-year: two "
+           "months; first and third quarters: one month), with the days late. Only the first publication counts. "
+           "The rules and their sources are listed in the program's rules folder."),
          A("Run all checks", "validate-all", [CODE_OPT()],
            "Also links related events (e.g. an investigation and its penalty). Re-run after adding data."),
          A("Show findings", "show-flags", [

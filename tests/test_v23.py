@@ -670,3 +670,70 @@ def test_the_topology_page_carries_the_zoom_runtime(monkeypatch):
     assert "chartjs-plugin-zoom" in page and "AshareInteractive" in page and "/*INTERACTIVE*/" not in page
     monkeypatch.setenv("ASHARE_FEATURES", "viz.interactive=off")
     assert "chartjs-plugin-zoom" not in render_viewer(snap)
+
+
+# --- B5: disclosure timeliness, and fix A2 --------------------------------------------------------------------------
+
+def test_deadlines_follow_the_rule_file():
+    from ashare.timeliness import deadline, add_months, rules
+    assert deadline("annual_report", "2024-12-31", "FY") == ("2025-04-30", "annual")
+    assert deadline("interim_report", "2025-06-30", "H1") == ("2025-08-30", "half_year")
+    assert deadline("quarterly_report", "2025-09-30", "Q3") == ("2025-10-30", "quarterly")
+    assert deadline("quarterly_report", "2019-03-31", "Q1") == (None, None)       # before the rule took effect
+    assert deadline("earnings_forecast_or_flash", "2024-12-31", "FY") == (None, None)
+    assert add_months(__import__("datetime").date(2024, 1, 31), 1).isoformat() == "2024-02-29"
+    assert all(r["source"] and r["verified"] for r in rules()["rules"])
+
+
+def test_first_publication_decides_lateness_and_the_panel_reads_it(db, company):
+    from ashare.models import SessionLocal, Disclosure
+    from ashare.timeliness import timeliness
+    s = SessionLocal()
+    from ashare.models import Company
+    s.get(Company, company.id).listing_date = "2001-08-27"
+    s.add_all([
+        Disclosure(company_id=company.id, announcement_id="L1", title_cn="2023年年度报告", kind="annual_report",
+                   announcement_date="2024-05-06"),                                # late
+        Disclosure(company_id=company.id, announcement_id="L2", title_cn="2023年年度报告（更正后）",
+                   kind="annual_report", announcement_date="2024-06-20"),           # a correction: not counted
+        Disclosure(company_id=company.id, announcement_id="L3", title_cn="2024年年度报告", kind="annual_report",
+                   announcement_date="2025-04-30"),                                # on the deadline day: on time
+        Disclosure(company_id=company.id, announcement_id="L4", title_cn="2024年第三季度报告",
+                   kind="quarterly_report", announcement_date="2024-10-29")])
+    s.commit()
+    s.close()
+    r = timeliness("600519")
+    by = {(x["kind"], x["period"]): x for x in r["rows"]}
+    assert by[("annual_report", "2023-12-31")]["late"] == 1 and by[("annual_report", "2023-12-31")]["days_late"] == 6
+    assert by[("annual_report", "2023-12-31")]["published"] == "2024-05-06"
+    assert by[("annual_report", "2024-12-31")]["late"] == 0
+    assert by[("quarterly_report", "2024-09-30")]["late"] == 0 and r["summary"]["late"] == 1
+    from ashare.panel import build_panel
+    p = build_panel(["report_delay_days", "report_late", "late_reports_3y"], unit="year", start="2025-01-01",
+                    end="2025-12-31", codes=["600519"], align="pit", pit_day="05-15")
+    row = p["rows"][0]
+    assert row["report_delay_days"] == 120.0 and row["report_late"] == 0.0 and row["late_reports_3y"] == 1.0
+
+
+def test_unpaired_guidance_says_why(db, company, tmp_path):
+    from ashare.models import SessionLocal, ExpectationObservation, Disclosure
+    from ashare.viz.registry import get
+    s = SessionLocal()
+    g = Disclosure(company_id=company.id, announcement_id="G1", announcement_date="2025-01-20",
+                   title_cn="2024年年度业绩预告", kind="earnings_forecast_or_flash")
+    r = Disclosure(company_id=company.id, announcement_id="R1", announcement_date="2025-03-28",
+                   title_cn="2024年年度报告", kind="annual_report")
+    s.add_all([g, r])
+    s.flush()
+    for period in ("2024-12-31", "2025-06-30", "2025-12-31"):
+        s.add(ExpectationObservation(company_id=company.id, disclosure_id=g.id, source_kind="MANAGEMENT_GUIDANCE",
+                                     document_kind="FORECAST", reporting_period=period, period_type="FY",
+                                     measure="net_profit_parent", low=1.0, high=2.0, published_date="2025-01-20",
+                                     source="PDF", extraction_method="PDF_TEXT"))
+    s.commit()
+    s.close()
+    snap = get("guidance_outcome").build({"start": "2024", "end": "2025", "as_of": "2025-08-01",
+                                          "key": b"k" * 32}).snapshot
+    reasons = {x["reason"]: x["guidance"] for x in snap["tables"]["unpaired"]["rows"]}
+    assert reasons == {"REPORT_NOT_DOWNLOADED": 1, "REPORT_NOT_DUE": 1, "PERIOD_NOT_ENDED": 1}
+    assert "report not downloaded" in snap["summary"][0]["value"]

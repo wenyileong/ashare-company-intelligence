@@ -20,6 +20,49 @@ from . import _checks
 
 BINS = [round(-1 + 0.1 * i, 1) for i in range(21)]          # relative error, -100% to +100% in 10-point bins
 
+# v2.3.0 (finding 141): why a guidance item has no outcome yet, checked in this order (the first that applies)
+REASONS = {
+    "PERIOD_NOT_ENDED": "period not ended by the date",
+    "REPORT_NOT_DUE": "report not yet due",
+    "REPORT_NOT_CATALOGUED": "report not catalogued",
+    "REPORT_NOT_DOWNLOADED": "report not downloaded",
+    "REPORT_NOT_READ": "report not yet read",
+    "NO_FIGURE": "report read, no net profit found",
+}
+_PERIOD_TYPE = {"12-31": ("FY", "annual_report"), "06-30": ("H1", "interim_report"),
+                "03-31": ("Q1", "quarterly_report"), "09-30": ("Q3", "quarterly_report")}
+
+
+class _Reasons:
+    """The reason a guidance item has no periodic-report figure as known on the date."""
+
+    def __init__(self, session, as_of, reports):
+        from ...financials import infer_period
+        self.as_of = as_of
+        self.docs: dict = {}
+        for d in reports.values():
+            if (d.announcement_date or "9999") > as_of:
+                continue
+            period, _ = infer_period(d.title_cn or "", "", d.announcement_date)
+            if period:
+                self.docs.setdefault((d.company_id, period), []).append(d)
+
+    def why(self, e) -> str:
+        from ...timeliness import deadline
+        period = e.reporting_period
+        if period > self.as_of:
+            return "PERIOD_NOT_ENDED"
+        ptype, kind = _PERIOD_TYPE.get(period[5:], ("FY", "annual_report"))
+        due, _ = deadline(kind, period, ptype)
+        docs = self.docs.get((e.company_id, period), [])
+        if not docs:
+            return "REPORT_NOT_DUE" if due and due > self.as_of else "REPORT_NOT_CATALOGUED"
+        if not any(d.local_path for d in docs):
+            return "REPORT_NOT_DOWNLOADED"
+        if not any(d.extracted_version for d in docs):
+            return "REPORT_NOT_READ"
+        return "NO_FIGURE"
+
 
 @register
 class GuidanceOutcomeView(View):
@@ -79,12 +122,14 @@ class GuidanceOutcomeView(View):
                 if d is None or (d.announcement_date or "9999") > ctx.as_of:
                     continue
                 outcomes.setdefault((f.company_id, f.reporting_period), []).append((d.announcement_date, f))
-            rows = []
+            rows, unpaired = [], []
+            reasons = _Reasons(s, ctx.as_of, reports)
             for e in sorted(guid, key=lambda e: (comps[e.company_id].security_code, e.reporting_period,
                                                  e.published_date or "", e.id)):
                 later = [(p, f) for p, f in outcomes.get((e.company_id, e.reporting_period), [])
                          if p >= (e.published_date or "")]
                 if not later:
+                    unpaired.append((reasons.why(e), comps[e.company_id].security_code))      # v2.3.0 (finding 141)
                     continue
                 p, f = min(later, key=lambda x: (x[0], x[1].id))         # the first report after the guidance
                 lo, hi = sorted((e.low, e.high))
@@ -134,7 +179,18 @@ class GuidanceOutcomeView(View):
                             "rows": by_year},
             }
             n_guid = len(guid)
-            summary = [{"label": "Guidance with a later report", "value": f"{len(rows):,} of {n_guid:,}"},
+            by_reason: dict = {}
+            for why, code in unpaired:
+                b = by_reason.setdefault(why, {"reason": why, "meaning": REASONS[why], "guidance": 0, "examples": []})
+                b["guidance"] += 1
+                if code not in b["examples"] and len(b["examples"]) < 5:
+                    b["examples"].append(code)
+            unp = [{**v, "examples": ", ".join(v["examples"])} for k, v in sorted(by_reason.items(),
+                                                                                     key=lambda kv: -kv[1]["guidance"])]
+            tables["unpaired"] = {"title": "Guidance without a later report, by reason", "columns":
+                                  ["reason", "meaning", "guidance", "examples"], "rows": unp}
+            summary = [{"label": "Guidance with a later report", "value": f"{len(rows):,} of {n_guid:,}"
+                        + "".join(f"; {v['guidance']:,} {v['meaning']}" for v in unp[:3])},
                        {"label": "Within the range", "value": (f"{sum(r['within_range'] for r in rows) / len(rows):.0%}"
                                                               if rows else "–")},
                        {"label": "Median absolute error",
@@ -147,7 +203,7 @@ class GuidanceOutcomeView(View):
                 "forecasts; the two kinds are kept apart.",
                 f"Errors beyond ±100% are counted in the summary but not in the histogram ({outside:,}).",
                 f"Guidance without a later report published by {ctx.as_of} is left out "
-                f"({n_guid - len(rows):,}).",
+                f"({n_guid - len(rows):,}); the table 'unpaired' gives the reasons.",
             ]
             p = {"codes": codes, "start": y0, "end": y1, "as_of": ctx.as_of,
                  "title": f"Guidance against outcome {y0}–{y1}, as of {ctx.as_of}"}

@@ -1,0 +1,21 @@
+{
+  "version": "deadlines-1",
+  "note": "Periodic-report deadlines (v2.3.0, plan B5). Each rule names its source. 'verified' records how it was checked; a rule not verified is not applied.",
+  "rules": [
+    {"id": "annual", "kinds": ["annual_report"], "period_type": "FY", "months_after_period_end": 4,
+     "counting": "calendar", "source": "Securities Law of the PRC (2019 revision), art. 79(1); CSRC Measures for the Administration of Information Disclosure by Listed Companies (2021), art. 13",
+     "effective_from": "2020-03-01", "effective_to": null,
+     "verified": "checked against the CSRC's 2020 consultation draft of the Measures (art. 20: 年度报告应当在每个会计年度结束之日起四个月内); the final text to be confirmed by the author"},
+    {"id": "half_year", "kinds": ["interim_report"], "period_type": "H1", "months_after_period_end": 2,
+     "counting": "calendar", "source": "Securities Law of the PRC (2019 revision), art. 79(2); CSRC Measures (2021), art. 13",
+     "effective_from": "2020-03-01", "effective_to": null,
+     "verified": "checked against the 2020 consultation draft (art. 20: 中期报告应当在每个会计年度的上半年结束之日起两个月内); the final text to be confirmed by the author"},
+    {"id": "quarterly", "kinds": ["quarterly_report"], "period_type": ["Q1", "Q3"], "months_after_period_end": 1,
+     "counting": "calendar", "source": "CSRC Measures (2021), art. 13",
+     "effective_from": "2021-05-01", "effective_to": null,
+     "verified": "checked against the 2020 consultation draft (art. 20: 季度报告应当在每个会计年度第三个月、第九个月结束后的一个月内编制完成并披露); the final text to be confirmed by the author"}
+  ],
+  "not_applied": [
+    {"id": "earnings_forecast", "reason": "the exchanges' deadlines for earnings forecasts depend on the board and the case; not verified, so not applied"}
+  ]
+}

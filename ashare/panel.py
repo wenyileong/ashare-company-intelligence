@@ -527,6 +527,36 @@ def _top10(kind):
     return get
 
 
+def _timeliness(kind):
+    """v2.3.0 (plan B5): reporting delays against the legal deadlines, from the reports published by the cut-off."""
+    def get(ctx):
+        from .models import SessionLocal, Company
+        from .timeliness import report_rows
+        key = ("tl", ctx.code)
+        if key not in ctx.cache:
+            s = SessionLocal()
+            try:
+                c = s.query(Company).filter_by(security_code=ctx.code).first()
+                ctx.cache[key] = report_rows(s, [c.id]) if c else []
+            finally:
+                s.close()
+        when = min(ctx.measure_date, ctx.cutoff)
+        rows = [r for r in ctx.cache[key] if r["published"] <= when]
+        if kind == "late_3y":
+            from datetime import date
+            start = date(int(when[:4]) - 3, int(when[5:7]), min(int(when[8:10]), 28)).isoformat()
+            judged = [r for r in rows if r["late"] is not None and r["published"] > start]
+            return (float(sum(r["late"] for r in judged)) if judged else None), None, "MEDIUM", None
+        annual = [r for r in rows if r["kind"] == "annual_report"]
+        if not annual:
+            return None, None, None, None
+        last = max(annual, key=lambda r: r["period"])
+        if kind == "delay":
+            return float(last["delay_days"]), last["published"], "HIGH", None
+        return (None if last["late"] is None else float(last["late"])), last["published"], "HIGH", None
+    return get
+
+
 def _relational(kind):
     """v2.2 (plan section B7): relational variables, from the control readings and regulatory events published by the
     row's cut-off."""
@@ -601,6 +631,16 @@ def _register_control():
     _var("reg_actions_12m", "regulatory events in the past year", "COUNT", "relational", "regulatory events "
          "(any kind) concerning the company in the twelve months to the row's date", "", "regulatory_events",
          "events published by the cut-off", getter=_relational("reg_actions"))
+    _var("report_delay_days", "days from year end to the annual report", "COUNT", "timeliness",
+         "days from the end of the fiscal year to the first publication of the latest annual report published by the "
+         "row's date", "", "disclosures", "reports published by the cut-off", getter=_timeliness("delay"))
+    _var("report_late", "annual report late", "DUMMY", "timeliness", "1 when the latest annual report was published "
+         "after the legal deadline (four months after the year end), 0 when on time; blank when no verified rule "
+         "applies (rules/disclosure_deadlines.json)", "", "disclosures", "reports published by the cut-off",
+         getter=_timeliness("late"))
+    _var("late_reports_3y", "late periodic reports in three years", "COUNT", "timeliness", "periodic reports (annual, "
+         "half-year, quarterly) published after their legal deadlines in the three years to the row's date", "",
+         "disclosures", "reports published by the cut-off", getter=_timeliness("late_3y"))
     _var("top10_pct", "top-10 holders' combined stake", "RATIO", "ownership", "sum of the top-10 holders' stakes", "",
          "ownership_observations (top-10 tables)", getter=_top10("sum"))
     _var("top_holder_pledged", "largest holder's pledged share", "RATIO", "ownership",
