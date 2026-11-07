@@ -6,6 +6,12 @@ The viewer embeds these files unchanged, as published on npm. They are loaded on
   3d-force-graph 1.80.1   vendor/3d-force-graph.min.js   MIT   https://github.com/vasturiano/3d-force-graph
   force-graph 1.52.0      vendor/force-graph.min.js      MIT   https://github.com/vasturiano/force-graph
   Chart.js 4.4.8          vendor/chart.umd.js            MIT   https://www.chartjs.org
+  chartjs-plugin-zoom 2.2.0   vendor/chartjs-plugin-zoom.min.js   MIT   https://github.com/chartjs/chartjs-plugin-zoom
+  Hammer.js 2.0.8         vendor/hammer.min.js           MIT   https://github.com/hammerjs/hammer.js
+  chartjs-chart-matrix 2.1.1  vendor/chartjs-chart-matrix.min.js  MIT   https://github.com/kurkle/chartjs-chart-matrix
+
+The last three (v2.3.0) make every chart zoomable; they are loaded by the view pages, the topology viewer and the
+interactive chart pages, never fetched from a network.
 
 The two graph bundles include, as built by their author: three.js (MIT); d3-force-3d, d3-array, d3-drag, d3-scale,
 d3-scale-chromatic, d3-selection and d3-zoom (ISC); @tweenjs/tween.js, bezier-js, canvas-color-tracker, kapsule,
@@ -99,3 +105,65 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
+----------------------------------------------------------------
+chartjs-plugin-zoom (licence file from the npm package chartjs-plugin-zoom-2.2.0)
+----------------------------------------------------------------
+The MIT License (MIT)
+
+Copyright (c) 2013-2021 chartjs-plugin-zoom contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+----------------------------------------------------------------
+Hammer.js (licence file from the npm package hammerjs-2.0.8)
+----------------------------------------------------------------
+The MIT License (MIT)
+
+Copyright (C) 2011-2014 by Jorik Tangelder (Eight Media)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+----------------------------------------------------------------
+chartjs-chart-matrix (licence file from the npm package chartjs-chart-matrix-2.1.1)
+----------------------------------------------------------------
+MIT License
+
+Copyright (c) 2019-2021 Jukka Kurkela
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

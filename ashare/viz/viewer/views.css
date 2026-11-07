@@ -14,3 +14,8 @@ table.data td,table.data th{border:1px solid var(--line);padding:3px 6px;text-al
 table.data th{background:var(--side)}table.data td:first-child,table.data th:first-child{text-align:left}
 .panel{padding:16px 20px}canvas{max-width:100%}
 @media (max-width:760px){#app{flex-direction:column}#side{width:auto;min-width:0;max-height:40%}}
+.ai-toolbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0;font-size:12px}
+.ai-toolbar button,.ai-toolbar select,.ai-toolbar input{font:inherit;padding:2px 6px;border:1px solid var(--line);
+border-radius:4px;background:#fff}.ai-toolbar label{display:inline;margin:0}.ai-range{width:96px}
+.ai-hint{color:var(--muted)}.ai-readout{font-size:12px;color:var(--muted);min-height:1.4em;margin:2px 0 10px}
+.ai-chart{position:relative}

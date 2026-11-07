@@ -101,9 +101,15 @@ function renderCharts() {
   if (titles[0]) $('chart1Title').textContent = titles[0];
   if (titles[1]) $('chart2Title').textContent = titles[1];
   const common = {responsive: true, maintainAspectRatio: true, interaction: {mode: 'index', intersect: false}, plugins: {legend: {position: 'bottom', labels: {boxWidth: 9, font: {size: 10}}}, tooltip: {callbacks: {label: ctx => `${ctx.dataset.label}: ${ctx.raw == null ? 'n/a' : Number(ctx.raw).toFixed(3)} CNY bn`}}}, scales: {x: {grid: {display: false}}, y: {grid: {color: '#edf0f4'}, ticks: {font: {size: 10}}}}};
+  if (window.AshareInteractive) window.AshareInteractive.options(common);   // v2.3.0: wheel, pinch and shift-drag zoom
   if (revenueChart) revenueChart.destroy(); if (profitChart) profitChart.destroy();
   revenueChart = new Chart($('revenueChart'), {type: 'line', data: {labels: years, datasets: dataFor('revenue')}, options: common});
   profitChart = new Chart($('profitChart'), {type: 'line', data: {labels: years, datasets: dataFor('net_profit_parent')}, options: common});
+  if (window.AshareInteractive) [revenueChart, profitChart].forEach(ch => {
+    window.AshareInteractive.charts.push(ch);
+    ch.canvas.addEventListener('dblclick', () => ch.resetZoom());
+    ch.canvas.title = 'Wheel or pinch to zoom, drag to pan, shift-drag to zoom to a box, double-click to reset';
+  });
 }
 
 function renderCoverage() {

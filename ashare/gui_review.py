@@ -43,6 +43,25 @@ def COLUMN_LABELS() -> dict:
             "error": tr("ui.win.col.error", "Error")}
 
 
+def open_interactive(app, spec) -> None:
+    """Write ``spec`` as an interactive page (in exports/interactive) and open it in the browser (v2.3.0)."""
+    import webbrowser
+    from .charts.interactive import write_page, SUPPORTED
+    if spec is None:
+        return
+    if spec.kind not in SUPPORTED:
+        messagebox.showinfo(tr("ui.win.chart", "Chart"), tr("ui.win.no_interactive",
+                            "This diagram has no interactive page; the views under Visualise have one."))
+        return
+    try:
+        p = write_page(spec, Path(app.folder) / "exports" / "interactive")
+    except Exception as exc:                                       # noqa: BLE001
+        messagebox.showwarning(tr("ui.win.chart", "Chart"), str(exc))
+        return
+    webbrowser.open(p.resolve().as_uri())
+    app._log(f"Interactive chart: {p}\n", "muted")
+
+
 class ChartWindow(tk.Toplevel):
     """One reusable window that shows the chart for the last chartable action."""
 
@@ -62,6 +81,9 @@ class ChartWindow(tk.Toplevel):
             ttk.Button(bar, text=tr("ui.win.save_png", "Save PNG…"), style="Small.TButton", command=self._png).pack(side="right", padx=(6, 0))
         ttk.Button(bar, text=tr("ui.win.save_data_csv", "Save data (CSV)…"), style="Small.TButton", command=self._csv).pack(side="right", padx=(6, 0))
         ttk.Button(bar, text=tr("ui.win.save_svg", "Save SVG…"), style="Small.TButton", command=self._svg).pack(side="right", padx=(6, 0))
+        # v2.3.0 (B4.5): the same data as a zoomable page in the browser
+        ttk.Button(bar, text=tr("ui.win.open_interactive", "Open interactive"), style="Small.TButton",
+                   command=self._interactive).pack(side="right", padx=(6, 0))
         ttk.Label(self, text=tr("ui.win.chart_hint", "Hover over a point or bar to see its source; click it to "
                                                      "show the full trace in the output panel."), style="Muted.TLabel").pack(side="bottom", anchor="w", padx=12,
                                                                              pady=(4, 10))
@@ -87,6 +109,9 @@ class ChartWindow(tk.Toplevel):
         self.geometry(f"{spec.width + 40}x{min(spec.height + 90, room)}")
         self.deiconify()
         self.lift()
+
+    def _interactive(self):
+        open_interactive(self.app, self.spec)
 
     def _clicked(self, meta):
         table, row_id = meta.get("table"), meta.get("row_id")
@@ -436,6 +461,8 @@ class ExplorerWindow(tk.Toplevel):
             ttk.Button(btns, text=label, style="Small.TButton", command=lambda k=kind: self.show(k)).pack(
                 side="left", padx=(0, 6))
         ttk.Button(btns, text=tr("ui.win.save_chart_svg", "Save chart (SVG)…"), style="Small.TButton", command=self.save).pack(side="right")
+        ttk.Button(btns, text=tr("ui.win.open_interactive", "Open interactive"), style="Small.TButton",
+                   command=lambda: open_interactive(self.app, self.spec)).pack(side="right", padx=(0, 6))
         self.canvas = tk.Canvas(self, bg="#ffffff", highlightthickness=0, width=780, height=420)
         self.canvas.pack(fill="both", expand=True, padx=12, pady=(0, 12))
         self.spec = None

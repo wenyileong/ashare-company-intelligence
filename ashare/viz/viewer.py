@@ -24,6 +24,8 @@ def render_viewer(snap: dict) -> str:
         page = page.replace(f"/*LIB:{lib}*/", _script_safe((HERE / "vendor" / lib).read_text(encoding="utf-8")))
     # the snapshot's JSON is data inside a script element: only "</" needs care, and JSON allows "<\/"
     page = page.replace("/*SNAPSHOT*/", dumps(snap).replace("</", "<\\/"))
+    from .pages import interactive_scripts           # v2.3.0 (B4): zoom on the topology page's charts too
+    page = page.replace("/*INTERACTIVE*/", interactive_scripts())
     page = page.replace("/*APP*/", _script_safe((HERE / "app.js").read_text(encoding="utf-8")))
     return page
 

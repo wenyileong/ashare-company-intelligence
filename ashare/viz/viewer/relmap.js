@@ -72,7 +72,7 @@
   }
   var holder = document.getElementById("graph");
   var main = document.getElementById("main");
-  var graph = null;
+  var graph = null, selected = null;
   if (typeof ForceGraph === "function") {
     graph = ForceGraph()(holder).width(main.clientWidth).height(main.clientHeight)
       .nodeId("id").nodeLabel(function (o) { return o.node.label; })
@@ -82,11 +82,13 @@
       .linkDirectionalArrowLength(4).linkDirectionalArrowRelPos(1)
       .nodeCanvasObjectMode(function () { return "after"; })
       .nodeCanvasObject(function (o, ctx, scale) {
-        if (scale < 1.2 && !o.node.centre) return;
-        ctx.font = (o.node.centre ? 5 : 3.5) + "px sans-serif"; ctx.fillStyle = "#1f2328"; ctx.textAlign = "center";
-        ctx.fillText(o.node.label, o.x, o.y + 7);
+        if (scale < 1.2 && !o.node.centre && o.id !== selected) return;
+        // v2.3.0 (B4): labels keep a legible size on screen at every zoom
+        var px = (o.node.centre ? 13 : 11) / scale;
+        ctx.font = px + "px sans-serif"; ctx.fillStyle = "#1f2328"; ctx.textAlign = "center";
+        ctx.fillText(o.node.label, o.x, o.y + 4 + px);
       })
-      .onNodeClick(function (o) { show(o.node, null); })
+      .onNodeClick(function (o) { selected = o.id; show(o.node, null); })
       .onLinkClick(function (l) { show(null, l.edge); });
     window.addEventListener("resize", function () { graph.width(main.clientWidth).height(main.clientHeight); });
   } else {
@@ -94,6 +96,26 @@
   }
   function redraw() { if (graph) graph.graphData(data()); }
   redraw();
+  // v2.3.0 (B4): zoom controls beside the wheel, pinch and drag the graph already has
+  if (graph) {
+    var bar = el("div", null, "ai-toolbar");
+    var fit = el("button", "Fit all"); fit.type = "button";
+    fit.onclick = function () { graph.zoomToFit(400, 30); };
+    var near = el("button", "Zoom to selected"); near.type = "button";
+    near.onclick = function () {
+      if (!selected) return;
+      var keep = {}; keep[selected] = true;
+      data().links.forEach(function (l) { var s = l.source.id || l.source, t = l.target.id || l.target;
+        if (s === selected) keep[t] = true; if (t === selected) keep[s] = true; });
+      graph.zoomToFit(400, 40, function (n) { return keep[n.id]; });
+    };
+    var zin = el("button", "+"), zout = el("button", "−"); zin.type = zout.type = "button";
+    zin.onclick = function () { graph.zoom(graph.zoom() * 1.5, 250); };
+    zout.onclick = function () { graph.zoom(graph.zoom() / 1.5, 250); };
+    [fit, near, zin, zout].forEach(function (b) { bar.appendChild(b); });
+    bar.appendChild(el("span", "Wheel or pinch to zoom · drag to pan · click a node, then 'Zoom to selected'", "ai-hint"));
+    side.insertBefore(bar, side.children[1] || null);
+  }
   window.__relmap = {nodes: function () { return data().nodes.length; }, links: function () { return data().links.length; },
-                     show: show};
+                     show: show, graph: graph, select: function (id) { selected = id; }};
 })();

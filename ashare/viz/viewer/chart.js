@@ -70,17 +70,42 @@
         options: {animation: false, scales: {x: {title: {display: true, text: c.x_label || c.x}},
           y: {title: {display: true, text: c.y_label || c.y}}}}};
     }
+    var holder = el("div");
+    if (window.AshareInteractive) { window.AshareInteractive.make(holder, cfg, {money: !!c.money}); return holder; }
     new Chart(canvas, cfg);
     return canvas;
+  }
+  /* v2.3.0 (B4): a heatmap as a zoomable matrix chart, with the table beneath it. */
+  function matrix(t, c) {
+    var holder = el("div");
+    if (!window.AshareInteractive || typeof Chart !== "function") return holder;
+    var rows = [], cols = [];
+    t.rows.forEach(function (r) { if (rows.indexOf(r[c.row]) < 0) rows.push(r[c.row]);
+      if (cols.indexOf(r[c.col]) < 0) cols.push(r[c.col]); });
+    var data = t.rows.filter(function (r) { return r[c.value] != null; })
+      .map(function (r) { return {x: String(r[c.col]), y: String(r[c.row]), v: r[c.value], r: r}; });
+    var cfg = {type: "matrix", data: {datasets: [{label: t.title, data: data,
+      backgroundColor: function (ctx) { var v = (ctx.raw && ctx.raw.v) || 0, x = Math.max(0, Math.min(1, v));
+        return "rgba(0,114,178," + (0.08 + 0.92 * x).toFixed(3) + ")"; },
+      width: function (ctx) { var a = ctx.chart.chartArea || {width: 0}; return Math.max(2, a.width / Math.max(1, cols.length) - 2); },
+      height: function (ctx) { var a = ctx.chart.chartArea || {height: 0}; return Math.max(2, a.height / Math.max(1, rows.length) - 2); }}]},
+      options: {animation: false, scales: {x: {type: "category", labels: cols.map(String), offset: true, grid: {display: false}},
+        y: {type: "category", labels: rows.map(String), offset: true, grid: {display: false}}},
+        plugins: {legend: {display: false}, tooltip: {callbacks: {title: function () { return ""; },
+          label: function (ctx) { var r = ctx.raw.r; return [c.row_label || c.row] + " " + ctx.raw.y + ", " + ctx.raw.x + ": "
+            + (Math.round(ctx.raw.v * 1000) / 10) + "%" + (c.tip && r[c.tip] ? " (" + r[c.tip] + ")" : ""); }}}}}};
+    window.AshareInteractive.make(holder, cfg, {});
+    return holder;
   }
   Object.keys(snap.tables).sort().forEach(function (name) {
     var t = snap.tables[name], c = t.chart || {type: "table"};
     main.appendChild(el("h2", t.title));
-    if (c.type === "heatmap") main.appendChild(heat(t, c));
+    if (c.type === "heatmap") { main.appendChild(matrix(t, c)); main.appendChild(heat(t, c)); }
     else if (c.type === "scatter" || c.type === "bars") main.appendChild(chart(t, c));
     var details = el("details"); details.appendChild(el("summary", "Data (" + t.rows.length + (t.rows.length === 1 ? " row" : " rows") +
       (t.rows.length > 500 ? "; the first 500 shown, all in the CSV" : "") + ")"));
     details.appendChild(table(t, 500)); main.appendChild(details);
   });
-  window.__chartview = {tables: Object.keys(snap.tables).length};
+  window.__chartview = {tables: Object.keys(snap.tables).length,
+                        interactive: !!(window.AshareInteractive && window.AshareInteractive.ready)};
 })();

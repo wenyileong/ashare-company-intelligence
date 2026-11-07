@@ -527,3 +527,146 @@ def test_adopting_a_restored_folder(tmp_path, monkeypatch):
     assert data_root() == (tmp_path / "blank").resolve()                    # a check changes nothing
     r = adopt_data_folder(str(restored), apply=True)
     assert r["applied"] and data_root() == restored.resolve()
+
+
+# --- B4: interactive charts (the author's requirement R1) ------------------------------------------------------------
+
+def _page(path, ready, steps):
+    """Open ``path`` in a headless browser, wait for ``ready``, run ``steps(page)``; returns (errors, requests, out)."""
+    pw = pytest.importorskip("playwright.sync_api")
+    with pw.sync_playwright() as p:
+        try:
+            browser = p.chromium.launch()
+        except Exception as exc:                       # noqa: BLE001
+            pytest.skip(f"no browser: {exc}")
+        try:
+            page = browser.new_page(viewport={"width": 1300, "height": 900})
+            errors, requests = [], []
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
+            page.on("request", lambda r: requests.append(r.url) if not r.url.startswith(("file:", "data:")) else None)
+            page.goto(Path(path).as_uri())
+            page.wait_for_function(ready, timeout=60000)
+            out = steps(page)
+            return errors, requests, out
+        finally:
+            browser.close()
+
+
+def _guidance_view(company, tmp_path, folder="g"):
+    from test_v22 import _guidance
+    from ashare.viz.registry import get
+    from ashare.viz.publish import write_view
+    _guidance(company, tmp_path)
+    built = get("guidance_outcome").build({"start": "2023", "end": "2023", "as_of": "2024-06-30", "key": b"k" * 32})
+    write_view(get("guidance_outcome"), built, tmp_path / folder, formats=("html", "svg", "csv"), width="page")
+    return tmp_path / folder
+
+
+def test_every_series_chart_zooms_resets_and_reads_exactly(db, company, tmp_path):
+    import hashlib
+    folder = _guidance_view(company, tmp_path)
+    before = {f.name: hashlib.sha256(f.read_bytes()).hexdigest() for f in folder.glob("figure_*")}
+
+    def steps(page):
+        n = page.evaluate("window.AshareInteractive.charts.length")
+        r0 = page.evaluate("(() => { const c = window.AshareInteractive.charts[0]; return [c.scales.x.min, c.scales.x.max]; })()")
+        page.evaluate("window.AshareInteractive.charts[0].zoom(2)")
+        r1 = page.evaluate("(() => { const c = window.AshareInteractive.charts[0]; return [c.scales.x.min, c.scales.x.max]; })()")
+        box = page.locator("canvas").first.bounding_box()
+        page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+        page.mouse.wheel(0, 400)
+        page.wait_for_timeout(200)
+        r2 = page.evaluate("(() => { const c = window.AshareInteractive.charts[0]; return [c.scales.x.min, c.scales.x.max]; })()")
+        page.get_by_text("Reset zoom").first.click()
+        r3 = page.evaluate("(() => { const c = window.AshareInteractive.charts[0]; return [c.scales.x.min, c.scales.x.max]; })()")
+        # the readout gives the stored value exactly: point at the scatter's one point
+        i = page.evaluate("window.AshareInteractive.charts.findIndex(c => c.config.type === 'scatter')")
+        page.evaluate(f"window.AshareInteractive.charts[{i}].canvas.scrollIntoView()")
+        pt = page.evaluate(f"""(() => {{ const c = window.AshareInteractive.charts[{i}];
+            const m = c.getDatasetMeta(0).data[0]; const r = c.canvas.getBoundingClientRect();
+            return [r.left + m.x, r.top + m.y]; }})()""")
+        page.mouse.move(pt[0], pt[1])
+        page.wait_for_timeout(200)
+        text = page.locator(".ai-readout").nth(i).inner_text()
+        return n, r0, r1, r2, r3, text
+    errors, requests, (n, r0, r1, r2, r3, text) = _page(folder / "view.html", "window.__chartview !== undefined",
+                                                        steps)
+    assert errors == [] and requests == []
+    assert n >= 2
+    assert (r1[1] - r1[0]) < (r0[1] - r0[0])                    # zoomed in
+    assert r2 != r1                                              # the wheel changed the range
+    assert r3 == r0                                              # reset
+    assert "620,000,000" in text                                 # the exact stored value (6.2e8)
+    after = {f.name: hashlib.sha256(f.read_bytes()).hexdigest() for f in folder.glob("figure_*")}
+    assert before == after and before                            # publication figures untouched
+
+
+def test_with_the_switch_off_the_pages_are_as_in_v22(db, company, tmp_path, monkeypatch):
+    monkeypatch.setenv("ASHARE_FEATURES", "viz.interactive=off")
+    folder = _guidance_view(company, tmp_path, "off")
+    html_text = (folder / "view.html").read_text(encoding="utf-8")
+    assert "chartjs-plugin-zoom" not in html_text and "AshareInteractive" in html_text   # (the hook in chart.js)
+    errors, _, inter = _page(folder / "view.html", "window.__chartview !== undefined",
+                             lambda page: page.evaluate("window.__chartview.interactive"))
+    assert errors == [] and inter is False
+
+
+def test_the_coverage_heatmap_is_a_zoomable_matrix(rel, tmp_path):
+    from ashare.viz.registry import get
+    from ashare.viz.publish import write_view
+    built = get("coverage").build({"start": "2023", "end": "2024", "as_of": "2024-06-30", "key": b"k" * 32})
+    write_view(get("coverage"), built, tmp_path / "cov", formats=("html",), width="page")
+    errors, requests, types = _page(tmp_path / "cov" / "view.html", "window.__chartview !== undefined",
+                                    lambda page: page.evaluate("window.AshareInteractive.charts.map(c => c.config.type)"))
+    assert errors == [] and requests == [] and "matrix" in types
+
+
+def test_relational_maps_and_the_topology_charts_zoom(rel, tmp_path):
+    from ashare.viz.registry import get
+    from ashare.viz.publish import write_view
+    from test_v22 import _ego as ego
+    write_view(get("ego_map"), ego(), tmp_path / "e", formats=("html",), width="page")
+
+    def steps(page):
+        page.wait_for_timeout(300)
+        z0 = page.evaluate("window.__relmap.graph.zoom()")
+        page.get_by_text("+", exact=True).click()
+        page.wait_for_timeout(400)
+        return z0, page.evaluate("window.__relmap.graph.zoom()"), page.get_by_role("button", name="Zoom to selected").count()
+    errors, requests, (z0, z1, buttons) = _page(tmp_path / "e" / "view.html", "window.__relmap !== undefined", steps)
+    assert errors == [] and requests == [] and z1 > z0 and buttons == 1
+
+
+def test_a_desktop_chart_opens_as_an_interactive_page(tmp_path):
+    from ashare.charts.spec import ChartSpec, Series, Point
+    from ashare.charts.interactive import write_page, config
+    spec = ChartSpec("line", "Revenue", [Series("600519", [Point("2023", 1.5e11), Point("2024", None),
+                                                          Point("2025", 1.7e11)])], unit="CNY", y_label="yuan")
+    assert config(spec)["data"]["datasets"][0]["data"] == [1.5e11, None, 1.7e11]       # gaps stay gaps
+    p = write_page(spec, tmp_path)
+    errors, requests, n = _page(p, "window.__interactive !== undefined",
+                                lambda page: page.evaluate("window.__interactive.charts"))
+    assert errors == [] and requests == [] and n == 1
+    with pytest.raises(ValueError):
+        config(ChartSpec("network", "x", []))
+
+
+def test_the_new_libraries_are_bundled_with_their_licences():
+    from ashare.viz.pages import INTERACTIVE_LIBS
+    from ashare.viz.viewer import HERE
+    text = (HERE / "vendor" / "LICENSES.txt").read_text(encoding="utf-8")
+    for lib in INTERACTIVE_LIBS:
+        assert (HERE / "vendor" / lib).exists() and lib in text
+    for name in ("chartjs-plugin-zoom 2.2.0", "Hammer.js 2.0.8", "chartjs-chart-matrix 2.1.1"):
+        assert name in text
+
+
+def test_the_topology_page_carries_the_zoom_runtime(monkeypatch):
+    from ashare.viz.viewer import render_viewer
+    snap = {"schema_version": 1}
+    monkeypatch.setattr("ashare.viz.snapshot.dumps", lambda s: "{}")
+    page = render_viewer(snap)
+    assert "chartjs-plugin-zoom" in page and "AshareInteractive" in page and "/*INTERACTIVE*/" not in page
+    monkeypatch.setenv("ASHARE_FEATURES", "viz.interactive=off")
+    assert "chartjs-plugin-zoom" not in render_viewer(snap)

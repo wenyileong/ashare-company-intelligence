@@ -3551,6 +3551,10 @@
   "en_hash": "4bfc194b68",
   "zh": "下一页"
  },
+ "ui.win.no_interactive": {
+  "en_hash": "75858e6afb",
+  "zh": "此图示没有交互式页面；“可视化”下的视图提供交互式页面。"
+ },
  "ui.win.no_match": {
   "en_hash": "21e942d302",
   "zh": "，本页未找到匹配内容"
@@ -3562,6 +3566,10 @@
  "ui.win.no_rows": {
   "en_hash": "1d1ea8dd10",
   "zh": "无记录"
+ },
+ "ui.win.open_interactive": {
+  "en_hash": "a56b33980f",
+  "zh": "打开交互式图表"
  },
  "ui.win.open_panel": {
   "en_hash": "3b8b4a62f6",
