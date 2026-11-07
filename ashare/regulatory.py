@@ -30,6 +30,7 @@ from .evaluation import calibrated_confidence
 from .timeutil import utcnow
 from .models import SessionLocal, Company, Disclosure, RegulatoryEvent, init_db
 from .corporate_actions import _clean, parse_cn_date, _DATE, _document_pages, _page_of
+from .storepaths import document_path, has_document  # v2.3.0 (B1)
 
 # ---------------------------------------------------------------------------
 # Vocabulary
@@ -559,9 +560,9 @@ def extract_from_disclosure(disclosure: Disclosure, company: Company | None, use
     if not events:
         return []
     pages: list[str] = []
-    if use_documents and disclosure.local_path and Path(disclosure.local_path).exists():
+    if use_documents and has_document(disclosure):
         try:
-            pages = _document_pages(Path(disclosure.local_path))
+            pages = _document_pages(document_path(disclosure))
         except Exception:
             pages = []
     has_text = bool(pages) and any(p.strip() for p in pages)
@@ -661,7 +662,8 @@ def import_regulatory_document(path_or_url: str, security_code: str | None = Non
         ctype = {"pdf": "application/pdf", "html": "text/html", "htm": "text/html"}.get(suffix.lstrip("."), "text/plain")
     archived = store_raw(source or "REGULATOR_DOCUMENT", url or path_or_url, data,
                          {"content_type": ctype, "origin": path_or_url})
-    doc_path = Path(archived["payload_path"])
+    from .storepaths import raw_path
+    doc_path = raw_path(archived["payload_path"], archived["sha256"])
     typed = doc_path.with_suffix(suffix if suffix in (".pdf", ".html", ".htm", ".txt") else ".txt")
     if not typed.exists():
         typed.write_bytes(data)

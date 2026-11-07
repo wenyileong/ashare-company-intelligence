@@ -77,6 +77,7 @@ from typing import Callable
 
 from .models import SessionLocal, Company, CatalogueDay, init_db
 from .timeutil import utcnow
+from .storepaths import document_path, has_document  # v2.3.0 (B1)
 
 PAGE_SIZE = 30
 QUERY_LIMIT = 3000               # results one CNINFO query returns (100 pages of 30), confirmed live
@@ -883,7 +884,7 @@ def catalogue(since: str, until: str, kind: str = "all", download_documents: boo
                 tot["inserted"] += created
                 tot["updated"] += not created
                 if download_documents and row.document_url and _wanted(row) and \
-                        not (row.local_path and Path(row.local_path).exists()):
+                        not (has_document(row)):
                     session.flush()
                     new_rows.append(row.id)
             session.commit()

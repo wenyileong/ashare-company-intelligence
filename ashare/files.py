@@ -18,6 +18,7 @@ Nothing here sends anything anywhere.
 from __future__ import annotations
 
 import csv
+import os
 import html
 import re
 import shutil
@@ -26,6 +27,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .config import disclosure_dir, market_raw_dir
+from .storepaths import document_path, has_document  # v2.3.0 (B1)
 
 TIDY_CLASSES = ("unnamed", "summaries_english", "kind")
 _BAD = re.compile(r'[\\/:*?"<>|\r\n\t]+')
@@ -71,7 +73,7 @@ def _rows(session, security_code=None, kind=None, year=None, on_disk=True):
     for d, c in q.order_by(Company.security_code, Disclosure.announcement_date, Disclosure.id):
         if year and _year(d) != str(year):
             continue
-        p = Path(d.local_path)
+        p = document_path(d)
         if on_disk and not p.exists():
             continue
         out.append((d, c, p))
@@ -80,7 +82,7 @@ def _rows(session, security_code=None, kind=None, year=None, on_disk=True):
 
 def readable_name(d, c) -> str:
     """``<code> <date> <title>.<ext>``, safe as a Windows file name."""
-    ext = Path(d.local_path or "").suffix or ".pdf"
+    ext = os.path.splitext(d.local_path or "")[1] or ".pdf"
     return _safe(f"{c.security_code} {d.announcement_date or ''} {d.title_cn or d.announcement_id}", 120) + ext
 
 
@@ -232,7 +234,7 @@ def check_files() -> dict:
         named: dict[str, list[int]] = defaultdict(list)
         missing, extra = [], []
         for d in s.query(Disclosure).filter(Disclosure.local_path.isnot(None)):
-            p = Path(d.local_path)
+            p = document_path(d)
             key = str(p.resolve()).lower()
             named[key].append(d.id)
             if not p.exists():
@@ -263,13 +265,13 @@ def tidy_files(what: str, apply: bool = False, kind: str | None = None, security
     try:
         targets: list[tuple[Path, list]] = []
         if what == "unnamed":
-            named = {str(Path(d.local_path).resolve()).lower()
+            named = {str(document_path(d).resolve()).lower()
                      for d in s.query(Disclosure).filter(Disclosure.local_path.isnot(None))}
             targets = [(p, []) for p in _disk_files() if str(p.resolve()).lower() not in named]
         else:
             everyone: dict[str, list[int]] = defaultdict(list)
             for d in s.query(Disclosure.id, Disclosure.local_path).filter(Disclosure.local_path.isnot(None)):
-                everyone[str(Path(d.local_path).resolve()).lower()].append(d.id)
+                everyone[str(document_path(d).resolve()).lower()].append(d.id)
             q = s.query(Disclosure).filter(Disclosure.local_path.isnot(None))
             if security_code:
                 q = q.join(Company, Disclosure.company_id == Company.id).filter(
@@ -280,7 +282,7 @@ def tidy_files(what: str, apply: bool = False, kind: str | None = None, security
                     continue
                 if what == "kind" and d.kind != kind:
                     continue
-                p = Path(d.local_path)
+                p = document_path(d)
                 if p.exists():
                     by_path.setdefault(str(p.resolve()).lower(), (p, []))[1].append(d)
             for key, (p, recs) in by_path.items():

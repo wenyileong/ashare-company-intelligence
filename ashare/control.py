@@ -26,6 +26,7 @@ from .models import (SessionLocal, init_db, Company, Disclosure, OwnershipObserv
                      ManagementObservation, SubsidiaryObservation, ReviewItem)
 from .corporate_actions import parse_cn_date, _DATE, _clean, _document_pages
 from .ownership import normalise_date
+from .storepaths import document_path, has_document  # v2.3.0 (B1)
 
 NATURES = ("国有法人", "国有股", "国家", "境内非国有法人", "境内一般法人", "境外法人", "境内自然人", "境外自然人",
            "国有独资", "基金、理财产品等", "其他")
@@ -468,8 +469,8 @@ def extract_pledges(security_code: str | None = None, use_documents: bool = True
                 continue
             totals["announcements"] += 1
             text, method, conf = d.title_cn or "", "TITLE_ONLY", 0.3
-            if use_documents and d.local_path and Path(d.local_path).exists():
-                pages = _document_pages(Path(d.local_path))
+            if use_documents and has_document(d):
+                pages = _document_pages(document_path(d))
                 if any(p.strip() for p in pages):
                     text, method, conf = "\n".join(pages), "DOCUMENT_TEXT_REGEX", 0.6
             recs = parse_pledge_text(text, typ) if method != "TITLE_ONLY" else []

@@ -26,6 +26,7 @@ import re
 import statistics
 from dataclasses import dataclass, field
 from pathlib import Path
+from .storepaths import document_path, has_document  # v2.3.0 (B1)
 
 
 def available() -> bool:
@@ -298,7 +299,7 @@ def scan_documents(security_code: str | None = None, recheck: bool = False, prog
                                           "date": d.announcement_date, "text_layer": status})
 
         for d, c in q.order_by(Company.security_code, Disclosure.announcement_date, Disclosure.id).all():
-            path = Path(d.local_path)
+            path = document_path(d)
             if path.suffix.lower() != ".pdf":
                 continue
             if not path.exists():

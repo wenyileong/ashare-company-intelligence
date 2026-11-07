@@ -18,6 +18,7 @@ import re
 from pathlib import Path
 
 from .models import Company, Disclosure, ExpectationObservation, SessionLocal, init_db
+from .storepaths import document_path, has_document  # v2.3.0 (B1)
 
 GUIDANCE = "MANAGEMENT_GUIDANCE"
 ANALYST = "ANALYST_FORECAST"
@@ -203,7 +204,7 @@ def read_guidance(security_code: str | None = None, again: bool = False, progres
         if security_code:
             q = q.filter(Company.security_code == str(security_code).zfill(6))
         if download:
-            missing = [d.id for d, _ in q if not d.local_path or not Path(d.local_path).exists()]
+            missing = [d.id for d, _ in q if not d.local_path or not document_path(d).exists()]
             if missing:
                 from .disclosure_pipeline import download_pending
                 say(f"Downloading {len(missing):,} earnings forecast and flash report document(s) first")

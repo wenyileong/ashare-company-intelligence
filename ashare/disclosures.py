@@ -13,6 +13,7 @@ from .config import disclosure_dir, CNINFO_QUERY_URL, CNINFO_STATIC_BASE, USER_A
 from .http import RateLimitedClient
 from .models import SessionLocal, Company, Disclosure
 from .storage import store_raw
+from .storepaths import document_path, has_document  # v2.3.0 (B1)
 
 # CNINFO category codes. The four periodic-report codes were used in v0.4-0.7.
 # NB: category_yjdbg_szsh is the *first-quarter* report (一季报), not an
@@ -287,7 +288,7 @@ def persist_disclosures(
                     continue
                 inserted += created
                 updated += not created
-                if download_documents and row.document_url and not (row.local_path and Path(row.local_path).exists()):
+                if download_documents and row.document_url and not (has_document(row)):
                     store_downloaded(adapter, company, row)
                     downloaded += 1
 
@@ -343,7 +344,8 @@ def store_downloaded(adapter, company: Company, row) -> str:
         target.write_bytes(content)
     if row.sha256 != digest:
         row.extracted_version = None        # v2.0.6: a new or changed document is read again
-    row.local_path = str(target)
+    from .storepaths import to_stored
+    row.local_path = to_stored(target)          # v2.3.0 (B1): relative to the data folder
     row.sha256 = digest
     row.content_type = response.headers.get("content-type")
     row.file_size = len(content)

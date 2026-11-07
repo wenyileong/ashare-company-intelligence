@@ -36,6 +36,7 @@ import httpx
 
 from .timeutil import utcnow
 from .models import Base, SessionLocal, init_db, Company, Disclosure, MarketBar, Job, JobItem, HighWaterMark
+from .storepaths import document_path, has_document  # v2.3.0 (B1)
 
 MAX_ATTEMPTS = 3
 
@@ -492,7 +493,7 @@ def storage_stats() -> dict:
     try:
         by_kind = {}
         for d in s.query(Disclosure).filter(Disclosure.local_path.isnot(None)):
-            p = Path(d.local_path)
+            p = document_path(d)
             k = by_kind.setdefault(d.kind or "other", {"documents": 0, "bytes": 0, "missing": 0})
             if p.exists():
                 k["documents"] += 1
@@ -521,7 +522,7 @@ def prune_documents(kinds: tuple[str, ...] = ("other_announcement",), older_than
     root = disclosure_dir().resolve()
     try:
         for d in s.query(Disclosure).filter(Disclosure.local_path.isnot(None), Disclosure.kind.in_(kinds)):
-            p = Path(d.local_path)
+            p = document_path(d)
             if not p.exists() or (d.announcement_date or "") > cutoff:
                 continue
             if root not in p.resolve().parents:
@@ -554,7 +555,7 @@ def refetch_document(disclosure_id: int) -> dict:
         c = s.get(Company, d.company_id)
         store_downloaded(adapter, c, d)
         s.commit()
-        return {"disclosure_id": d.id, "path": d.local_path, "hash_matches": old is None or old == d.sha256}
+        return {"disclosure_id": d.id, "path": str(document_path(d)) if d.local_path else None, "hash_matches": old is None or old == d.sha256}
     finally:
         adapter.close()
         s.close()

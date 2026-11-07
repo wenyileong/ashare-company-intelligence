@@ -14,6 +14,7 @@ from __future__ import annotations
 import re
 from datetime import datetime
 from pathlib import Path
+from .storepaths import document_path, has_document  # v2.3.0 (B1)
 
 TABLES = {
     "top10": {"sections": ["top10", "top10_tradable"], "family": "top10"},
@@ -134,7 +135,7 @@ def inspect_table(disclosure_id: int, table: str, out: str | Path | None = None)
         if d is None:
             raise ValueError(f"no document with ID {disclosure_id}")
         c = s.get(Company, d.company_id)
-        path = Path(d.local_path) if d.local_path else None
+        path = document_path(d)
         title, code, ann = d.title_cn, c.security_code if c else "", d.announcement_date
     finally:
         s.close()

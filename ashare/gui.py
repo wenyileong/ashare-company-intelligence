@@ -83,6 +83,9 @@ def _view_action(view_id: str) -> dict:
     return act
 
 
+from .features import FEATURES as _FEATURES  # noqa: E402
+_FEATURE_NAMES = list(_FEATURES)
+
 SECTIONS = [
     {"id": "home", "group": "", "title": "Getting started", "intro": "", "actions": []},
 
@@ -651,6 +654,18 @@ SECTIONS = [
                "Unticked, only shows what would be removed. Ticked, removes the files, clears their place in the "
                "database (a later run downloads them again if needed) and lists every removal in logs/."),
          ], "Preview first, then tick 'Apply'."),
+     ]},
+
+    {"id": "diagnostics", "group": "Check", "title": "Diagnostics",
+     "intro": "The data folder, the database schema and the feature switches of v2.3. Each new feature can be "
+              "switched off on its own if it misbehaves; switching a feature off never deletes its data.",
+     "actions": [
+         A("Show diagnostics", "diagnostics", [], "The version, the data folder, the schema revision and every "
+           "feature switch with where its setting comes from."),
+         A("Switch a feature on or off", "features", [
+             F("on", "Switch on", "choice:," + ",".join(_FEATURE_NAMES), "", "--on"),
+             F("off", "Switch off", "choice:," + ",".join(_FEATURE_NAMES), "", "--off")],
+           "The switches are kept in features.json in the data folder."),
      ]},
 
     {"id": "selftest", "group": "Check", "title": "Self-test",

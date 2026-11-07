@@ -1800,7 +1800,8 @@ def render_page_cmd(disclosure_id: int, page: int = typer.Option(1), out: str = 
     s = SessionLocal()
     try:
         d = s.get(Disclosure, disclosure_id)
-        path = d.local_path if d else None
+        from .storepaths import document_path
+        path = str(document_path(d)) if d is not None and d.local_path else None
     finally:
         s.close()
     if not path:
@@ -2420,6 +2421,10 @@ def show_company(security_code: str):
             })
     finally:
         session.close()
+
+# v2.3.0: the commands added in v2.3 live in their own module and register themselves on ``app``.
+from . import cli_v23  # noqa: E402
+cli_v23.register(app, _table)
 
 if __name__ == "__main__":
     app()

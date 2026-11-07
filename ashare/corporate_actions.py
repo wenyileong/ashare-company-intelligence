@@ -28,6 +28,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .models import SessionLocal, Company, Disclosure, CorporateAction, init_db
+from .storepaths import document_path, has_document  # v2.3.0 (B1)
 
 # ---------------------------------------------------------------------------
 # Vocabulary
@@ -499,9 +500,9 @@ def extract_from_disclosure(disclosure: Disclosure, use_documents: bool = True) 
     status = classify_action_status(title)
     pages: list[str] = []
     method = "TITLE_ONLY"
-    if use_documents and disclosure.local_path and Path(disclosure.local_path).exists():
+    if use_documents and has_document(disclosure):
         try:
-            pages = _document_pages(Path(disclosure.local_path))
+            pages = _document_pages(document_path(disclosure))
         except Exception:
             pages = []
     if pages and any(p.strip() for p in pages):

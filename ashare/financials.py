@@ -15,6 +15,7 @@ from pypdf import PdfReader
 from .models import SessionLocal, Company, Disclosure, FinancialFact
 from .disclosures import REPORT_KINDS
 from .numbers import well_formed_amount, glue_split, power_of_ten  # noqa: F401  (v2.0.8)
+from .storepaths import document_path, has_document, stored_forms  # v2.3.0 (B1)
 
 _KIND_ALIASES = {"annual": "annual_report", "interim": "interim_report", "quarterly": "quarterly_report"}
 
@@ -432,7 +433,7 @@ def _find_disclosure(session, company: Company, path: Path) -> Disclosure | None
     name = path.name
     return session.query(Disclosure).filter(
         Disclosure.company_id == company.id,
-        Disclosure.local_path == str(path),
+        Disclosure.local_path.in_(stored_forms(path)),      # v2.3.0 (B1): absolute or relative form
     ).one_or_none()
 
 
@@ -468,7 +469,7 @@ SHORT_DOCUMENT_PAGES = 30
 def extract_document(company: Company, disclosure: Disclosure, reader=None) -> list[dict]:
     if not disclosure.local_path:
         return []
-    path = Path(disclosure.local_path)
+    path = document_path(disclosure)
     if not path.exists():
         return []
     return extract_path(path, disclosure.title_cn or "", disclosure.announcement_date, reader)
@@ -842,11 +843,11 @@ def extract_financials(security_code: str | None = None, kind: str = "reports", 
         prog = Progress(n, say)
         jobs, by_id = [], {}
         for disclosure, company in todo:
-            if not Path(disclosure.local_path).exists():
+            if not document_path(disclosure).exists():
                 totals["missing_files"] += 1
                 prog.step()
                 continue
-            jobs.append({"id": disclosure.id, "path": disclosure.local_path, "title": disclosure.title_cn,
+            jobs.append({"id": disclosure.id, "path": str(document_path(disclosure)), "title": disclosure.title_cn,
                          "announcement_date": disclosure.announcement_date, "group": company.id})
             by_id[disclosure.id] = (disclosure, company)
         with quiet_heartbeat():
@@ -865,7 +866,7 @@ def extract_financials(security_code: str | None = None, kind: str = "reports", 
                     facts = res["result"]["facts"]
                     if res["result"]["by_section"]:
                         totals["read_by_section"] = totals.get("read_by_section", 0) + 1
-                    if Path(disclosure.local_path).suffix.lower() == ".pdf":
+                    if document_path(disclosure).suffix.lower() == ".pdf":
                         # v2.0.8: a figure the current readers no longer produce from this document (one
                         # misread before) is removed, so it does not linger beside the corrected one.
                         keep = {(f.get("period"), f.get("period_type"), f["metric"], f.get("method"))

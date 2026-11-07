@@ -20,6 +20,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from .timeutil import utcnow
 from .models import Base, SessionLocal, init_db, Company, Disclosure
 from .corporate_actions import parse_cn_date, _DATE, _clean, _document_pages
+from .storepaths import document_path, has_document  # v2.3.0 (B1)
 
 _NUM = r"(\d[\d,]*(?:\.\d+)?)"
 _SCALE = r"\s*(亿|万)?\s*元"
@@ -187,8 +188,8 @@ def extract_transactions(security_code: str | None = None, use_documents: bool =
                 continue
             totals["announcements"] += 1
             text, method, conf = d.title_cn or "", "TITLE_ONLY", 0.35
-            if use_documents and d.local_path and Path(d.local_path).exists():
-                pages = _document_pages(Path(d.local_path))
+            if use_documents and has_document(d):
+                pages = _document_pages(document_path(d))
                 if any(p.strip() for p in pages):
                     text, method, conf = (d.title_cn or "") + "\n" + "\n".join(pages), "DOCUMENT_TEXT_REGEX", 0.6
             for typ, stage in kinds:

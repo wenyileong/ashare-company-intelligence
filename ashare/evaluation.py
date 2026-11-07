@@ -50,6 +50,7 @@ from typing import Callable
 from .timeutil import utcnow
 
 from .parsers import ParserSpec, PARSERS, PARSER_VERSION, load_pages, pages_for  # noqa: F401 (re-exported)
+from .storepaths import document_path, has_document  # v2.3.0 (B1)
 
 
 # --- corpus I/O ---------------------------------------------------------------
@@ -395,7 +396,7 @@ def corpus_template(corpus_dir: str | Path, document: str, doc_id: str | None = 
             d = s.get(Disclosure, int(document))
             if d is None or not d.local_path:
                 raise FileNotFoundError(f"disclosure {document} has no downloaded document")
-            src = Path(d.local_path)
+            src = document_path(d)
             title = title or d.title_cn
             announcement_date = announcement_date or d.announcement_date
             c = s.get(Company, d.company_id)

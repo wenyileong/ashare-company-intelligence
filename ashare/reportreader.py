@@ -106,11 +106,16 @@ class ReportReader:
         try:
             st = self.path.stat()
             from .config import disclosure_dir
-            key = hashlib.sha1(f"{self.path.resolve()}|{st.st_size}|{int(st.st_mtime)}|{INDEX_VERSION}".encode()).hexdigest()
+            # v2.3.0 (B1): keyed by the file's name (for stored documents, its SHA-256) and size, so a moved data
+            # folder keeps its indexes; the key of earlier versions (full path and time) is still read
+            old = hashlib.sha1(f"{self.path.resolve()}|{st.st_size}|{int(st.st_mtime)}|{INDEX_VERSION}".encode()).hexdigest()
+            named = re.fullmatch(r"[0-9a-fA-F]{64}", self.path.stem) is not None      # a content-addressed name
+            key = hashlib.sha1(f"{self.path.name}|{st.st_size}|{INDEX_VERSION}".encode()).hexdigest() if named else old
             cache = disclosure_dir() / ".section_index" / f"{key}.json"
-            if cache.exists():
-                self._index = {k: list(v) for k, v in json.loads(cache.read_text(encoding="utf-8")).items()}
-                return self._index
+            for c in (cache, cache.with_name(f"{old}.json")):
+                if c.exists():
+                    self._index = {k: list(v) for k, v in json.loads(c.read_text(encoding="utf-8")).items()}
+                    return self._index
         except Exception:
             cache = None
         found: dict[str, list[int]] = {name: [] for name in SECTIONS}

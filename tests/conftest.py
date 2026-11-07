@@ -12,6 +12,7 @@ def _isolated_paths(tmp_path, monkeypatch):
     monkeypatch.setenv("ASHARE_MARKET_RAW_DIR", str(tmp_path / "market_raw"))
     monkeypatch.setenv("ASHARE_LOG_DIR", str(tmp_path / "logs"))
     monkeypatch.setenv("ASHARE_SUMMARY_FILE", str(tmp_path / "validation_summary.json"))
+    monkeypatch.setenv("ASHARE_HOME", str(tmp_path))      # v2.3.0: the data root (feature switches, stored paths)
     yield
     from ashare.models import reset_init_cache
     reset_init_cache()

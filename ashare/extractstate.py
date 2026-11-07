@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
+from .storepaths import document_path, has_document  # v2.3.0 (B1)
 
 # Bump a version when its parser changes what it reads, so that a normal run re-reads every document.
 VERSIONS = {
@@ -99,7 +100,7 @@ def run(extractor: str, rows, handle, totals: dict, again: bool = False, progres
         if parse is not None:
             jobs, by_id = [], {}
             for d, c in todo:
-                path = Path(d.local_path) if d.local_path else None
+                path = document_path(d)
                 if path is None or not path.exists():
                     totals["missing_files"] = totals.get("missing_files", 0) + 1
                     prog.step()
@@ -131,7 +132,7 @@ def run(extractor: str, rows, handle, totals: dict, again: bool = False, progres
         for d, c in todo:
             reader = None
             try:
-                path = Path(d.local_path) if d.local_path else None
+                path = document_path(d)
                 if path is None or not path.exists():
                     totals["missing_files"] = totals.get("missing_files", 0) + 1
                 else:

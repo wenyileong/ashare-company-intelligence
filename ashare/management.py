@@ -27,6 +27,7 @@ from .timeutil import utcnow
 from .models import (SessionLocal, Company, Disclosure, ManagementEvent, ManagementObservation, init_db)
 from .corporate_actions import _clean, parse_cn_date, _DATE, _document_pages, _page_of
 from .ownership import normalise_date
+from .storepaths import document_path, has_document  # v2.3.0 (B1)
 
 # ---------------------------------------------------------------------------
 # Roles
@@ -233,8 +234,8 @@ def extract_management_events(security_code: str | None = None, use_documents: b
                 continue
             try:
                 pages = []
-                if use_documents and d.local_path and Path(d.local_path).exists():
-                    pages = _document_pages(Path(d.local_path))
+                if use_documents and has_document(d):
+                    pages = _document_pages(document_path(d))
                 text = (d.title_cn or "") + "\n" + "\n".join(pages)
                 recs = parse_management_text(text, types) if any(p.strip() for p in pages) else []
                 method, conf = "DOCUMENT_TEXT_REGEX", 0.6

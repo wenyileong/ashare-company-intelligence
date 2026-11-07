@@ -25,6 +25,7 @@ from typing import Callable
 from .models import SessionLocal, Company, Disclosure, init_db
 from .disclosures import (CNInfoDisclosureAdapter, persist_disclosures, persist_announcement, store_downloaded,
                           REPORT_CATEGORIES, CNINFO_QUERY_URL)
+from .storepaths import document_path, has_document  # v2.3.0 (B1)
 
 # Results CNINFO returns for one query before paging stops being reliable.
 # Typical document sizes (MB) for the download estimate.
@@ -219,7 +220,7 @@ def download_pending(ids: list[int] | None = None, kinds: tuple[str, ...] | None
         else:
             found = q.all()
         found.sort(key=lambda r: (r.announcement_date or "", r.id), reverse=True)
-        rows = [r for r in found if not (r.local_path and Path(r.local_path).exists())]
+        rows = [r for r in found if not (has_document(r))]
         est = download_estimate(rows)
         _say(progress, f"Downloading {est['documents']:,} documents: roughly {est['approx_gb']} GB and "
                        f"{est['approx_hours']} hours at {est['seconds_each']:.1f} s a document"
@@ -236,7 +237,7 @@ def download_pending(ids: list[int] | None = None, kinds: tuple[str, ...] | None
                     session.commit()
                     done += 1
                     try:
-                        mb = Path(row.local_path).stat().st_size / 1048576 if row.local_path else 0.0
+                        mb = document_path(row).stat().st_size / 1048576 if row.local_path else 0.0
                     except OSError:
                         mb = 0.0
                     sec0, mb0, k0 = timed.get(row.kind or "", (0.0, 0.0, 0))
@@ -268,7 +269,7 @@ def wanted_missing(since: str, until: str, kinds: tuple[str, ...] | None = None)
                             Disclosure.announcement_date <= until,
                             *([Disclosure.kind.in_(kinds)] if kinds else []))
                     .yield_per(2000)):
-            if row.local_path and Path(row.local_path).exists():
+            if has_document(row):
                 continue
             if _wanted(row):
                 out.append(row.id)

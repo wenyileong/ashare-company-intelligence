@@ -691,6 +691,30 @@
   "en_hash": "1e8cc8f51b",
   "zh": "列出面板数据变量"
  },
+ "action.diagnostics.diagnostics.label": {
+  "en_hash": "41bf32eeab",
+  "zh": "显示诊断信息"
+ },
+ "action.diagnostics.diagnostics.note": {
+  "en_hash": "d507ed4775",
+  "zh": "版本、数据文件夹、数据库结构修订号，以及每个功能开关及其设置来源。"
+ },
+ "action.diagnostics.features.field.off.label": {
+  "en_hash": "d61b7f2364",
+  "zh": "关闭"
+ },
+ "action.diagnostics.features.field.on.label": {
+  "en_hash": "bcdb919b51",
+  "zh": "开启"
+ },
+ "action.diagnostics.features.label": {
+  "en_hash": "e2e8fe2baf",
+  "zh": "开启或关闭功能"
+ },
+ "action.diagnostics.features.note": {
+  "en_hash": "f2cd7e848d",
+  "zh": "开关保存在数据文件夹中的 features.json。"
+ },
  "action.disclosures.catalogue-days.field.by_day.hint": {
   "en_hash": "da941bbc05",
   "zh": "通常，以单次检索读取的若干公告稀少日为一行，显示其总数与缺口。"
@@ -2698,6 +2722,14 @@
  "section.datasets.title": {
   "en_hash": "93a7f22476",
   "zh": "数据集"
+ },
+ "section.diagnostics.intro": {
+  "en_hash": "1277ecc97d",
+  "zh": "数据文件夹、数据库结构版本以及 v2.3 的功能开关。每项新功能出现问题时均可单独关闭；关闭功能不会删除其数据。"
+ },
+ "section.diagnostics.title": {
+  "en_hash": "3af2279f9e",
+  "zh": "诊断"
  },
  "section.disclosures.intro": {
   "en_hash": "9dbcbd4557",

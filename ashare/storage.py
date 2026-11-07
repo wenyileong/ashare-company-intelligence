@@ -3,6 +3,7 @@ import hashlib
 import json
 from datetime import datetime
 from .config import raw_dir
+from .storepaths import to_stored  # v2.3.0 (B1): relative to the data folder
 from .models import SessionLocal, Source, RawRecord, Company, Security
 from .universe import infer_board, infer_exchange, is_a_share, is_supported, SECURITY_TYPES  # noqa: F401
 
@@ -46,12 +47,12 @@ def store_raw(source_name, url, payload, metadata, company_id=None):
             url=url,
             content_type=metadata.get("content_type"),
             sha256=digest,
-            payload_path=str(path),
+            payload_path=to_stored(path),
             metadata_json=json.dumps(metadata, ensure_ascii=False),
         )
         session.add(row)
         session.commit()
-        return {"sha256": digest, "payload_path": str(path)}
+        return {"sha256": digest, "payload_path": to_stored(path)}
     finally:
         session.close()
 
@@ -67,7 +68,7 @@ def register_raw(source_name, url, digest, payload_path, metadata, company_id=No
             url=url,
             content_type=metadata.get("content_type"),
             sha256=digest,
-            payload_path=str(payload_path),
+            payload_path=to_stored(payload_path),
             metadata_json=json.dumps(metadata, ensure_ascii=False),
         ))
         session.commit()

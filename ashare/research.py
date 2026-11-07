@@ -16,6 +16,7 @@ from .timeutil import utcnow
 from .models import (
     SessionLocal, Company, Security, Disclosure, DocumentPage, ResearchQuery, Base, init_db, engine,
 )
+from .storepaths import document_path, has_document  # v2.3.0 (B1)
 
 
 def _sha256_file(path: Path) -> str | None:
@@ -90,7 +91,7 @@ def index_documents(security_code: str | None = None, reindex: bool = False) -> 
             if existing and not reindex:
                 totals["skipped"] += 1
                 continue
-            path = Path(d.local_path)
+            path = document_path(d)
             if not path.exists():
                 totals["errors"].append({"disclosure_id": d.id, "error": "file missing"})
                 continue
@@ -161,18 +162,19 @@ def inspect_document(disclosure_id: int, page: int | None = None, verify: bool =
         if not d:
             return {"error": "disclosure not found"}
         info = {"disclosure_id": d.id, "title": d.title_cn, "date": d.announcement_date,
-                "announcement_id": d.announcement_id, "url": d.document_url, "local_path": d.local_path,
+                "announcement_id": d.announcement_id, "url": d.document_url,
+                "local_path": str(document_path(d)) if d.local_path else None,
                 "stored_sha256": d.sha256}
         if d.local_path and verify:
-            actual = _sha256_file(Path(d.local_path))
+            actual = _sha256_file(document_path(d))
             info["integrity"] = ("FILE_MISSING" if actual is None else
                                  "VERIFIED" if actual == d.sha256 else "HASH_MISMATCH")
         if page:
             stored = session.query(DocumentPage).filter_by(disclosure_id=d.id, page=page).first()
             if stored:
                 info["page_text"] = stored.text
-            elif d.local_path and Path(d.local_path).exists():
-                pages = _document_pages(Path(d.local_path))
+            elif has_document(d):
+                pages = _document_pages(document_path(d))
                 info["page_text"] = pages[page - 1] if 0 < page <= len(pages) else None
         return info
     finally:
@@ -218,10 +220,11 @@ def trace(table: str, row_id: int, verify: bool = True) -> dict:
         if disclosure:
             doc = {"disclosure_id": disclosure.id, "title": disclosure.title_cn,
                    "published": disclosure.announcement_date, "announcement_id": disclosure.announcement_id,
-                   "url": disclosure.document_url, "local_path": disclosure.local_path,
+                   "url": disclosure.document_url,
+                   "local_path": str(document_path(disclosure)) if disclosure.local_path else None,
                    "sha256": disclosure.sha256, "retrieved_at": str(disclosure.retrieved_at)}
             if verify and disclosure.local_path:
-                actual = _sha256_file(Path(disclosure.local_path))
+                actual = _sha256_file(document_path(disclosure))
                 doc["integrity"] = ("FILE_MISSING" if actual is None else
                                     "VERIFIED" if actual == disclosure.sha256 else "HASH_MISMATCH")
         elif getattr(row, "source_document", None):
