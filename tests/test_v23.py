@@ -1021,3 +1021,17 @@ def test_the_largest_pages_stay_usable(tmp_path):
     errors, _, (shown, kept) = _page(p, "window.__interactive !== undefined", lambda page: page.evaluate(
         "(d => [d.data.length, (d._data || d.data).length])(window.AshareInteractive.charts[0].data.datasets[0])"))
     assert errors == [] and shown <= 2000 and kept == 50000 and time.monotonic() - t0 < 60   # thinned for display
+
+
+def test_the_scheduled_update_is_re_created_only_when_it_exists(monkeypatch):
+    import platform
+    import subprocess
+    from ashare import datafolder, ops
+    monkeypatch.setattr(platform, "system", lambda: "Windows")
+    made = []
+    monkeypatch.setattr(ops, "schedule", lambda enable: made.append(enable) or {"returncode": 0})
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0, stdout="", stderr=""))
+    assert datafolder._reschedule() is None and made == []                   # nothing listed: nothing re-created
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(
+        a, 0, stdout=f"Folder: \\\\\n{ops.TASK_NAME}  Ready", stderr=""))
+    assert datafolder._reschedule() == "re-created" and made == [True]

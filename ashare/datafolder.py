@@ -368,7 +368,7 @@ def _reschedule() -> str | None:
         return None
     from .ops import TASK_NAME, schedule
     q = subprocess.run(["schtasks", "/Query", "/TN", TASK_NAME], capture_output=True, text=True)
-    if q.returncode != 0:
+    if q.returncode != 0 or TASK_NAME not in (q.stdout or ""):      # no scheduled update to re-create
         return None
     r = schedule(True)
     return "re-created" if r.get("returncode") == 0 else f"could not be re-created: {r.get('output')}"
