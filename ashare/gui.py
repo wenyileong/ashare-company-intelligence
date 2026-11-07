@@ -664,6 +664,60 @@ SECTIONS = [
          ], "Preview first, then tick 'Apply'."),
      ]},
 
+    {"id": "outputs", "group": "Check", "title": "Outputs",
+     "intro": "Everything the program has written (views, topology views, panels, event studies, releases, exports, "
+              "charts and query results) in one place, with its size and whether it lies inside the data folder. "
+              "Outputs made before v2.3 can be added by 'Find earlier outputs'.",
+     "actions": [
+         A("List outputs", "outputs", [
+             F("kind", "Kind", "choice:,view,topology,panel,event_study,release,export,files_export,chart,query", "",
+               "--kind", "Blank for every kind."),
+             F("removed", "Include removed", "bool", False, ("--removed", None))],
+           "Each output with its number, date, size and place, and the disk used by documents, archives, market "
+           "data, the database, its backups and the caches."),
+         A("Check an output", "outputs-check", [F("id", "Output number", "text", "", None, required=True)],
+           "Compares the output's files with the hashes in its manifest."),
+         A("Remove an output", "outputs-remove", [
+             F("id", "Output number", "text", "", None, required=True),
+             F("apply", "Apply", "bool", False, ("--apply", None),
+               "Unticked, only shows what would be removed. Ticked, removes the files; the record is kept, marked "
+               "removed.")], "Preview first, then tick 'Apply'."),
+         A("Find earlier outputs", "outputs-scan", [
+             F("folder", "Folder", "folder", "", "--folder", "Blank: the usual output folders in the data folder."),
+             F("apply", "Apply", "bool", False, ("--apply", None), "Unticked, only lists what was found.")],
+           "Finds outputs written before v2.3 by their manifests and adds them to the list."),
+     ]},
+
+    {"id": "datafolder", "group": "Check", "title": "Data folder",
+     "intro": "Where the database, documents and outputs are kept, and moving them safely. Checking changes nothing. "
+              "Normalising and moving always show a preview or dry run first, take a backup of the database, record "
+              "every change so it can be undone, and after a copy leave the old folder untouched.",
+     "actions": [
+         A("Check paths", "paths-report", [],
+           "How each stored path is written, which files are present, missing or found after a move, the caches "
+           "and the free space. Read-only: run it before moving or reinstalling."),
+         A("Move data folder", "move-data-folder", [
+             F("target", "New folder", "folder", "", None, "An empty folder, or one not yet made.", required=True),
+             F("apply", "Apply", "bool", False, ("--apply", None),
+               "Unticked, a dry run: what would move, the space needed and any warnings. Ticked, moves the folder.")],
+           "On the same drive the folder is renamed; otherwise it is copied and each document checked against its "
+           "hash. The stored paths are then rewritten, the setting switched and the scheduled update re-created.",
+           after="folder_changed"),
+         A("Use a folder already moved", "adopt-data-folder", [
+             F("folder", "Folder", "folder", "", None, "For example, restored from a backup after reinstalling "
+               "Windows.", required=True),
+             F("apply", "Apply", "bool", False, ("--apply", None), "Unticked, only checks the folder.")],
+           "Checks the folder and a sample of its documents, then switches to it.", after="folder_changed"),
+         A("Normalise stored paths", "paths-normalise", [
+             F("apply", "Apply", "bool", False, ("--apply", None),
+               "Unticked, a preview. Ticked, takes a backup and rewrites the paths.")],
+           "Rewrites stored paths relative to the data folder, so the folder can be moved later without losing "
+           "links. Every change can be undone."),
+         A("Undo a path rewrite", "paths-undo", [
+             F("run", "Run", "text", "", None, "Blank to list the runs.")],
+           "Restores the paths one normalising run or move changed."),
+     ]},
+
     {"id": "diagnostics", "group": "Check", "title": "Diagnostics",
      "intro": "The data folder, the database schema and the feature switches of v2.3. Each new feature can be "
               "switched off on its own if it misbehaves; switching a feature off never deletes its data.",
@@ -1803,6 +1857,17 @@ class App(tk.Tk):
             panel = (self.folder / "panels" / f"{vals.get('name') or 'panel'}.csv") if action["command"] == "build-panel" \
                 else None
             ExplorerWindow(self, str(panel) if panel and panel.exists() else None)
+        if code == 0 and action.get("after") == "folder_changed":           # v2.3.0 (B1 phase 5)
+            m = re.search(r"Data folder now:\s*(.+)", out)
+            if m:
+                self.folder = Path(m.group(1).strip())
+                apply_data_folder(self.folder)
+                self.folder_var.set(str(self.folder))
+                self._update_folder_label()
+                self.settings["data_folder"] = str(self.folder)
+                save_settings(self.settings)
+                self._log(tr("ui.log.folder", "Data folder changed to {folder}").format(folder=self.folder) + "\n",
+                          "muted")
         if code == 0 and action.get("after") == "open_view":
             m = re.search(r"Interactive page:\s*(.+\.html)", out)
             if m:

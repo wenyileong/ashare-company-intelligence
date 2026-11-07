@@ -519,6 +519,94 @@
   "en_hash": "c7b4270227",
   "zh": "以某一日期已披露的信息为准，哪些层、分组和年度有数据：各层有数据的上市公司占比、财务数据的置信度及面板的平衡情况（上市、退市、有财务数据的公司）。"
  },
+ "action.datafolder.adopt-data-folder.field.apply.hint": {
+  "en_hash": "8ca331a9a4",
+  "zh": "不勾选时仅检查该文件夹。"
+ },
+ "action.datafolder.adopt-data-folder.field.apply.label": {
+  "en_hash": "cfea419c3b",
+  "zh": "执行"
+ },
+ "action.datafolder.adopt-data-folder.field.folder.hint": {
+  "en_hash": "4e31431c87",
+  "zh": "例如重装 Windows 后从备份恢复的文件夹。"
+ },
+ "action.datafolder.adopt-data-folder.field.folder.label": {
+  "en_hash": "30baa24967",
+  "zh": "文件夹"
+ },
+ "action.datafolder.adopt-data-folder.label": {
+  "en_hash": "1240564933",
+  "zh": "使用已移动的文件夹"
+ },
+ "action.datafolder.adopt-data-folder.note": {
+  "en_hash": "70fd889d17",
+  "zh": "检查该文件夹及其中抽样的文件，然后切换到该文件夹。"
+ },
+ "action.datafolder.move-data-folder.field.apply.hint": {
+  "en_hash": "7863eda9a7",
+  "zh": "不勾选时为试运行：显示将移动的内容、所需空间和警告。勾选后移动文件夹。"
+ },
+ "action.datafolder.move-data-folder.field.apply.label": {
+  "en_hash": "cfea419c3b",
+  "zh": "执行"
+ },
+ "action.datafolder.move-data-folder.field.target.hint": {
+  "en_hash": "bd7759a5d5",
+  "zh": "空文件夹，或尚未创建的文件夹。"
+ },
+ "action.datafolder.move-data-folder.field.target.label": {
+  "en_hash": "a711999b72",
+  "zh": "新文件夹"
+ },
+ "action.datafolder.move-data-folder.label": {
+  "en_hash": "5a982efc64",
+  "zh": "移动数据文件夹"
+ },
+ "action.datafolder.move-data-folder.note": {
+  "en_hash": "6866918b01",
+  "zh": "同一磁盘上直接重命名文件夹；否则复制文件夹并按哈希值逐一核对文件。随后改写存储路径、切换设置并重新创建定时更新。"
+ },
+ "action.datafolder.paths-normalise.field.apply.hint": {
+  "en_hash": "b9c93374f6",
+  "zh": "不勾选时仅预览。勾选后先备份，再改写路径。"
+ },
+ "action.datafolder.paths-normalise.field.apply.label": {
+  "en_hash": "cfea419c3b",
+  "zh": "执行"
+ },
+ "action.datafolder.paths-normalise.label": {
+  "en_hash": "59f15c08e6",
+  "zh": "规范存储路径"
+ },
+ "action.datafolder.paths-normalise.note": {
+  "en_hash": "4eb7453d37",
+  "zh": "将存储路径改写为相对于数据文件夹的路径，以便日后移动文件夹而不丢失链接。每项改动均可撤销。"
+ },
+ "action.datafolder.paths-report.label": {
+  "en_hash": "fd97cfdbe3",
+  "zh": "检查路径"
+ },
+ "action.datafolder.paths-report.note": {
+  "en_hash": "ce6881e572",
+  "zh": "显示各存储路径的写法，哪些文件存在、缺失或在移动后被找到，以及缓存和剩余空间。只读：请在移动或重装系统前运行。"
+ },
+ "action.datafolder.paths-undo.field.run.hint": {
+  "en_hash": "a85218f619",
+  "zh": "留空则列出各次运行。"
+ },
+ "action.datafolder.paths-undo.field.run.label": {
+  "en_hash": "b1b392607d",
+  "zh": "运行"
+ },
+ "action.datafolder.paths-undo.label": {
+  "en_hash": "0675f72ea6",
+  "zh": "撤销路径改写"
+ },
+ "action.datafolder.paths-undo.note": {
+  "en_hash": "b427d42be5",
+  "zh": "恢复某次规范化或移动所改动的路径。"
+ },
  "action.datasets.adjustment-factors.field.security_code.hint": {
   "en_hash": "7bb1962600",
   "zh": "留空则对全部公司运行。"
@@ -1510,6 +1598,82 @@
  "action.market.show-market.label": {
   "en_hash": "586a96d3a7",
   "zh": "显示价格"
+ },
+ "action.outputs.outputs-check.field.id.label": {
+  "en_hash": "55853179e2",
+  "zh": "输出编号"
+ },
+ "action.outputs.outputs-check.label": {
+  "en_hash": "0e2d282e77",
+  "zh": "核对输出"
+ },
+ "action.outputs.outputs-check.note": {
+  "en_hash": "5fae8780fb",
+  "zh": "将输出文件与其清单中的哈希值进行比对。"
+ },
+ "action.outputs.outputs-remove.field.apply.hint": {
+  "en_hash": "4394d4ffae",
+  "zh": "不勾选时仅显示将删除的内容。勾选后删除文件；记录保留并标记为已删除。"
+ },
+ "action.outputs.outputs-remove.field.apply.label": {
+  "en_hash": "cfea419c3b",
+  "zh": "执行"
+ },
+ "action.outputs.outputs-remove.field.id.label": {
+  "en_hash": "55853179e2",
+  "zh": "输出编号"
+ },
+ "action.outputs.outputs-remove.label": {
+  "en_hash": "e7c79c9edc",
+  "zh": "删除输出"
+ },
+ "action.outputs.outputs-remove.note": {
+  "en_hash": "7e2900f31e",
+  "zh": "请先预览，再勾选“执行”。"
+ },
+ "action.outputs.outputs-scan.field.apply.hint": {
+  "en_hash": "711ec9f8f3",
+  "zh": "不勾选时仅列出找到的内容。"
+ },
+ "action.outputs.outputs-scan.field.apply.label": {
+  "en_hash": "cfea419c3b",
+  "zh": "执行"
+ },
+ "action.outputs.outputs-scan.field.folder.hint": {
+  "en_hash": "a0cbccb10f",
+  "zh": "留空：数据文件夹中的常用输出文件夹。"
+ },
+ "action.outputs.outputs-scan.field.folder.label": {
+  "en_hash": "30baa24967",
+  "zh": "文件夹"
+ },
+ "action.outputs.outputs-scan.label": {
+  "en_hash": "7d35e5fcff",
+  "zh": "查找早期输出"
+ },
+ "action.outputs.outputs-scan.note": {
+  "en_hash": "dd10dc0cfe",
+  "zh": "根据清单文件查找 v2.3 之前写出的输出，并加入列表。"
+ },
+ "action.outputs.outputs.field.kind.hint": {
+  "en_hash": "ec21008d9f",
+  "zh": "留空表示全部类型。"
+ },
+ "action.outputs.outputs.field.kind.label": {
+  "en_hash": "e00ac23f2a",
+  "zh": "类别"
+ },
+ "action.outputs.outputs.field.removed.label": {
+  "en_hash": "a39b05a121",
+  "zh": "包括已删除的"
+ },
+ "action.outputs.outputs.label": {
+  "en_hash": "e52f68f28f",
+  "zh": "列出输出"
+ },
+ "action.outputs.outputs.note": {
+  "en_hash": "904c5ddff3",
+  "zh": "列出每项输出的编号、日期、大小和位置，以及文件、存档、行情数据、数据库及其备份和缓存所占的磁盘空间。"
  },
  "action.ownership.extract-control.field.again.hint": {
   "en_hash": "93e93f4859",
@@ -2743,6 +2907,14 @@
   "en_hash": "becd0ef491",
   "zh": "数据覆盖"
  },
+ "section.datafolder.intro": {
+  "en_hash": "a2b3790d51",
+  "zh": "数据库、文件和输出的存放位置，以及如何安全移动。检查不会改动任何内容。规范化和移动总是先预览或试运行，先备份数据库，记录每项改动以便撤销；复制后旧文件夹保持不变。"
+ },
+ "section.datafolder.title": {
+  "en_hash": "9421c0213a",
+  "zh": "数据文件夹"
+ },
  "section.datasets.intro": {
   "en_hash": "fcd98ad13c",
   "zh": "无前视偏差的研究面板数据、估值与事件研究。每个面板均附变量说明手册和清单，便于说明和重建数据集。图表和数据集浏览器现位于“可视化”之下。"
@@ -2830,6 +3002,14 @@
  "section.operations.title": {
   "en_hash": "a1fdaa6b2a",
   "zh": "运行维护"
+ },
+ "section.outputs.intro": {
+  "en_hash": "5df13d052f",
+  "zh": "集中显示本程序写出的全部内容（视图、拓扑视图、面板数据、事件研究、数据发布、导出、图表和查询结果），以及其大小和是否位于数据文件夹内。v2.3 之前生成的输出可通过“查找早期输出”添加。"
+ },
+ "section.outputs.title": {
+  "en_hash": "7835db447b",
+  "zh": "输出"
  },
  "section.ownership.intro": {
   "en_hash": "6d68c99c6b",

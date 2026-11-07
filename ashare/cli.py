@@ -1,4 +1,5 @@
 import typer
+from pathlib import Path
 from rich import print
 from .models import init_db, SessionLocal, Company, FinancialFact
 from .pipeline import update_universe
@@ -782,8 +783,10 @@ def export_cmd(
 ):
     """Export tables to UTF-8 CSV (opens correctly in Excel)."""
     init_db()
+    from .outputs import record_output
     for path, n in export_table(table, out_dir, security_code):
         print(f"{path}: {n} rows")
+        record_output("export", path, "export", {"table": table, "code": security_code})
 
 
 # ---------------------------------------------------------------------------
@@ -975,6 +978,8 @@ def query_cmd(sql: str, out: str = typer.Option(None, help="Write results to thi
     _table(rows, res["columns"], title=f"Query #{res['log_id']} ({res['row_count']} rows)")
     if res["output"]:
         print(f"Saved {res['output']} (sha256 {res['output_sha256'][:16]}…)")
+        from .outputs import record_output
+        record_output("query", res["output"], "query", {"name": name, "log_id": res["log_id"]})
 
 
 @app.command("release")
@@ -1001,6 +1006,10 @@ def release_cmd(out_dir: str = typer.Option("releases"), name: str = typer.Optio
                       pseudonymise=pseudonymise, key_file=key_file, coarsen=coarsen,
                       drop_free_text=drop_free_text, author=author)
     print(r)
+    from .outputs import record_output
+    if isinstance(r, dict) and r.get("release"):
+        record_output("release", r["release"], "release", {"name": name, "code": security_code},
+                      manifest=str(Path(r["release"]) / "manifest.json"))
 
 
 # ---------------------------------------------------------------------------
@@ -1466,7 +1475,10 @@ def files_export_cmd(out: str = typer.Option("exports/files", "--out"),
                      year_from: str = typer.Option(None, "--year-from"), year_to: str = typer.Option(None, "--year-to")):
     """Copy downloaded documents under readable names, by company and year, with an index (v2.1.2)."""
     from .files import export_files
-    print(export_files(out, security_code or None, kind or None, year or None, year_from or None, year_to or None))
+    r = export_files(out, security_code or None, kind or None, year or None, year_from or None, year_to or None)
+    print(r)
+    from .outputs import record_output
+    record_output("files_export", out, "files-export", {"code": security_code, "kind": kind})
 
 
 @app.command("files-check")
@@ -1637,6 +1649,8 @@ def topology_cmd(codes: str = typer.Option(None, help="Comma-separated security 
         raise typer.Exit(1)
     r = export_snapshot(snap, out, viewer=viewer)
     files = r["files"] + export_chart(layers_chart(snap), str(Path(out) / "layers"))
+    from .outputs import record_output
+    record_output("topology", r["folder"], "topology", {"codes": picked, "start": start, "end": end, "as_of": as_of})
     print(f"Topology: {len(picked)} compan{'y' if len(picked) == 1 else 'ies'}, {r['nodes']:,} nodes, "
           f"{r['edges']:,} documented links, as of {as_of}")
     for c in snap["coverage"]:
@@ -1673,6 +1687,9 @@ def _viz_run(view_id: str, params: dict, formats: str, width: str) -> None:
         raise typer.Exit(1)
     out = params.get("out") or f"visualise/{view.id}"
     r = write_view(view, built, out, tuple(f.strip() for f in formats.split(",") if f.strip()), width)
+    from .outputs import record_output
+    record_output("view", r["folder"], view.command(), {k: v for k, v in params.items() if k != "key"},
+                  manifest=str(Path(r["folder"]) / "manifest.json"))
     snap = built.snapshot
     for s in snap.get("summary", []):
         print(f"  {s['label']}: {s['value']}")
@@ -1802,8 +1819,12 @@ def chart_cmd(kind: str = typer.Argument(..., help="financials, segments, histor
         spec = peer_scatter_chart(code, ms[0], ms[1])
     else:
         raise typer.BadParameter("unknown chart kind")
-    for f in export_chart(spec, out):
+    written = export_chart(spec, out)
+    for f in written:
         print(f"Written: {f}")
+    from .outputs import record_output
+    if written:
+        record_output("chart", written[0], "chart", {"kind": kind, "code": code})
 
 
 @app.command("render-page")
@@ -2086,6 +2107,9 @@ def build_panel_cmd(variables: str = typer.Option(None, help="Comma-separated (d
         print({"dropped": r["dropped"]} if r["dropped"] else "")
         raise typer.Exit(code=1)
     print({k: v for k, v in w.items() if k != "files"})
+    from .outputs import record_output
+    record_output("panel", Path(out) / f"{name}_manifest.json", "build-panel", r.get("params"),
+                  manifest=str(Path(out) / f"{name}_manifest.json"))
     if r.get("fiscal_years_not_ended"):                                   # v2.0.8, finding 93
         yrs = ", ".join(str(y) for y in r["fiscal_years_not_ended"])
         print(f"[yellow]Fiscal year {yrs} has not ended, so its annual figures do not exist yet. For the last "
@@ -2119,8 +2143,12 @@ def panel_chart_cmd(panel: str = typer.Argument(..., help="Panel CSV"),
     if kind == "summary":
         _table(summary(rows), title=f"{panel}: {len(rows)} rows")
         return
-    for f in export_chart(chart_for(rows, kind, x, y), out):
+    written = export_chart(chart_for(rows, kind, x, y), out)
+    for f in written:
         print(f"Written: {f}")
+    from .outputs import record_output
+    if written:
+        record_output("chart", written[0], "explore", {"panel": panel, "kind": kind})
 
 
 @app.command("event-study")
@@ -2140,8 +2168,12 @@ def event_study_cmd(events: str = typer.Argument(..., help="e.g. corporate_actio
     evs = select_events(events, security_code, date_field)
     r = event_study(evs, (est_start, est_end), (win_start, win_end), model, benchmark, min_estimation)
     print(r["summary"])
-    for f in write_event_study(r, out, name):
+    written = write_event_study(r, out, name)
+    for f in written:
         print(f"Written: {f}")
+    from .outputs import record_output
+    if written:
+        record_output("event_study", written[0], "event-study", {"events": events, "code": security_code})
 
 
 @app.command("price-chart")
@@ -2149,8 +2181,12 @@ def price_chart_cmd(code: str, out: str = typer.Option("charts/price", help="Out
     """Adjusted closes with corporate, regulatory, management and listing events (SVG and CSV)."""
     from .charts.builders import price_chart, export_chart
     init_db()
-    for f in export_chart(price_chart(code), out):
+    written = export_chart(price_chart(code), out)
+    for f in written:
         print(f"Written: {f}")
+    from .outputs import record_output
+    if written:
+        record_output("chart", written[0], "price-chart", {"code": code})
 
 
 # --- v1.8: ownership and control ------------------------------------------------------

@@ -98,3 +98,123 @@ def register(app, _table) -> None:
             return
         _table(r["summary"], ["job", "reason", "meaning", "documents"], title="Not read, by reason")
         _table(r["rows"][:limit], ["job", "reason", "item", "code", "date", "title", "detail"], title="Examples")
+
+    # --- B1 phases 4 and 5: the data folder -------------------------------------------------------------------
+
+    def _guard(fn, *a, **k):
+        from .features import FeatureOff
+        try:
+            return fn(*a, **k)
+        except (FeatureOff, RuntimeError) as exc:
+            _fail(exc)
+
+    @app.command("paths-normalise")
+    def paths_normalise_cmd(apply: bool = typer.Option(False, "--apply", help="Rewrite (after a backup); without it, "
+                                                                               "a preview"),
+                            confirm_other_database: bool = typer.Option(False, "--confirm-dumped",
+                                                                         help="For PostgreSQL: you have made a dump")):
+        """Rewrite stored paths relative to the data folder; every change is recorded and can be undone (v2.3.0)."""
+        from .datafolder import normalise_paths
+        r = _guard(normalise_paths, apply=apply, confirm_other_database=confirm_other_database)
+        print({k: v for k, v in r.items() if k not in ("examples", "note")})
+        if r.get("examples"):
+            _table(r["examples"], ["table", "old", "new"], title="Examples")
+        print(r.get("note", ""))
+
+    @app.command("paths-undo")
+    def paths_undo_cmd(run_id: str = typer.Argument(None, help="The run to undo (see 'paths-runs')")):
+        """Restore the stored paths a normalising run or a move changed (v2.3.0)."""
+        from .datafolder import undo_paths, rewrite_runs
+        if not run_id:
+            _table(rewrite_runs(), ["run_id", "changes", "when", "undone"], title="Path rewrites")
+            return
+        print(undo_paths(run_id))
+
+    @app.command("paths-runs")
+    def paths_runs_cmd():
+        """The normalising runs and moves recorded, with their changes (v2.3.0)."""
+        from .datafolder import rewrite_runs
+        _table(rewrite_runs(), ["run_id", "changes", "when", "undone"], title="Path rewrites")
+
+    @app.command("move-data-folder")
+    def move_data_folder_cmd(target: str = typer.Argument(..., help="The new data folder (empty or not yet made)"),
+                             apply: bool = typer.Option(False, "--apply", help="Move; without it, a dry run")):
+        """Move the data folder: a dry run first; then rename (same drive) or copy and verify, rewrite the stored
+        paths, switch the setting and re-create the scheduled update (v2.3.0). After a copy the old folder is left
+        untouched."""
+        from .datafolder import move_data_folder
+        r = _guard(move_data_folder, target, apply=apply, progress=lambda m: print(m, flush=True))
+        print(f"From {r['from']}\nTo   {r['to']}\n{r['files']:,} files, {r['gb']:,.2f} GB; method: {r['method']}"
+              + (f"; free on the target: {r['free_gb']:,.1f} GB" if r.get("free_gb") is not None else ""))
+        for p in r.get("problems", []):
+            print(f"[red]Problem: {p}[/red]")
+        for w in r.get("warnings", []):
+            print(f"[yellow]Warning: {w}[/yellow]")
+        if r.get("applied"):
+            print(f"Paths rewritten: {r.get('paths_rewritten', 0):,} (undo: paths-undo {r.get('undo_run')})")
+            if r.get("schedule"):
+                print(f"Scheduled update: {r['schedule']}")
+            print(f"Data folder now: {r['to']}")
+        print(r.get("note", ""))
+
+    @app.command("adopt-data-folder")
+    def adopt_data_folder_cmd(folder: str = typer.Argument(..., help="A data folder already moved or restored"),
+                              apply: bool = typer.Option(False, "--apply", help="Switch to it; without it, a check")):
+        """Use a data folder already moved or restored (for example after reinstalling Windows): checks it, then
+        switches to it (v2.3.0)."""
+        from .datafolder import adopt_data_folder
+        r = _guard(adopt_data_folder, folder, apply=apply)
+        if "report" in r:
+            for label, t in r["report"]["tables"].items():
+                print(f"{label}: {t['forms']} {t['files']}")
+            sm = r["sample"]
+            print(f"Sample of documents: {sm['checked']} checked, {sm['ok']} match, {sm['mismatched']} differ, "
+                  f"{sm['missing']} missing")
+        if r.get("applied"):
+            print(f"Data folder now: {r['folder']}")
+        print(r.get("note", ""))
+
+    def _number(text: str) -> int:
+        try:
+            return int(str(text).strip())
+        except ValueError:
+            _fail(ValueError(f"not an output number: {text!r} (the numbers are listed by 'outputs')"))
+
+    # --- B11: the outputs register -------------------------------------------------------------------------------
+
+    @app.command("outputs")
+    def outputs_cmd(kind: str = typer.Option(None, "--kind", help="view, topology, panel, event_study, release, "
+                                                                   "export, files_export, chart, query"),
+                    removed: bool = typer.Option(False, "--removed", help="Include removed outputs")):
+        """Every output the program wrote, by kind and date, with its place and size (v2.3.0)."""
+        from .outputs import list_outputs, disk_use
+        from .features import enabled
+        if not enabled("outputs.register"):
+            _fail(RuntimeError("the outputs register is switched off (features --on outputs.register)"))
+        rows = list_outputs(kind or None, removed)
+        _table(rows[:500], ["id", "kind", "created", "status", "files", "mb", "inside_data_folder", "path"],
+               title="Outputs")
+        _table(disk_use(), ["category", "files", "mb", "path"], title="Disk use")
+        print("Outputs made before v2.3 can be added with 'outputs-scan'.")
+
+    @app.command("outputs-check")
+    def outputs_check_cmd(output_id: str = typer.Argument(..., help="The output's number (see 'outputs')")):
+        """An output against its manifest: each listed file present, with the hash recorded (v2.3.0)."""
+        from .outputs import check_output
+        print(check_output(_number(output_id)))
+
+    @app.command("outputs-remove")
+    def outputs_remove_cmd(output_id: str = typer.Argument(..., help="The output's number (see 'outputs')"),
+                           apply: bool = typer.Option(False, "--apply", help="Remove; without it, a preview")):
+        """Remove an output's files (preview first); its record is kept, marked removed (v2.3.0)."""
+        from .outputs import remove_output
+        print(remove_output(_number(output_id), apply))
+
+    @app.command("outputs-scan")
+    def outputs_scan_cmd(folder: str = typer.Option(None, "--folder", help="Blank: the usual output folders"),
+                         apply: bool = typer.Option(False, "--apply", help="Record them; without it, a preview")):
+        """Find outputs made before v2.3 by their manifests and add them to the register (v2.3.0)."""
+        from .outputs import scan_outputs
+        r = scan_outputs(folder or None, apply)
+        print({k: v for k, v in r.items() if k != "rows"})
+        _table(r["rows"][:200], ["kind", "path", "manifest"], title="Found")

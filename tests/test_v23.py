@@ -340,3 +340,190 @@ def test_the_price_download_resumes_and_reports_progress(db, company, monkeypatc
     fetched.clear()
     r = market.acquire_market_data(None, "2025-01-01", "2025-12-31", "eastmoney", refetch=True)
     assert sorted(fetched) == ["000001", "600519"]
+
+
+# --- B11: the outputs register -------------------------------------------------------------------------------------
+
+def test_a_view_command_records_its_output_and_it_can_be_checked_and_removed(rel, tmp_path):
+    from typer.testing import CliRunner
+    from ashare.cli import app
+    from ashare.outputs import list_outputs, check_output, remove_output, inside_outside
+    out = tmp_path / "visualise" / "ego"
+    r = CliRunner().invoke(app, ["viz-ego-map", "--code", "600519", "--as-of", "2024-06-30", "--out", str(out)])
+    assert r.exit_code == 0, r.output
+    rows = list_outputs()
+    assert len(rows) == 1 and rows[0]["kind"] == "view" and rows[0]["inside_data_folder"]
+    assert check_output(rows[0]["id"])["status"] == "OK"
+    (out / "nodes.csv").write_text("changed", encoding="utf-8")
+    assert "nodes.csv" in check_output(rows[0]["id"])["changed"]
+    assert inside_outside()["inside"] == 1
+    prev = remove_output(rows[0]["id"])
+    assert not prev["applied"] and out.exists()
+    remove_output(rows[0]["id"], apply=True)
+    assert not out.exists() and list_outputs() == [] and list_outputs(include_removed=True)[0]["status"] == "REMOVED"
+
+
+def test_recording_never_fails_the_output_and_respects_its_switch(db, tmp_path, monkeypatch):
+    from ashare import outputs
+    f = tmp_path / "exports" / "x.csv"
+    f.parent.mkdir()
+    f.write_text("a", encoding="utf-8")
+    monkeypatch.setenv("ASHARE_FEATURES", "outputs.register=off")
+    assert outputs.record_output("export", f) is None
+    monkeypatch.delenv("ASHARE_FEATURES")
+    monkeypatch.setattr(outputs, "_size", lambda p: 1 / 0)
+    assert outputs.record_output("export", f) is None                        # logged, not raised
+
+
+def test_earlier_outputs_are_found_by_their_manifests_once(db, tmp_path):
+    from ashare.outputs import scan_outputs, list_outputs
+    v = tmp_path / "visualise" / "old_view"
+    v.mkdir(parents=True)
+    (v / "manifest.json").write_text(json.dumps({"view": "coverage", "files": {}}), encoding="utf-8")
+    p = tmp_path / "panels"
+    p.mkdir()
+    (p / "panel.csv").write_text("a", encoding="utf-8")
+    (p / "panel_manifest.json").write_text(json.dumps({"columns": ["a"], "files": {"panel.csv": None}}),
+                                           encoding="utf-8")
+    r = scan_outputs()
+    assert r["found"] == 2 and r["by_kind"] == {"view": 1, "panel": 1} and list_outputs() == []
+    scan_outputs(apply=True)
+    assert len(list_outputs()) == 2
+    assert scan_outputs()["found"] == 0                                      # not added twice
+
+
+# --- B1 phases 4 and 5: normalise, undo, move, adopt ---------------------------------------------------------------
+
+def _seed_paths(company, root: Path, old_root: str):
+    from ashare.models import SessionLocal, Disclosure, FinancialFact
+    p, sha = _doc(root / "disclosures")
+    s = SessionLocal()
+    d = Disclosure(company_id=company.id, announcement_id="P1", title_cn="2024年年度报告", kind="annual_report",
+                   announcement_date="2025-04-01", local_path=f"{old_root}/disclosures/600519/{p.name}", sha256=sha)
+    s.add(d)
+    s.flush()
+    s.add(FinancialFact(company_id=company.id, disclosure_id=d.id, reporting_period="2024-12-31", period_type="FY",
+                        metric="revenue", value=1.0, source_document=d.local_path, extraction_method="PDF_TEXT"))
+    s.commit()
+    did = d.id
+    s.close()
+    return did, p
+
+
+def test_normalising_rewrites_with_a_backup_and_can_be_undone(db, company, tmp_path):
+    from ashare.datafolder import normalise_paths, undo_paths
+    from ashare.models import SessionLocal, Disclosure, FinancialFact
+    did, p = _seed_paths(company, tmp_path, "/old/machine/AShareScraper")
+    pre = normalise_paths()
+    assert pre["changes"] == 2 and not pre["applied"]
+    s = SessionLocal()
+    assert s.get(Disclosure, did).local_path.startswith("/old/")                 # the preview changed nothing
+    s.close()
+    r = normalise_paths(apply=True)
+    assert r["applied"] and r["verified"] == 1 and Path(r["backup"]).exists()
+    s = SessionLocal()
+    rel = p.relative_to(tmp_path).as_posix()
+    assert s.get(Disclosure, did).local_path == rel
+    assert s.query(FinancialFact).one().source_document == rel
+    s.close()
+    assert undo_paths(r["run_id"])["restored"] == 2
+    s = SessionLocal()
+    assert s.get(Disclosure, did).local_path.startswith("/old/")
+    s.close()
+
+
+def test_normalising_is_refused_when_switched_off(db, monkeypatch):
+    from ashare.datafolder import normalise_paths
+    from ashare.features import FeatureOff
+    monkeypatch.setenv("ASHARE_FEATURES", "storage.normalise=off")
+    with pytest.raises(FeatureOff):
+        normalise_paths()
+
+
+def _home_folder(tmp_path, monkeypatch, name="home"):
+    """A data folder laid out as the desktop program lays it out."""
+    import os
+    from ashare.models import reset_init_cache
+    home = tmp_path / name
+    home.mkdir()
+    for k, v in {"ASHARE_HOME": home, "ASHARE_DB": home / "ashares.db", "ASHARE_RAW_DIR": home / "raw",
+                 "ASHARE_DISCLOSURE_DIR": home / "disclosures", "ASHARE_MARKET_RAW_DIR": home / "market_raw"}.items():
+        monkeypatch.setenv(k, str(v))
+    monkeypatch.chdir(home)
+    reset_init_cache()
+    return home
+
+
+@pytest.mark.skipif(bool(os.environ.get("ASHARE_TEST_DB_URL")), reason="moves a SQLite database")
+@pytest.mark.parametrize("method", ["copy", "rename"])
+def test_moving_the_data_folder_keeps_every_link(tmp_path, monkeypatch, method):
+    from ashare.storage import upsert_ashares
+    from ashare.models import SessionLocal, Disclosure, Company, init_db, ExtractionState
+    from ashare import datafolder
+    from ashare.datafolder import move_data_folder
+    from ashare.storepaths import has_document
+    home = _home_folder(tmp_path, monkeypatch)
+    init_db()
+    upsert_ashares([{"code": "600519", "exchange": "SSE", "legal_name_cn": "x", "short_name_cn": "x", "org_id": "o"}])
+    s = SessionLocal()
+    c = s.query(Company).one()
+    s.close()
+    did, p = _seed_paths(c, home, str(home))                                  # absolute, as the desktop wrote them
+    s = SessionLocal()
+    s.add(ExtractionState(disclosure_id=did, extractor="control", version="control-4", outcome="READ"))
+    s.commit()
+    s.close()
+    if method == "copy":
+        monkeypatch.setattr(datafolder, "_same_device", lambda a, b: False)
+    target = tmp_path / "elsewhere" / "AShareScraper"
+    dry = move_data_folder(str(target))
+    assert not dry["applied"] and not target.exists() and dry["can_move"]
+    r = move_data_folder(str(target), apply=True)
+    assert r["applied"] and r["paths_rewritten"] == 2, r
+    assert (home.exists() and (home / "ashares.db").exists()) == (method == "copy")   # a copy leaves the old one
+    s = SessionLocal()
+    d = s.get(Disclosure, did)
+    assert d.local_path == p.relative_to(home).as_posix() and has_document(d)
+    assert s.query(ExtractionState).one().version == "control-4"                     # nothing to read again
+    s.close()
+    assert (target / "logs").exists() and "data folder moved" in (target / "run_log.txt").read_text(encoding="utf-8")
+
+
+@pytest.mark.skipif(bool(os.environ.get("ASHARE_TEST_DB_URL")), reason="moves a SQLite database")
+def test_a_move_is_refused_into_a_non_empty_or_nested_folder(tmp_path, monkeypatch):
+    from ashare.models import init_db
+    from ashare.datafolder import move_data_folder
+    home = _home_folder(tmp_path, monkeypatch)
+    init_db()
+    full = tmp_path / "full"
+    full.mkdir()
+    (full / "x").write_text("x")
+    assert "not empty" in move_data_folder(str(full), apply=True)["note"]
+    assert "inside the current" in move_data_folder(str(home / "sub"), apply=True)["note"]
+
+
+@pytest.mark.skipif(bool(os.environ.get("ASHARE_TEST_DB_URL")), reason="adopts a SQLite database")
+def test_adopting_a_restored_folder(tmp_path, monkeypatch):
+    import shutil
+    from ashare.storage import upsert_ashares
+    from ashare.models import SessionLocal, Company, init_db
+    from ashare.datafolder import adopt_data_folder
+    from ashare.features import data_root
+    home = _home_folder(tmp_path, monkeypatch)
+    init_db()
+    upsert_ashares([{"code": "600519", "exchange": "SSE", "legal_name_cn": "x", "short_name_cn": "x", "org_id": "o"}])
+    s = SessionLocal()
+    c = s.query(Company).one()
+    s.close()
+    _seed_paths(c, home, "C:\\Users\\User\\Documents\\AShareScraper")
+    from ashare.models import engine
+    engine().dispose()
+    restored = tmp_path / "restored"
+    shutil.copytree(home, restored)
+    _home_folder(tmp_path, monkeypatch, "blank")                              # the program, pointing elsewhere
+    init_db()
+    chk = adopt_data_folder(str(restored))
+    assert not chk["applied"] and chk["sample"] == {"checked": 1, "ok": 1, "mismatched": 0, "missing": 0}
+    assert data_root() == (tmp_path / "blank").resolve()                    # a check changes nothing
+    r = adopt_data_folder(str(restored), apply=True)
+    assert r["applied"] and data_root() == restored.resolve()
