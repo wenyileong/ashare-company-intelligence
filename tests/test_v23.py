@@ -178,3 +178,165 @@ def test_the_paths_report_command(db, tmp_path):
     r = CliRunner().invoke(app, ["paths-report"])
     assert r.exit_code == 0, r.output
     assert "Nothing has been changed" in r.output
+
+
+# --- B2: network patience ----------------------------------------------------------------------------------------
+
+def _client(handler, patience=True, retries=3):
+    import httpx
+    from ashare.http import RateLimitedClient
+    return RateLimitedClient("t", transport=httpx.MockTransport(handler), retries=retries, server_patience=patience)
+
+
+def test_server_errors_are_waited_out_for_patient_clients(capsys):
+    import httpx
+    calls = []
+
+    def handler(req):
+        calls.append(1)
+        return httpx.Response(504) if len(calls) <= 3 else httpx.Response(200, text="ok")
+    assert _client(handler).get("http://www.cninfo.com.cn/x").text == "ok"
+    assert len(calls) == 4
+    assert "CNINFO is not answering (504)" in capsys.readouterr().out
+
+
+def test_patience_has_an_end_and_other_clients_keep_quick_retries():
+    import httpx
+    from ashare.http import SERVER_PAUSES
+    calls = []
+
+    def handler(req):
+        calls.append(1)
+        return httpx.Response(503)
+    with pytest.raises(httpx.HTTPStatusError):
+        _client(handler).get("http://www.cninfo.com.cn/x")
+    assert len(calls) == len(SERVER_PAUSES) + 3                  # the pauses, then the usual retries
+    calls.clear()
+    with pytest.raises(httpx.HTTPStatusError):
+        _client(handler, patience=False, retries=2).get("http://push2.eastmoney.com/x")
+    assert len(calls) == 2                                        # unchanged for Eastmoney's refusals
+    calls.clear()
+
+    def notfound(req):
+        calls.append(1)
+        return httpx.Response(404)
+    with pytest.raises(httpx.HTTPStatusError):
+        _client(notfound).get("http://www.cninfo.com.cn/x")
+    assert len(calls) == 1                                        # a 404 is not retried by a patient client
+
+
+def test_a_429_honours_retry_after(monkeypatch):
+    import httpx
+    from ashare import http
+    waits = []
+    monkeypatch.setattr(http, "_sleep_checking", lambda s: waits.append(s))
+    calls = []
+
+    def handler(req):
+        calls.append(1)
+        return httpx.Response(429, headers={"Retry-After": "7"}) if len(calls) == 1 else httpx.Response(200)
+    c = _client(handler)
+    c.offline = False                         # take the real pause path, with the sleep recorded instead
+    c.delay = 0
+    assert c.get("http://www.cninfo.com.cn/x").status_code == 200
+    assert waits == [7.0]
+
+
+# --- B3: the work ledger -------------------------------------------------------------------------------------------
+
+def test_the_ledger_records_and_lists_documents_not_read(db, company, monkeypatch):
+    from ashare.models import SessionLocal, Disclosure
+    from ashare.ledger import Ledger, not_read, DONE, NOT_READ, FAILED
+    s = SessionLocal()
+    s.add_all([Disclosure(company_id=company.id, announcement_id=f"N{i}", title_cn=f"报告{i}", kind="annual_report",
+                          announcement_date="2025-04-01") for i in range(3)])
+    s.commit()
+    ids = [d.id for d in s.query(Disclosure).order_by(Disclosure.id)]
+    s.close()
+    with Ledger("control") as led:
+        led.record(ids[0], NOT_READ, "MISSING_FILE")
+        led.record(ids[1], FAILED, "PARSE_ERROR", "boom")
+        led.record(ids[2], DONE)
+    with Ledger("control") as led:
+        led.record(ids[1], DONE)                                  # read on a later run: no longer listed
+    r = not_read()
+    assert [x["item"] for x in r["rows"]] == [str(ids[0])]
+    assert r["rows"][0]["code"] == "600519" and r["summary"][0]["reason"] == "MISSING_FILE"
+    monkeypatch.setenv("ASHARE_FEATURES", "jobs.ledger=off")
+    with Ledger("control") as led:
+        led.record(ids[2], FAILED, "PARSE_ERROR")
+    assert len(not_read()["rows"]) == 1                           # switched off: nothing recorded
+
+
+def test_extraction_records_missing_files_in_the_ledger(db, company):
+    from ashare.models import SessionLocal, Disclosure
+    from ashare.ledger import not_read
+    from ashare.control import extract_control
+    s = SessionLocal()
+    s.add(Disclosure(company_id=company.id, announcement_id="R1", title_cn="2024年年度报告", kind="annual_report",
+                     announcement_date="2025-04-01", local_path="disclosures/600519/" + "a" * 64 + ".pdf",
+                     sha256="a" * 64))
+    s.commit()
+    s.close()
+    extract_control(security_code="600519")
+    rows = not_read("control")["rows"]
+    assert len(rows) == 1 and rows[0]["reason"] == "MISSING_FILE"
+
+
+# --- Part A ----------------------------------------------------------------------------------------------------------
+
+from test_v22 import rel, _ego  # noqa: E402,F401  (the seeded ego-map database of v2.2)
+
+
+def test_events_without_an_authority_are_drawn_and_counted(rel):
+    from ashare.models import SessionLocal, RegulatoryEvent, Company
+    s = SessionLocal()
+    a = s.query(Company).filter_by(security_code="600519").one()
+    s.add(RegulatoryEvent(company_id=a.id, event_id="E2", event_type="REGULATORY_LETTER",
+                          legal_classification="EXCHANGE_SUPERVISORY_MEASURE", announcement_date="2024-02-01", event_date="2024-01-30", title_cn="关于收到问询函的公告",
+                          extraction_method="TITLE", source="CNINFO"))
+    s.add(RegulatoryEvent(company_id=a.id, event_id="E3", event_type="REGULATORY_LETTER",
+                          legal_classification="EXCHANGE_SUPERVISORY_MEASURE", announcement_date="2025-02-01", event_date="2025-01-30", title_cn="later",
+                          extraction_method="TITLE", source="CNINFO"))
+    s.commit()
+    s.close()
+    snap = _ego().snapshot
+    unnamed = [n for n in snap["nodes"] if "UNNAMED" in n["flags"]]
+    assert len(unnamed) == 1 and unnamed[0]["kind"] == "authority"
+    note = next(c for c in snap["coverage"] if c["item"] == "regulators")["note"]
+    assert "2 event(s) from 1 named authority; 1 naming no authority; 1 published after the date" in note
+
+
+def test_codes_given_twice_count_once():
+    from ashare.util import parse_codes, plural, span
+    assert parse_codes("688012, 600519,688012，1") == (["688012", "600519", "000001"], ["688012"])
+    assert parse_codes(["1", "000001"]) == (["000001"], ["000001"])
+    assert plural(1, "announcement") == "1 announcement" and plural(2, "company", "companies") == "2 companies"
+    assert span("2020-12-30", "2020-12-30") == "2020-12-30" and span("a", "b") == "a to b"
+
+
+def test_the_price_download_resumes_and_reports_progress(db, company, monkeypatch):
+    from ashare import market
+    from ashare.storage import upsert_ashares
+    from ashare.ledger import not_read
+    upsert_ashares([{"code": "000001", "exchange": "SZSE", "legal_name_cn": "平安银行股份有限公司",
+                     "short_name_cn": "平安银行", "org_id": "z"}])
+    fetched = []
+
+    def fake(c, start, end, adjust):
+        fetched.append(c.security_code)
+        if c.security_code == "000001" and fetched.count("000001") == 1:
+            raise RuntimeError("source down")
+        return [{"trade_date": d, "close": 1.0, "adjustment": adjust, "source": "EASTMONEY_PUBLIC"}
+                for d in ("2025-01-02", "2025-06-30", "2025-12-31")]
+    monkeypatch.setattr(market, "_fetcher", lambda p: fake)
+    said = []
+    r = market.acquire_market_data(None, "2025-01-01", "2025-12-31", "eastmoney", progress=said.append)
+    assert r["companies"] == 2 and r["errors"] and "2 of 2 companies" in said[-1]
+    assert [x["item"] for x in not_read("market_prices")["rows"]] == ["000001"]
+    fetched.clear()
+    r = market.acquire_market_data(None, "2025-01-01", "2025-12-31", "eastmoney", progress=said.append)
+    assert fetched == ["000001"] and r["skipped_up_to_date"] == 1   # 600519 is covered; 000001 failed before
+    fetched.clear()
+    r = market.acquire_market_data(None, "2025-01-01", "2025-12-31", "eastmoney", refetch=True)
+    assert sorted(fetched) == ["000001", "600519"]

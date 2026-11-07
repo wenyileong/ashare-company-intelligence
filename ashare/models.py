@@ -1140,3 +1140,7 @@ def init_db():
     from .migrate import upgrade
     upgrade()
     _INITIALISED.add(url)
+
+
+# v2.3.0: the tables added in v2.3 are defined in their own module and registered on Base here.
+from . import models_v23  # noqa: E402,F401

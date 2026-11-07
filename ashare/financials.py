@@ -841,10 +841,13 @@ def extract_financials(security_code: str | None = None, kind: str = "reports", 
         from .http import check_cancel
         from .parallel import imap
         prog = Progress(n, say)
+        from .ledger import Ledger, DONE, EMPTY, NOT_READ, FAILED
+        led = Ledger("financials")              # v2.3.0 (B3): records only; extracted_version decides what is skipped
         jobs, by_id = [], {}
         for disclosure, company in todo:
             if not document_path(disclosure).exists():
                 totals["missing_files"] += 1
+                led.record(disclosure.id, NOT_READ, "MISSING_FILE")
                 prog.step()
                 continue
             jobs.append({"id": disclosure.id, "path": str(document_path(disclosure)), "title": disclosure.title_cn,
@@ -860,6 +863,7 @@ def extract_financials(security_code: str | None = None, kind: str = "reports", 
                 if res.get("error"):
                     totals["errors"].append({"code": company.security_code, "disclosure_id": disclosure.id,
                                              "error": res["error"]})
+                    led.record(disclosure.id, FAILED, "PARSE_ERROR", str(res["error"]))
                     prog.step()
                     continue
                 try:
@@ -884,13 +888,16 @@ def extract_financials(security_code: str | None = None, kind: str = "reports", 
                     disclosure.extracted_version = EXTRACTOR_VERSION
                     disclosure.extracted_at = utcnow()
                     session.commit()
+                    led.record(disclosure.id, DONE if facts else EMPTY, None if facts else "NO_VALUES")
                 except Exception as exc:
                     session.rollback()
                     totals["errors"].append({"code": company.security_code, "disclosure_id": disclosure.id,
                                              "error": repr(exc)})
+                    led.record(disclosure.id, FAILED, "PARSE_ERROR", repr(exc))
                 prog.step()
             if slow.report():
                 totals["slowest"] = slow.report()
+        led.flush()
         return totals
     finally:
         session.close()

@@ -47,7 +47,11 @@ from .models import Base, Company, SessionLocal, engine, init_db
 from .timeutil import utcnow
 
 # Operational tables: never part of a release.
-OPERATIONAL = {"jobs", "job_items", "high_water_marks", "raw_records", "research_queries", "review_items"}
+OPERATIONAL = {"jobs", "job_items", "high_water_marks", "raw_records", "research_queries", "review_items",
+               # v2.3.0: operational tables; insider dealings and external identifiers are left out of releases until
+               # their pseudonymisation and licence terms are settled
+               "work_ledger", "outputs", "path_rewrites", "watchlists", "alerts", "insider_dealings",
+               "entity_identifiers", "external_relationships"}
 # Reference tables kept in a single-company release.
 GLOBAL_TABLES = {"trading_calendar", "parser_calibration", "sources", "persons", "entities", "entity_aliases"}
 # Columns that hold the researcher's own file paths or raw provider payloads.

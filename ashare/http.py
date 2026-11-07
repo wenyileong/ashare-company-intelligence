@@ -105,6 +105,18 @@ def is_name_lookup_failure(exc: BaseException) -> bool:
     return False
 
 
+SERVER_ERRORS = (502, 503, 504)
+SERVER_PAUSES = (15.0, 30.0, 60.0, 120.0, 75.0)       # v2.3.0 (B2): five minutes in all
+
+
+def _say_waiting(url: str, status: str, pause: float) -> None:
+    """Progress while a source is waited out (v2.3.0, B2)."""
+    from urllib.parse import urlsplit
+    host = urlsplit(url).hostname or url
+    name = "CNINFO" if "cninfo" in host else host
+    print(f"  {name} is not answering ({status}); waiting {pause:.0f} s", flush=True)
+
+
 def _sleep_checking(seconds: float) -> None:
     """Sleep, answering Stop within a second."""
     end = time.monotonic() + seconds
@@ -118,11 +130,14 @@ def _sleep_checking(seconds: float) -> None:
 
 class RateLimitedClient:
     def __init__(self, user_agent: str, requests_per_second: float = 1.0, transport=None,
-                 retries: int = 3):
+                 retries: int = 3, server_patience: bool = False):
         # At least 0.1 and at most MAX_REQUESTS_PER_SECOND requests a second (v2.0.5 ceiling).
         self.delay = 1.0 / min(max(requests_per_second, 0.1), MAX_REQUESTS_PER_SECOND)
         self.last_request = 0.0
         self.retries = max(1, retries)
+        # v2.3.0 (B2): only clients of sources whose server errors mean an outage (CNINFO) wait them out; others
+        # (Eastmoney answers 502 to refuse a request without a Referer) keep their quick retries
+        self.server_patience = server_patience
         transport = transport if transport is not None else _DEFAULT_TRANSPORT
         kwargs = {"transport": transport} if transport is not None else {}
         if transport is not None:
@@ -150,6 +165,7 @@ class RateLimitedClient:
         last_error = None
         attempt = 0
         dns_waited = 0.0
+        server_waits = 0
         while True:
             try:
                 self._pace()
@@ -159,6 +175,30 @@ class RateLimitedClient:
                 return response
             except (httpx.HTTPError, OSError) as exc:
                 last_error = exc
+                # v2.3.0 (plan B2, finding 143): a server error (502, 503, 504) is usually an outage of the source's
+                # gateway lasting minutes; it is waited out in growing pauses (SERVER_PAUSES, five minutes in all)
+                # before it counts as a failure. A 429 honours Retry-After. Other 4xx answers are not retried.
+                status = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else None
+                if not self.server_patience:
+                    status = None
+                if status in SERVER_ERRORS and server_waits < len(SERVER_PAUSES):
+                    pause = 0.0 if self.offline else SERVER_PAUSES[server_waits]
+                    _say_waiting(url, f"{status}", pause)
+                    _sleep_checking(pause)
+                    server_waits += 1
+                    continue
+                if status == 429 and server_waits < len(SERVER_PAUSES):
+                    try:
+                        pause = min(300.0, float(exc.response.headers.get("Retry-After") or 30))
+                    except ValueError:
+                        pause = 30.0
+                    pause = 0.0 if self.offline else pause
+                    _say_waiting(url, "429", pause)
+                    _sleep_checking(pause)
+                    server_waits += 1
+                    continue
+                if status is not None and 400 <= status < 500 and status not in (408, 429):
+                    raise
                 # v2.1 (finding 16): a failed name lookup ("getaddrinfo failed") is usually a brief outage of the
                 # local network or resolver, before any request reaches the site. It is retried for up to
                 # DNS_PATIENCE seconds, in pauses of up to 30 s, before it counts as a failure.

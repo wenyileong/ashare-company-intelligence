@@ -4,6 +4,7 @@ from .timeutil import utcnow
 import csv
 import hashlib
 import json
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable
@@ -278,33 +279,89 @@ def _fetcher(provider: str):
     return globals()[PROVIDERS[provider][1]]
 
 
+PROVIDER_SOURCE = {"eastmoney": "EASTMONEY_PUBLIC", "tencent": "TENCENT_PUBLIC"}
+EDGE_DAYS = 15          # v2.3.0 (A5): stored bars within this many days of each end of the period count as covering it
+
+
+def _covered(session, company: Company, start: str, end: str, source: str, adjust: str) -> bool:
+    """Whether the stored bars of this source and adjustment already cover the period (v2.3.0, finding 144): the
+    first within EDGE_DAYS of the later of the start and the listing date, the last within EDGE_DAYS of the end (or
+    of today)."""
+    from datetime import date, timedelta
+    from sqlalchemy import func
+    lo, hi = session.query(func.min(MarketBar.trade_date), func.max(MarketBar.trade_date)).filter(
+        MarketBar.company_id == company.id, MarketBar.source == source, MarketBar.adjustment == adjust).one()
+    if not lo or not hi:
+        return False
+    eff_start = max(start, (company.listing_date or start)[:10])
+    eff_end = min(end, date.today().isoformat())
+    d = lambda s: date.fromisoformat(s[:10])                              # noqa: E731
+    return d(lo) <= d(eff_start) + timedelta(days=EDGE_DAYS) and d(hi) >= d(eff_end) - timedelta(days=EDGE_DAYS)
+
+
 def acquire_market_data(security_code: str | None, start: str, end: str, provider: str | None = None,
-                        adjust: str = "none", raise_errors: bool = False) -> dict:
-    """Daily bars from the chosen public source (v2.0.8: eastmoney or tencent; default from Settings)."""
+                        adjust: str = "none", raise_errors: bool = False, refetch: bool = False,
+                        progress=None) -> dict:
+    """Daily bars from the chosen public source (v2.0.8: eastmoney or tencent; default from Settings).
+
+    v2.3.0 (finding 144): progress by company with the time left; a company whose stored bars from the same source
+    and adjustment already cover the period is skipped unless ``refetch``; a stop keeps what was fetched and reports
+    the result so far; each company's outcome goes to the work ledger."""
+    from .extractstate import Progress
+    from .http import Cancelled
+    from .ledger import Ledger, DONE, SKIPPED, FAILED
     provider = (provider or price_source()).lower()
     if provider == "none":
         raise ValueError("The price source is 'none': import prices from a CSV file instead ('Import prices').")
     fetch = _fetcher(provider)
+    source = PROVIDER_SOURCE.get(provider, provider.upper())
+    say = progress or (lambda m: None)
     session = SessionLocal()
-    totals = {"provider": provider, "companies": 0, "bars_inserted": 0, "bars_updated": 0, "errors": []}
+    totals = {"provider": provider, "companies": 0, "skipped_up_to_date": 0, "bars_inserted": 0, "bars_updated": 0,
+              "errors": []}
+    led = Ledger("market_prices")
     try:
         q = session.query(Company)
         if security_code:
             q = q.filter(Company.security_code == security_code.zfill(6))
         companies = q.order_by(Company.security_code).all()
+        todo = []
         for company in companies:
+            if not refetch and not security_code and _covered(session, company, start, end, source, adjust):
+                totals["skipped_up_to_date"] += 1
+                led.record(company.security_code, SKIPPED, "UP_TO_DATE")
+            else:
+                todo.append(company)
+        if totals["skipped_up_to_date"]:
+            say(f"{totals['skipped_up_to_date']:,} companies already have prices for the period and are skipped "
+                "(tick 'Fetch again' to fetch them anyway)")
+        say(f"{len(todo):,} companies to fetch")
+        prog = Progress(len(todo), say, every=50, unit="companies")
+        for company in todo:
             totals["companies"] += 1
+            t0 = time.monotonic()
             try:
                 bars = fetch(company, start, end, adjust)
                 result = persist_bars(company, bars)
                 totals["bars_inserted"] += result["inserted"]
                 totals["bars_updated"] += result["updated"]
+                led.record(company.security_code, DONE, None, None, time.monotonic() - t0)
+            except Cancelled:
+                totals["companies"] -= 1
+                totals["stopped"] = True
+                say(f"Stopped after {totals['companies']:,} of {len(todo):,} companies; the prices fetched are "
+                    f"kept: {totals['bars_inserted']:,} bars added, {totals['bars_updated']:,} updated. Running it "
+                    "again skips the companies already done.")
+                raise
             except Exception as exc:
                 if raise_errors:
                     raise
                 totals["errors"].append((company.security_code, str(exc)))
+                led.record(company.security_code, FAILED, "FETCH_ERROR", str(exc), time.monotonic() - t0)
+            prog.step()
         return totals
     finally:
+        led.flush()
         session.close()
 
 

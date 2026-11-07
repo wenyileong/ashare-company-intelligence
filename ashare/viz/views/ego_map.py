@@ -29,6 +29,9 @@ def _nid(prefix: str, text: str) -> str:
     return prefix + ":" + hashlib.sha1(text.encode("utf-8")).hexdigest()[:12]
 
 
+UNNAMED = "Authority not named"      # v2.3.0 (finding 140)
+
+
 @register
 class EgoMapView(View):
     id = "ego_map"
@@ -287,22 +290,35 @@ class EgoMapView(View):
 
     def _regulators(self, ctx, g, c, centre):
         from ...models import RegulatoryEvent
-        evs = [e for e in ctx.s.query(RegulatoryEvent).filter(RegulatoryEvent.company_id == c.id)
-               if ctx.known(e.announcement_date, e.event_date) and (e.authority_name or e.authority)]
+        # v2.3.0 (finding 140): an event that names no authority (often one read from a title) is drawn under one
+        # node, "Authority not named", instead of being dropped; the note counts what was shown and left out
+        allev = list(ctx.s.query(RegulatoryEvent).filter(RegulatoryEvent.company_id == c.id))
+        evs = [e for e in allev if ctx.known(e.announcement_date, e.event_date)]
+        later = len(allev) - len(evs)
         if not evs:
-            return {"item": "regulators", "status": "NONE", "note": "no regulatory event published by then"}
+            return {"item": "regulators", "status": "NONE",
+                    "note": "no regulatory event published by then" + (f" ({later} published later)" if later else "")}
         by = {}
         for e in evs:
-            by.setdefault(e.authority_name or e.authority, []).append(e)
+            by.setdefault(e.authority_name or e.authority or UNNAMED, []).append(e)
+        unnamed = len(by.get(UNNAMED, []))
         for name, es in sorted(by.items()):
             nid = _nid("authority", name)
-            g.node(nid, "authority", name, ring="regulators", group=es[0].authority)
+            node = g.node(nid, "authority", name, ring="regulators", group=es[0].authority)
+            if name == UNNAMED and "UNNAMED" not in node["flags"]:
+                node["flags"].append("UNNAMED")
             last = max(es, key=lambda e: (e.announcement_date or e.event_date or "", e.id))
             g.edge(nid, centre, "ACTS_ON", {"kind": "page", "disclosure_id": last.disclosure_id,
                                             "page": last.source_page, "method": last.extraction_method},
                    {"published_date": last.announcement_date, "observed_date": last.event_date}, value=len(es),
                    label=f"{len(es)} event(s); latest {last.legal_classification or last.event_type}")
-        return {"item": "regulators", "status": "FOUND", "note": f"{len(evs)} event(s) from {len(by)} authorities"}
+        named = len(by) - (1 if unnamed else 0)
+        note = f"{len(evs)} event(s) from {named} named authorit{'y' if named == 1 else 'ies'}"
+        if unnamed:
+            note += f"; {unnamed} naming no authority"
+        if later:
+            note += f"; {later} published after the date, left out"
+        return {"item": "regulators", "status": "FOUND", "note": note}
 
     def _sector(self, ctx, g, c, centre):
         from ...models import IndustryClassification

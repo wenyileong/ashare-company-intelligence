@@ -84,3 +84,17 @@ def register(app, _table) -> None:
                   "(do not move)")
         print("'recoverable': the stored path is gone but the file was found under the current folder with a matching "
               "hash. Nothing has been changed.")
+
+    @app.command("not-read")
+    def not_read_cmd(job: str = typer.Option(None, "--job", help="An extractor (financials, control, top_holders ...) or "
+                                                                  "market_prices; blank for all"),
+                     limit: int = typer.Option(200, help="Rows to list")):
+        """Documents (and companies) whose latest attempt did not succeed, and why (v2.3.0, Files > Documents not
+        read)."""
+        from .ledger import not_read
+        r = not_read(job or None, limit=max(limit, 1))
+        if not r["summary"]:
+            print("Nothing is recorded as not read. (The record starts with v2.3; runs before it are not listed.)")
+            return
+        _table(r["summary"], ["job", "reason", "meaning", "documents"], title="Not read, by reason")
+        _table(r["rows"][:limit], ["job", "reason", "item", "code", "date", "title", "detail"], title="Examples")

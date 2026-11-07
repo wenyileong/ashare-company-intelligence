@@ -68,6 +68,7 @@ v2.0.6 (findings 37 to 56, from the first live runs of the engine):
 """
 from __future__ import annotations
 
+from .util import plural, span  # v2.3.0
 import math
 from collections import Counter
 from dataclasses import dataclass, replace
@@ -944,11 +945,11 @@ def catalogue(since: str, until: str, kind: str = "all", download_documents: boo
                     return
                 col = _Collector(q, category, persist, progress, caps, split_companies)
                 if total > QUERY_LIMIT:
-                    _say(progress, f"  {a}: {total:,} announcements, more than one query returns; splitting")
+                    _say(progress, f"  {a}: {plural(total, 'announcement')}, more than one query returns; splitting")
                     rows = col.collect(spec, total, data, DIMENSIONS, top=True)
                     method = "+".join(dict.fromkeys(col.methods)) or "SPLIT"
                 else:
-                    _say(progress, f"  {a} to {b}: {total:,} announcements" if a != b else f"  {a}: {total:,} announcements")
+                    _say(progress, f"  {span(a, b)}: {plural(total, 'announcement')}")      # v2.3.0 (finding 146)
                     rows = col.collect(spec, total, data, (), small_split=True)
                     method = ("DAY" if a == b else "WINDOW") + "".join(f"+{m}" for m in dict.fromkeys(col.methods))
                 finish_unit(col, spec, total, rows, method)
@@ -966,7 +967,8 @@ def catalogue(since: str, until: str, kind: str = "all", download_documents: boo
                 session.commit()
                 tot["days_failed"].extend(failed)
                 tot["errors"].append({"window": f"{a}~{b}", "error": repr(exc)})
-                _say(progress, f"  {a} to {b}: error {exc!r}; recorded as failed, run again to retry these days")
+                _say(progress, f"  {span(a, b)}: error {exc!r}; recorded as failed, run again to retry "
+                               + ("this day" if a == b else "these days"))
                 state["consecutive"] += 1
                 if state["consecutive"] >= max_failures:
                     raise StopRun(exc)
@@ -991,9 +993,7 @@ def catalogue(since: str, until: str, kind: str = "all", download_documents: boo
                        + ("; today kept open (it is fetched again next time)" if tot["days_open"] else "") + ", "
                        f"{len(tot['days_shortfall'])} with a gap within the enabled boards, "
                        f"{len(tot['days_failed'])} failed.")
-        if tot["days_failed"]:
-            _say(progress, "Failed days (run the same action again to retry only these): "
-                 + ", ".join(tot["days_failed"]))
+        # v2.3.0 (finding 146): the failed days are listed once, by the command that reports the result
         if download_documents:
             # v2.1.2 (findings 120 and 121): the documents to download are read from the database (wanted and not
             # on disk within the catalogued dates, for 'all' and 'reports'), so a rerun downloads what an

@@ -35,8 +35,9 @@ def _duration(seconds: float) -> str:
 class Progress:
     """'250 of 9,800 documents; 8.7 s each; about 23 hours left', every ``every`` documents and once a minute."""
 
-    def __init__(self, total: int, say=None, every: int = 25, interval: float = 60.0):
+    def __init__(self, total: int, say=None, every: int = 25, interval: float = 60.0, unit: str = "documents"):
         self.total, self.say, self.every, self.interval = total, say or (lambda m: None), every, interval
+        self.unit = unit
         self.done = 0
         self.t0 = self.last = time.monotonic()
 
@@ -46,7 +47,7 @@ class Progress:
         if self.done % self.every == 0 or now - self.last >= self.interval or self.done == self.total:
             each = (now - self.t0) / self.done
             left = f"; about {_duration(each * (self.total - self.done))} left" if self.done < self.total else ""
-            self.say(f"  {self.done:,} of {self.total:,} documents; {each:.1f} s each{left}")
+            self.say(f"  {self.done:,} of {self.total:,} {self.unit}; {each:.1f} s each{left}")
             self.last = now
 
 
@@ -90,8 +91,11 @@ def run(extractor: str, rows, handle, totals: dict, again: bool = False, progres
         + (f"; {totals['already_read']:,} already read by this version are skipped (--again reads them too)"
            if totals["already_read"] else ""))
     prog = Progress(n, say)
+    from .ledger import Ledger, DONE, EMPTY, NOT_READ, FAILED, SKIPPED
+    led = Ledger(extractor)                     # v2.3.0 (B3): records only; the marks below decide what is skipped
 
     def failed(d, exc):
+        led.record(d.id, FAILED, "PARSE_ERROR", exc if isinstance(exc, str) else repr(exc))
         session.rollback()
         totals.setdefault("errors", []).append({"disclosure_id": d.id, "error": exc if isinstance(exc, str)
                                                 else repr(exc)})
@@ -103,6 +107,7 @@ def run(extractor: str, rows, handle, totals: dict, again: bool = False, progres
                 path = document_path(d)
                 if path is None or not path.exists():
                     totals["missing_files"] = totals.get("missing_files", 0) + 1
+                    led.record(d.id, NOT_READ, "MISSING_FILE")
                     prog.step()
                     continue
                 jobs.append({"id": d.id, "path": str(path), "title": d.title_cn, "kind": d.kind,
@@ -121,6 +126,8 @@ def run(extractor: str, rows, handle, totals: dict, again: bool = False, progres
                         if outcome:
                             mark(session, d.id, extractor, outcome)
                         session.commit()
+                        led.record(d.id, DONE if outcome == "READ" else EMPTY if outcome else SKIPPED,
+                                   None if outcome == "READ" else "NO_VALUES" if outcome else "NOT_APPLICABLE")
                         if res.get("read_whole"):
                             totals["read_whole"] = totals.get("read_whole", 0) + 1
                     except Exception as exc:
@@ -128,6 +135,7 @@ def run(extractor: str, rows, handle, totals: dict, again: bool = False, progres
                 prog.step()
             if slow.report():
                 totals["slowest"] = slow.report()
+            led.flush()
             return totals
         for d, c in todo:
             reader = None
@@ -135,12 +143,15 @@ def run(extractor: str, rows, handle, totals: dict, again: bool = False, progres
                 path = document_path(d)
                 if path is None or not path.exists():
                     totals["missing_files"] = totals.get("missing_files", 0) + 1
+                    led.record(d.id, NOT_READ, "MISSING_FILE")
                 else:
                     reader = ReportReader(path)
                     outcome = handle(d, c, reader)
                     if outcome:
                         mark(session, d.id, extractor, outcome)
                     session.commit()
+                    led.record(d.id, DONE if outcome == "READ" else EMPTY if outcome else SKIPPED,
+                               None if outcome == "READ" else "NO_VALUES" if outcome else "NOT_APPLICABLE")
                     if reader.fallback_full:
                         totals["read_whole"] = totals.get("read_whole", 0) + 1
             except Exception as exc:
@@ -149,4 +160,5 @@ def run(extractor: str, rows, handle, totals: dict, again: bool = False, progres
                 if reader is not None:
                     reader.close()
             prog.step()
+    led.flush()
     return totals

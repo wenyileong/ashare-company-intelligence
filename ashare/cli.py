@@ -329,7 +329,8 @@ def _report_catalogue(result: dict) -> None:
               "Re-cataloguing only helps after a change of method; if a gap remains, please report it with "
               "the output of probe-cninfo-filters.")
     if failed:
-        print(f"[red]{len(failed)} day(s) failed: {', '.join(failed[:40])}{' ...' if len(failed) > 40 else ''}[/red]")
+        print(f"[red]{len(failed)} day{'' if len(failed) == 1 else 's'} failed: {', '.join(failed[:40])}"
+              f"{' ...' if len(failed) > 40 else ''}[/red]")
         print("Run the same action again to retry only these days.")
     elif errors:
         print(f"[yellow]Errors: {len(errors)} (run the same action again to retry)[/yellow]")
@@ -559,14 +560,17 @@ def acquire_market_cmd(
     provider: str = typer.Option(None, help="eastmoney or tencent (default: the price source in Settings, "
                                              "ASHARE_PRICE_SOURCE)"),
     adjust: str = typer.Option("none", help="none, forward, or backward"),
+    refetch: bool = typer.Option(False, "--refetch", help="Fetch companies whose prices already cover the period"),
 ):
-    """Download daily prices for one company (or all) from a public price feed (v2.0.8: the source is chosen)."""
+    """Download daily prices for one company (or all) from a public price feed (v2.0.8: the source is chosen; v2.3.0:
+    progress, and companies already up to date are skipped)."""
     from .market import price_source
     init_db()
     provider = provider or price_source()
     print(f"[cyan]Acquiring market data: {start} to {end}, provider={provider}, adjustment={adjust}...[/cyan]")
     try:
-        result = acquire_market_data(security_code, start, end, provider, adjust)
+        result = acquire_market_data(security_code, start, end, provider, adjust, refetch=refetch,
+                                     progress=lambda m: print(m, flush=True))
     except ValueError as exc:
         print(f"[red]{exc}[/red]")
         raise typer.Exit(code=2)
@@ -1613,9 +1617,12 @@ def topology_cmd(codes: str = typer.Option(None, help="Comma-separated security 
     from .charts.builders import export_chart
     init_db()
     as_of = as_of or _date.today().isoformat()
-    picked = [c.strip() for c in (codes or "").split(",") if c.strip()]
+    from .util import parse_codes
+    picked, dropped = parse_codes(codes)            # v2.3.0 (finding 142): a code given twice counts once
+    if dropped:
+        print(f"Duplicates dropped: {', '.join(sorted(set(dropped)))}")
     if industry:
-        picked += codes_in_industry(industry, as_of)
+        picked, more = parse_codes(picked + list(codes_in_industry(industry, as_of)))
         if not picked:
             print(f"[red]No company is classified in {industry} on {as_of}. Import industry classifications first "
                   "(Research: 'Import industry classifications').[/red]")
@@ -1637,6 +1644,15 @@ def topology_cmd(codes: str = typer.Option(None, help="Comma-separated security 
     print({"folder": r["folder"], "files": [Path(f).name for f in files]})
     if viewer:
         print(f"Viewer: {Path(out) / 'topology.html'}")
+
+
+def _codes_once(codes: str) -> list[str]:
+    """Comma-separated codes, each once (v2.3.0, finding 142)."""
+    from .util import parse_codes
+    picked, dropped = parse_codes(codes)
+    if dropped:
+        print(f"Duplicates dropped: {', '.join(sorted(set(dropped)))}")
+    return picked
 
 
 # --- v2.2: the Visualise section (plan section B4.6) ------------------------------------------------------------------
@@ -2058,7 +2074,7 @@ def build_panel_cmd(variables: str = typer.Option(None, help="Comma-separated (d
     from .panel import build_panel, write_panel, EmptyPanel, coverage_line
     init_db()
     r = build_panel([v.strip() for v in variables.split(",")] if variables else None, unit, start, end, align,
-                    pit_day, lag_days, as_of, [c.strip().zfill(6) for c in codes.split(",")] if codes else None,
+                    pit_day, lag_days, as_of, _codes_once(codes) if codes else None,
                     index, [b.strip().upper() for b in boards.split(",")] if boards else None, exclude_financials,
                     min_class, reviewed_only, winsor,
                     {k: int(v) for k, v in (x.split(":") for x in lags.split(","))} if lags else None, with_dates,

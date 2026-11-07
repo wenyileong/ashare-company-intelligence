@@ -231,7 +231,10 @@ SECTIONS = [
              F("provider", "Source", "choice:,eastmoney,tencent", "", "--provider",
                "Blank = the source chosen in Settings."),
              F("adjust", "Adjustment", "choice:none,forward,backward", "none", "--adjust",
-               "Keep one adjustment type per analysis.")]),
+               "Keep one adjustment type per analysis."),
+             F("refetch", "Fetch again", "bool", False, ("--refetch", None),
+               "Unticked, companies whose prices already cover the period are skipped, so a stopped run resumes.")],
+           "Shows progress by company with the time left. Stopping keeps the prices already fetched."),
          A("Import prices from CSV", "import-market-csv", [CSV_FILE, CODE_OPT("Only if the file holds one company."), SOURCE],
            "Columns: code, date, open, high, low, close (others optional)."),
          A("Show prices", "show-market", [CODE_REQ, F("start", "From", "text", "", "--start", "Optional")]),
@@ -640,6 +643,11 @@ SECTIONS = [
              F("out", "Folder", "folder", "exports/files", "--out"),
          ], "Copies the chosen documents into folders by company and year, named '<code> <date> <title>', with "
             "an index (index.html and index.csv) giving each copy's source address. The originals are unchanged."),
+         A("Documents not read", "not-read", [
+             F("job", "Reader", "choice:,financials,control,top_holders,esg,guidance,segments,subsidiaries,"
+               "human_capital,roster,market_prices", "", "--job", "Blank for every reader.")],
+           "Documents (and, for prices, companies) whose latest attempt did not succeed, with the reason: the file "
+           "is missing, it could not be read, or nothing was found in it. Recorded from v2.3 onwards."),
          A("Check files", "files-check", [],
            "Files no record names, records whose file is missing, one file under several records, and summaries "
            "or English versions downloaded by earlier versions."),
@@ -918,6 +926,8 @@ RESUME_NOTES = {
     "extract-esg": "reports read so far are saved; running it again continues with the rest",
     "read-guidance": "documents read so far are saved; running it again continues with the rest",
     "scan-documents": "documents checked so far are saved; running it again checks the rest",
+    # v2.3.0 (finding 144)
+    "acquire-market": "prices fetched so far are saved; running it again skips the companies already done",
 }
 
 

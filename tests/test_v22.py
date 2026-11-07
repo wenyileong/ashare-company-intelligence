@@ -426,6 +426,8 @@ def test_the_visualise_pages_hold_the_views_and_their_commands_exist():
     pytest.importorskip("tkinter")
     from ashare import gui
     from ashare.cli import app
+    from ashare.i18n import set_language
+    set_language("en")                    # another test in the same worker may have left the interface in Chinese
     names = {c.name or c.callback.__name__.replace("_", "-") for c in app.registered_commands}
     by_id = {s["id"]: s for s in gui.SECTIONS}
     for sid in ("topology", "relational", "company_views", "econometric", "coverage"):

@@ -1071,6 +1071,22 @@
   "en_hash": "7e2900f31e",
   "zh": "请先预览，再勾选“执行”。"
  },
+ "action.files.not-read.field.job.hint": {
+  "en_hash": "e1002f5b0b",
+  "zh": "留空表示全部读取程序。"
+ },
+ "action.files.not-read.field.job.label": {
+  "en_hash": "ac5bbe8292",
+  "zh": "读取程序"
+ },
+ "action.files.not-read.label": {
+  "en_hash": "df1b6013db",
+  "zh": "未读取的文件"
+ },
+ "action.files.not-read.note": {
+  "en_hash": "5b26d5fac4",
+  "zh": "最近一次处理未成功的文件（价格数据则为公司）及原因：文件缺失、无法读取或未找到内容。自 v2.3 起记录。"
+ },
  "action.financials.extract-financials.field.again.hint": {
   "en_hash": "02a847293c",
   "zh": "通常会跳过已读取的文件，停止后再次运行将从中断处继续。"
@@ -1403,6 +1419,14 @@
   "en_hash": "6da13addb0",
   "zh": "来源"
  },
+ "action.market.acquire-market.field.refetch.hint": {
+  "en_hash": "b0275447d0",
+  "zh": "不勾选时，跳过价格已覆盖该期间的公司，因此中断的运行可以续接。"
+ },
+ "action.market.acquire-market.field.refetch.label": {
+  "en_hash": "33dbf3c766",
+  "zh": "重新获取"
+ },
  "action.market.acquire-market.field.security_code.hint": {
   "en_hash": "7bb1962600",
   "zh": "留空则对全部公司运行。"
@@ -1418,6 +1442,10 @@
  "action.market.acquire-market.label": {
   "en_hash": "43188b6fb0",
   "zh": "下载日行情价格"
+ },
+ "action.market.acquire-market.note": {
+  "en_hash": "120664e8de",
+  "zh": "按公司显示进度及剩余时间。停止后保留已获取的价格。"
  },
  "action.market.diagnose-prices.field.code.hint": {
   "en_hash": "5268da372b",

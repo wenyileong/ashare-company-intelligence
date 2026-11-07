@@ -23,7 +23,7 @@ class CNInfoAdapter(SourceAdapter):
         return os.environ.get("ASHARE_CNINFO_STOCK_LIST_URL") or cls.STOCK_LIST_URL
 
     def __init__(self):
-        self.http = RateLimitedClient(USER_AGENT, REQUESTS_PER_SECOND)
+        self.http = RateLimitedClient(USER_AGENT, REQUESTS_PER_SECOND, server_patience=True)   # v2.3.0 (B2)
         self.last_source_records = []
 
     def _fetch(self, url: str):

@@ -6,10 +6,8 @@ from ..view import Requirement, MET, PARTLY, MISSING
 
 
 def _codes(params: dict) -> list[str]:
-    raw = params.get("code") or params.get("codes") or ""
-    if isinstance(raw, (list, tuple)):
-        return [str(c).zfill(6) for c in raw if str(c).strip()]
-    return [c.strip().zfill(6) for c in str(raw).split(",") if c.strip()]
+    from ...util import parse_codes
+    return parse_codes(params.get("code") or params.get("codes") or "")[0]
 
 
 def _company_ids(s, params) -> list[int] | None:

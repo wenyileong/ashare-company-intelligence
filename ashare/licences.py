@@ -49,7 +49,10 @@ METHOD_TABLES = {"financial_facts"}
 INTERNAL_TABLES = {"jobs", "job_items", "high_water_marks", "parser_calibration", "research_queries",
                    "review_items", "validation_flags", "sources", "raw_records", "document_pages",
                    "companies", "securities", "persons", "person_roles", "entities", "entity_aliases",
-                   "capital_reconciliations"}
+                   "capital_reconciliations",
+                   # v2.3.0: operational and experimental tables, not released
+                   "work_ledger", "outputs", "path_rewrites", "watchlists", "alerts", "insider_dealings",
+                   "entity_identifiers", "external_relationships"}
 
 
 def _overrides(session=None) -> dict[str, str]:
