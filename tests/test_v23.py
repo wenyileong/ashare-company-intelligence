@@ -737,3 +737,92 @@ def test_unpaired_guidance_says_why(db, company, tmp_path):
     reasons = {x["reason"]: x["guidance"] for x in snap["tables"]["unpaired"]["rows"]}
     assert reasons == {"REPORT_NOT_DOWNLOADED": 1, "REPORT_NOT_DUE": 1, "PERIOD_NOT_ENDED": 1}
     assert "report not downloaded" in snap["summary"][0]["value"]
+
+
+# --- B6: share dealings (experimental) ---------------------------------------------------------------------------
+
+def test_dealing_rows_are_read_and_unverified_rules_flag_nothing(db, company, tmp_path, monkeypatch):
+    from helpers import make_pdf
+    import hashlib
+    from ashare.models import SessionLocal, Disclosure
+    from ashare.features import FeatureOff
+    from ashare.insider import extract_dealings, flags, rules, is_dealing_title
+    with pytest.raises(FeatureOff):
+        extract_dealings()                                      # experimental: off by default
+    monkeypatch.setenv("ASHARE_FEATURES", "insider=on")
+    pdf = tmp_path / "a.pdf"
+    make_pdf(pdf, ["张三 董事长 2025-03-12 减持 120,000 股 15.32 元"])
+    sha = hashlib.sha256(pdf.read_bytes()).hexdigest()
+    dest = tmp_path / "disclosures" / "600519" / f"{sha}.pdf"
+    dest.parent.mkdir(parents=True)
+    pdf.rename(dest)
+    s = SessionLocal()
+    s.add(Disclosure(company_id=company.id, announcement_id="I1", announcement_date="2025-03-14",
+                     title_cn="关于公司董事减持股份的公告", kind="other", local_path=str(dest), sha256=sha))
+    s.add(Disclosure(company_id=company.id, announcement_id="I2", announcement_date="2025-03-14",
+                     title_cn="2024年年度报告", kind="annual_report"))
+    s.commit()
+    s.close()
+    r = extract_dealings("600519")
+    assert r["announcements"] == 1 and r["rows"] == 1
+    f = flags("600519")
+    assert f["rows"][0]["shares"] == 120000.0 and f["rows"][0]["direction"] == "SELL"
+    assert f["applied_rules"] == [] and f["rows"][0]["flags"] == "" and "not a finding of breach" in f["note"]
+    assert all(r["verified"] is None for r in rules()["rules"])
+    assert not is_dealing_title("2024年年度报告") and is_dealing_title("关于高级管理人员增持公司股份的公告")
+
+
+# --- B7: GLEIF identifiers ------------------------------------------------------------------------------------------
+
+def _gleif_transport():
+    import httpx
+    rec = lambda lei, name, reg: {"id": lei, "attributes": {"lei": lei, "entity": {               # noqa: E731
+        "legalName": {"name": name}, "registeredAs": reg, "jurisdiction": "CN", "status": "ACTIVE",
+        "registeredAt": {"id": "RA000000"}}, "registration": {"status": "ISSUED"}}}
+    seen = []
+
+    def handler(req):
+        seen.append(str(req.url))
+        q = dict(req.url.params)
+        if req.url.path.endswith("/direct-parent") and "LEICHILD" in req.url.path:
+            return httpx.Response(200, json={"data": rec("LEIPARENT", "母公司", "91000000000000000P")})
+        if req.url.path.endswith(("-parent",)):
+            return httpx.Response(404, json={"errors": []})
+        if q.get("filter[entity.registeredAs]") == "91520000214434146R":
+            return httpx.Response(200, json={"data": [rec("LEICHILD", "贵州茅台酒股份有限公司", "91520000214434146R")]})
+        if q.get("filter[entity.legalName]") == "某某证券投资基金":
+            return httpx.Response(200, json={"data": [rec("LEIFUND", "某某证券投资基金", None)]})
+        return httpx.Response(200, json={"data": []})
+    return httpx.MockTransport(handler), seen
+
+
+def test_gleif_accepts_exact_credit_codes_and_offers_names_for_review(db, monkeypatch):
+    from ashare.models import SessionLocal, Entity, ControlEdge
+    from ashare.models_v23 import EntityIdentifier, ExternalRelationship
+    from ashare.http import RateLimitedClient
+    from ashare import gleif
+    from ashare.features import FeatureOff
+    with pytest.raises(FeatureOff):
+        gleif.match_entities()
+    monkeypatch.setenv("ASHARE_FEATURES", "gleif=on")
+    s = SessionLocal()
+    s.add_all([Entity(name="贵州茅台酒股份有限公司", normalised_name="贵州茅台酒股份有限公司",
+                      credit_code="91520000214434146R"),
+               Entity(name="某某证券投资基金", normalised_name="某某证券投资基金")])
+    s.commit()
+    s.close()
+    transport, seen = _gleif_transport()
+    client = RateLimitedClient("t", transport=transport, server_patience=True)
+    r = gleif.match_entities(names=True, client=client)
+    assert r["accepted"] == 1 and r["candidates"] == 1 and r["parents"] == 1, r
+    s = SessionLocal()
+    acc = s.query(EntityIdentifier).filter_by(status="ACCEPTED").one()
+    assert acc.value == "LEICHILD" and acc.confidence == "HIGH"
+    assert s.query(ExternalRelationship).one().parent_lei == "LEIPARENT"
+    assert s.query(ControlEdge).count() == 0                      # report chains untouched
+    s.close()
+    cands = gleif.candidates()
+    assert len(cands) == 1 and cands[0]["lei"] == "LEIFUND"
+    assert gleif.decide(cands[0]["id"], False)["status"] == "REJECTED"
+    again = gleif.match_entities(names=True, client=client)
+    assert again["looked_up"] == 1 and again["candidates"] == 0 and again["errors"] == 0   # not offered again

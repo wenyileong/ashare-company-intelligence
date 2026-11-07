@@ -321,6 +321,14 @@ SECTIONS = [
      "intro": "Directors, supervisors and senior executives: appointments and resignations from announcements, and the "
               "officer table (tenure, shareholding, pay) from annual reports.",
      "actions": [
+         A("Read share dealings of directors and officers (experimental)", "extract-insider-dealings", [
+             CODE_OPT("Leave blank for every company.")],
+           "Reads the dealings (name, date, direction, shares, price) from the announcements of directors', "
+           "supervisors' and senior managers' share changes. Experimental: switch 'insider' on under Diagnostics "
+           "first. Names are shown only under pseudonyms outside the program."),
+         A("Share dealings and their flags (experimental)", "insider-flags", [CODE_OPT("Leave blank for every company.")],
+           "Each dealing with the flags of the rules that have been verified (late report, dealing in a window). A "
+           "flag is a fact to examine, not a finding of breach."),
          A("Extract from announcements and annual reports", "extract-management", [
              CODE_OPT(), F("docs", "Read downloaded documents", "bool", True, ("--use-documents", "--titles-only")),
              F("again", "Read reports again", "bool", False, ("--again", None), "Normally reports already read by this version are skipped, so a stopped run continues where it stopped.")],
@@ -670,6 +678,23 @@ SECTIONS = [
                "Unticked, only shows what would be removed. Ticked, removes the files, clears their place in the "
                "database (a later run downloads them again if needed) and lists every removal in logs/."),
          ], "Preview first, then tick 'Apply'."),
+     ]},
+
+    {"id": "identifiers", "group": "Check", "title": "Identifiers",
+     "intro": "Legal Entity Identifiers (LEIs) from GLEIF, the public global register: matched automatically only when "
+              "the register's number equals the entity's credit code, otherwise offered here to accept or reject. "
+              "GLEIF's parents are kept beside the control chains read from reports, never mixed into them. Switch "
+              "'gleif' on under Diagnostics first: it asks GLEIF over the network.",
+     "actions": [
+         A("Look up identifiers", "gleif-match", [
+             F("names", "Also by name", "bool", False, ("--names", None),
+               "Name matches are only candidates, listed below for you to decide."),
+             F("limit", "At most", "text", "", "--limit", "Optional: the number of entities to look up.")],
+           "One request a second. Accepted identifiers and GLEIF's direct and ultimate parents are stored."),
+         A("Candidates to decide", "gleif-candidates", []),
+         A("Accept or reject a candidate", "gleif-decide", [
+             F("id", "Candidate number", "text", "", None, required=True),
+             F("decision", "Decision", "choice:accept,reject", "accept", None, required=True)]),
      ]},
 
     {"id": "outputs", "group": "Check", "title": "Outputs",

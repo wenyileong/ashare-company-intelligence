@@ -89,6 +89,9 @@ class EgoMapView(View):
             if on("ACTS_ON"):
                 cov.append(self._regulators(ctx, g, c, centre))
             self._sector(ctx, g, c, centre)
+            ids = self._identifiers(ctx, g)                           # v2.3.0 (B7)
+            if ids is not None:
+                cov.append(ids)
             deg = g.degree()
             for nid, n in g.nodes.items():
                 n["degree"] = deg.get(nid, 0)
@@ -122,6 +125,27 @@ class EgoMapView(View):
             return Built(snap, [("ego_map", ego_spec(snap))])
 
     # --- the parts ----------------------------------------------------------------------------------------------
+
+    def _identifiers(self, ctx, g):
+        """v2.3.0 (B7): accepted LEIs on the entity nodes, and the share of entities with one."""
+        from ...models import Entity, EntityAlias
+        from ...models_v23 import EntityIdentifier
+        lei = {}
+        for i, e in (ctx.s.query(EntityIdentifier, Entity).join(Entity, Entity.id == EntityIdentifier.entity_id)
+                     .filter(EntityIdentifier.scheme == "LEI", EntityIdentifier.status == "ACCEPTED")):
+            lei[e.name] = i.value
+            for a in ctx.s.query(EntityAlias).filter(EntityAlias.entity_id == e.id):
+                lei.setdefault(a.alias, i.value)
+        if not lei:
+            return None
+        ents = [n for n in g.nodes.values() if n["kind"] in ("entity", "company") and not n.get("masked")]
+        n_with = 0
+        for n in ents:
+            if n["label"] in lei:
+                n["lei"] = lei[n["label"]]
+                n_with += 1
+        return {"item": "identifiers", "status": "FOUND" if n_with else "NONE",
+                "note": f"{n_with} of {len(ents)} organisations with a Legal Entity Identifier (GLEIF)"}
 
     def _entity(self, ctx, g, table, row, col, natural_hint=False):
         shown, masked = ctx.mask(table, row, col)

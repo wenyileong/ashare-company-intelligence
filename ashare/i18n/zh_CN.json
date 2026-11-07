@@ -1239,6 +1239,46 @@
   "en_hash": "b6f2e13f0b",
   "zh": "检查每份报告的资产 = 负债 + 所有者权益；不符者予以标记，从不改动。"
  },
+ "action.identifiers.gleif-candidates.label": {
+  "en_hash": "0f17b0900d",
+  "zh": "待决定的候选匹配"
+ },
+ "action.identifiers.gleif-decide.field.decision.label": {
+  "en_hash": "7f59a1f1d5",
+  "zh": "决定"
+ },
+ "action.identifiers.gleif-decide.field.id.label": {
+  "en_hash": "7ce5076f57",
+  "zh": "候选编号"
+ },
+ "action.identifiers.gleif-decide.label": {
+  "en_hash": "7e5688d2df",
+  "zh": "接受或拒绝候选匹配"
+ },
+ "action.identifiers.gleif-match.field.limit.hint": {
+  "en_hash": "d6d95d9c24",
+  "zh": "可选：要查找的主体数量。"
+ },
+ "action.identifiers.gleif-match.field.limit.label": {
+  "en_hash": "b7ff6c8662",
+  "zh": "最多"
+ },
+ "action.identifiers.gleif-match.field.names.hint": {
+  "en_hash": "76387c330e",
+  "zh": "按名称匹配的结果仅为候选，列在下方由您决定。"
+ },
+ "action.identifiers.gleif-match.field.names.label": {
+  "en_hash": "e58d49d4c8",
+  "zh": "同时按名称查找"
+ },
+ "action.identifiers.gleif-match.label": {
+  "en_hash": "272fd1a2ec",
+  "zh": "查找标识符"
+ },
+ "action.identifiers.gleif-match.note": {
+  "en_hash": "ae61580da0",
+  "zh": "每秒一次请求。保存已接受的标识符以及 GLEIF 的直接母公司和最终母公司。"
+ },
  "action.indices.build-calendar.label": {
   "en_hash": "71e30d8c90",
   "zh": "生成交易日历"
@@ -1407,6 +1447,22 @@
   "en_hash": "3cefb78b65",
   "zh": "显示公司的行业分类"
  },
+ "action.management.extract-insider-dealings.field.security_code.hint": {
+  "en_hash": "94b507960c",
+  "zh": "留空则为全部公司。"
+ },
+ "action.management.extract-insider-dealings.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.management.extract-insider-dealings.label": {
+  "en_hash": "3e4fb957e1",
+  "zh": "读取董监高股份买卖（试验性）"
+ },
+ "action.management.extract-insider-dealings.note": {
+  "en_hash": "0a5b145b32",
+  "zh": "从董事、监事和高级管理人员持股变动公告中读取买卖记录（姓名、日期、方向、股数、价格）。试验性功能：请先在“诊断”中开启“insider”。在本程序之外，姓名仅以化名显示。"
+ },
  "action.management.extract-management.field.again.hint": {
   "en_hash": "93e93f4859",
   "zh": "通常会跳过本版本已读取的报告，停止后再次运行将从中断处继续。"
@@ -1454,6 +1510,22 @@
  "action.management.import-management-csv.note": {
   "en_hash": "0467bcf142",
   "zh": "列：security_code、observation_date、person_name、role、gender、age、tenure_start、tenure_end、remuneration。"
+ },
+ "action.management.insider-flags.field.security_code.hint": {
+  "en_hash": "94b507960c",
+  "zh": "留空则为全部公司。"
+ },
+ "action.management.insider-flags.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.management.insider-flags.label": {
+  "en_hash": "6b5628d881",
+  "zh": "股份买卖及其标记（试验性）"
+ },
+ "action.management.insider-flags.note": {
+  "en_hash": "9caa7eb681",
+  "zh": "列出每笔买卖及已核实规则的标记（报告逾期、窗口期内买卖）。标记是有待核查的事实，并非违规认定。"
  },
  "action.management.roster.field.as_of.hint": {
   "en_hash": "67949cb276",
@@ -2803,6 +2875,42 @@
   "en_hash": "ecb17f47bf",
   "zh": "先显示汇总；指定公司、规则或勾选“列出全部校验发现”则显示明细记录及公司代码。"
  },
+ "action.validate.timeliness.field.as_of.hint": {
+  "en_hash": "a4149a55fc",
+  "zh": "可选。"
+ },
+ "action.validate.timeliness.field.as_of.label": {
+  "en_hash": "3011562209",
+  "zh": "披露截至"
+ },
+ "action.validate.timeliness.field.out.label": {
+  "en_hash": "2c3cafa4db",
+  "zh": "文件"
+ },
+ "action.validate.timeliness.field.security_code.hint": {
+  "en_hash": "94b507960c",
+  "zh": "留空则为全部公司。"
+ },
+ "action.validate.timeliness.field.security_code.label": {
+  "en_hash": "f6a8a2fbae",
+  "zh": "证券代码"
+ },
+ "action.validate.timeliness.field.year.hint": {
+  "en_hash": "d004fe8cc1",
+  "zh": "可选，例如 2024"
+ },
+ "action.validate.timeliness.field.year.label": {
+  "en_hash": "93da0ca07f",
+  "zh": "报告年度"
+ },
+ "action.validate.timeliness.label": {
+  "en_hash": "8d1f72a727",
+  "zh": "定期报告披露及时性"
+ },
+ "action.validate.timeliness.note": {
+  "en_hash": "243ff94b8d",
+  "zh": "将每份定期报告与其法定披露期限对照（年度报告：会计年度结束后四个月；半年度报告：两个月；第一、三季度报告：一个月），并列出逾期天数。只计首次披露。规则及其出处列于本程序的 rules 文件夹。"
+ },
  "action.validate.validate-all.field.security_code.hint": {
   "en_hash": "7bb1962600",
   "zh": "留空则对全部公司运行。"
@@ -2966,6 +3074,14 @@
  "section.home.title": {
   "en_hash": "76e7a3a3f9",
   "zh": "入门"
+ },
+ "section.identifiers.intro": {
+  "en_hash": "4a6e05b540",
+  "zh": "来自全球法人识别编码基金会（GLEIF）公开登记册的法人识别编码（LEI）：仅当登记编号与主体的统一社会信用代码完全一致时自动匹配，否则在此列出供您接受或拒绝。GLEIF 的母公司信息与从报告读取的控制链分开保存，从不混合。请先在“诊断”中开启“gleif”：该功能会通过网络查询 GLEIF。"
+ },
+ "section.identifiers.title": {
+  "en_hash": "649d2864df",
+  "zh": "标识符"
  },
  "section.indices.intro": {
   "en_hash": "12b7b8096b",

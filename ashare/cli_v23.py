@@ -241,3 +241,48 @@ def register(app, _table) -> None:
             print(f"Written: {sm['file']}")
             from .outputs import record_output
             record_output("export", sm["file"], "timeliness", {"code": code, "year": year, "as_of": as_of})
+
+    # --- B6: directors' and officers' share dealings (experimental) -------------------------------------------
+
+    @app.command("extract-insider-dealings")
+    def extract_insider_cmd(code: str = typer.Option(None, "--code", help="Blank for every company")):
+        """Read directors', supervisors' and senior managers' share dealings from their announcements (v2.3.0;
+        experimental: switch 'insider' on first)."""
+        from .insider import extract_dealings
+        print(_guard(extract_dealings, code or None, progress=lambda m: print(m, flush=True)))
+
+    @app.command("insider-flags")
+    def insider_flags_cmd(code: str = typer.Option(None, "--code")):
+        """Each dealing with the flags of the verified rules (v2.3.0; experimental)."""
+        from .insider import flags
+        r = _guard(flags, code or None)
+        _table(r["rows"][:500], ["code", "deal_date", "direction", "shares", "published", "flags"],
+               title="Share dealings")
+        print(r["note"])
+
+    # --- B7: entity identifiers from GLEIF ---------------------------------------------------------------------
+
+    @app.command("gleif-match")
+    def gleif_match_cmd(names: bool = typer.Option(False, "--names", help="Also look up by name (candidates for "
+                                                                          "review)"),
+                        limit: int = typer.Option(None, "--limit", help="At most this many entities")):
+        """Look up Legal Entity Identifiers at GLEIF: accepted when the credit code matches exactly, candidates by
+        name; then GLEIF's direct and ultimate parents (v2.3.0; switch 'gleif' on first)."""
+        from .gleif import match_entities
+        print(_guard(match_entities, names, limit, progress=lambda m: print(m, flush=True)))
+
+    @app.command("gleif-candidates")
+    def gleif_candidates_cmd():
+        """LEIs matched by name, waiting for a decision (v2.3.0)."""
+        from .gleif import candidates
+        _table(candidates(), ["id", "entity", "credit_code", "lei", "gleif_name", "registered_as", "jurisdiction"],
+               title="Candidates")
+
+    @app.command("gleif-decide")
+    def gleif_decide_cmd(identifier_id: str = typer.Argument(..., help="The candidate's number"),
+                         decision: str = typer.Argument(..., help="accept or reject")):
+        """Accept or reject an LEI candidate (v2.3.0)."""
+        from .gleif import decide
+        if decision.lower() not in ("accept", "reject"):
+            _fail(ValueError("the decision is 'accept' or 'reject'"))
+        print(decide(_number(identifier_id), decision.lower() == "accept"))
