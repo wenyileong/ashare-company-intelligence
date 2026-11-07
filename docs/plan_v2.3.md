@@ -66,6 +66,7 @@ Settings > Diagnostics lists every switch, its state and the version of its sche
 | Ownership network measures (B8) | `network_measures` | yes (optional panel variables) |
 | Watchlists (B9) | `watchlists` | yes (in-program alerts only) |
 | Trusted timestamps (B10) | `timestamps` | no |
+| Outputs register and window (B11) | `outputs.register` | yes |
 
 ## Order of work
 
@@ -75,15 +76,16 @@ Settings > Diagnostics lists every switch, its state and the version of its sche
 | 2 | B1 phases 0 to 3 (diagnostics, accessor, tolerant reads, relative writes) | Urgent and safe: nothing stored is rewritten |
 | 3 | B2 Network patience, B3 Job ledger (recording only) | Shared by Part A and the new collectors |
 | 4 | Part A fixes 140, 142 to 144, 146 | Small, and they rest on B2 and B3 |
-| 5 | B1 phases 4 and 5 (normalise, move or adopt) | Built on the accessor once it has been proved |
-| 6 | B4 Interactive chart runtime (R1) | Every later view uses it |
-| 7 | B5 Timeliness, then fix A2 | A2 needs B5's deadlines |
-| 8 | B6 Share-dealings schema and rules | |
-| 9 | B7 Entity identifiers (GLEIF) | Feeds B8 and Part D |
-| 10 | B8 Ownership network computations | Feeds Part D and the panel variables |
-| 11 | B9 Watchlists, B10 Trusted timestamps | Operations |
-| 12 | Part D Views | Built on B4, B7 and B8 |
-| 13 | Part E Tests, docs, release | |
+| 5 | B11 Outputs register and window | The move's dry run uses it |
+| 6 | B1 phases 4 and 5 (normalise, move or adopt) | Built on the accessor once it has been proved |
+| 7 | B4 Interactive chart runtime (R1) | Every later view uses it |
+| 8 | B5 Timeliness, then fix A2 | A2 needs B5's deadlines |
+| 9 | B6 Share-dealings schema and rules | |
+| 10 | B7 Entity identifiers (GLEIF) | Feeds B8 and Part D |
+| 11 | B8 Ownership network computations | Feeds Part D and the panel variables |
+| 12 | B9 Watchlists, B10 Trusted timestamps | Operations |
+| 13 | Part D Views | Built on B4, B7 and B8 |
+| 14 | Part E Tests, docs, release | |
 
 ## Part A. Fixes from the v2.2.0 live run
 
@@ -350,6 +352,38 @@ These were planned for v2.3 with the market map, and are built here as a module 
 - The token (`manifest.tsr`) is stored beside the manifest, and `verify-release` checks it.
 - This proves that a dataset existed in that form on that date, which supports the point-in-time claims of the paper.
 - **Tests:** a mocked authority; a verification that fails on a changed manifest.
+
+### B11: the outputs register and window (added 8 November 2026)
+
+**Problem.** The Files page shows the downloaded documents and three folders (market data, exports, logs). It does not show most of what the program produces: views, topology views, panels and codebooks, event studies, releases, chart exports, query results, database backups and caches. Many commands write wherever `--out` points, and only releases and research queries are recorded in the database.
+
+**Design.**
+1. **Schema.** A new table `outputs`, holding for each output:
+   - kind, command and parameters (JSON);
+   - path, relative to the data root when inside it;
+   - created time, size and file count;
+   - the manifest's SHA-256 where the output has one;
+   - status (present, missing or removed).
+2. **Recording.** One helper, `ashare/outputs.py: record_output(kind, path, command, params, manifest=None)`, is called by every writer:
+   - views (`viz/publish.write_view`) and the topology view;
+   - panels and event studies;
+   - releases;
+   - exports and file exports;
+   - chart exports;
+   - research query results.
+
+   A failure to record never fails the output itself; it is logged.
+3. **Backfill.** `ashare-cli outputs-scan` registers outputs made before v2.3 from the `manifest.json` files under the usual folders (`visualise`, `exports`, `releases`, `panels`, `topology`) or a folder given. It previews before writing.
+4. **Window** (Files > Outputs). Every output by kind and date, with size and status. From it the author can:
+   - open the file, folder or interactive page;
+   - check the output against its manifest;
+   - remove an output, after a preview and confirmation; the row is kept as removed, with the time.
+
+   It also shows disk use by category: documents, raw responses, market data, outputs by kind, the database and its backups, and the caches.
+5. **The data move.** Phase 0's report and phase 5's dry run use the register to say which outputs lie inside the data folder (and so move with it) and which lie elsewhere (and so do not).
+6. **Switch** `outputs.register`, on by default once its tests pass. With it off, nothing is recorded and the window is hidden.
+
+**Tests.** Each writer records one row; a failing record does not fail the writer; the backfill finds seeded manifests and does not duplicate; a removed output is marked and its files are gone only after confirmation; the window's totals match the folders.
 
 ## Part C. Panels, codebook and interface
 
