@@ -21,6 +21,13 @@ The public price feed is classed separately (PUBLIC_FEED). It is not exchange-au
 
 Statutory disclosures are public, but that does not by itself settle every question of reuse. Facts and figures are generally free to use; extended verbatim text of documents is a different matter, which is one reason why pseudonymised releases omit the document text.
 
+### Added in v2.3
+
+- **GLEIF identifiers.** Legal Entity Identifiers and parent relationships are fetched from GLEIF's public API, one request a second, only when the researcher switches the feature on. GLEIF's LEI Data Terms of Use provide the data under the CC0 1.0 licence. The user must not claim rights in the data, must obtain it only through GLEIF's access service, and must not suggest that GLEIF endorses the use ([LEI Data Terms of Use](https://www.gleif.org/en/meta/lei-data-terms-of-use)). The program names GLEIF as the source of each identifier and does not use GLEIF's trademark or logo. In v2.3 the identifiers are left out of releases, to be added once a release's terms can name the source.
+- **The national enterprise credit register (国家企业信用信息公示系统).** It is linked to, never scraped: it sits behind protections against automated access.
+- **Directors' and officers' share dealings.** They are read from the companies' own announcements. The rules that flag a dealing (a late report, a sale without a prior plan, a dealing in a window period) are applied only once their article and effective date have been confirmed against the official text. A flag records dates against a rule. It is not a finding that a rule was breached, and the program says so wherever a flag is shown. The dealings are personal information: they leave the program only under pseudonyms, and the table is left out of releases.
+- **Alerts** from watchlists stay inside the program. Nothing is sent by email or to a notification service in v2.3.
+
 ## 3. Personal information
 
 The data include personal information: the names, gender, age, remuneration, shareholdings and career histories of directors, supervisors and senior officers, and the names of natural-person shareholders, pledgors and controllers. Listed companies must disclose this information, but its further processing remains subject to data-protection law.

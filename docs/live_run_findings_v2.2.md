@@ -12,13 +12,13 @@ The reports had not yet been read again under v2.2 (financials-5, control-4). Th
 
 | No. | Finding | Severity | Status |
 |---|---|---|---|
-| 140 | Ego map: regulatory events without a named authority are left out, and the note says there are none | Medium | To fix in v2.2.1 |
-| 141 | Guidance against outcome: 105 of 2,208 paired, without saying why the rest are not | Low | To fix in v2.2.1 (the reasons); the count should rise after the re-read |
-| 142 | Topology view: a code given twice is counted twice in the heading | Low | To fix in v2.2.1 |
-| 143 | The catalogue stopped after three 504 Gateway Time-out errors in a row (33 days failed) | Medium | To fix in v2.2.1 |
-| 144 | The whole-market price download shows no progress and does not resume | High | To fix in v2.2.1 |
-| 145 | Moving the data folder breaks the links to the downloaded documents | High | To fix in v2.2.1 |
-| 146 | Small wording ("1 announcements", "2020-12-30 to 2020-12-30", the failed days listed twice) | Low | To fix in v2.2.1 |
+| 140 | Ego map: regulatory events without a named authority are left out, and the note says there are none | Medium | Fixed in v2.3.0 |
+| 141 | Guidance against outcome: 105 of 2,208 paired, without saying why the rest are not | Low | Fixed in v2.3.0 |
+| 142 | Topology view: a code given twice is counted twice in the heading | Low | Fixed in v2.3.0 |
+| 143 | The catalogue stopped after three 504 Gateway Time-out errors in a row (33 days failed) | Medium | Fixed in v2.3.0 |
+| 144 | The whole-market price download shows no progress and does not resume | High | Fixed in v2.3.0 |
+| 145 | Moving the data folder breaks the links to the downloaded documents | High | Fixed in v2.3.0 |
+| 146 | Small wording ("1 announcements", "2020-12-30 to 2020-12-30", the failed days listed twice) | Low | Fixed in v2.3.0 |
 | 147 | Data coverage, the company charts and the views' files | Information | Work as designed |
 | 148 | The pace of a full "kind all" catalogue | Information | About 7.5 hours a year of announcements |
 

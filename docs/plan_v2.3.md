@@ -460,3 +460,41 @@ Each view has readiness checks, an interactive page, data, publication figures a
 - **The quarterly top-10 layout (finding 134).** Needs `inspect-tables ID --table top10` for two or three quarterly reports without rows.
 - **Rejoining a lone digit at the source (finding 132, rule 3).** Needs `inspect-tables 31 --table balance_sheet` and `inspect-tables 76 --table balance_sheet`.
 - **Exchange share-dealing pages as a source.** Only after their terms and access are checked (B6.2).
+
+# Build record (v2.3.0, 8 November 2026)
+
+Built scaffolding first, as planned: each feature added its tables (migration 0008, new tables only), its module with a dry run or preview, its switch, then its implementation and its pages.
+
+**Built as planned.**
+- Scaffolding: switches and Diagnostics.
+- B1 phases 0 to 5.
+- B2, B3 and B4.
+- B5 and fix A2.
+- B6 (schema, reader and rule engine), B7, B8, B9 and B11.
+- Part A fixes 140 to 144 and 146.
+- Part D: the market map, common ownership, sectors and timeliness views.
+
+**Differences from the plan, and why.**
+- **B3: the ledger's table** is `work_ledger`, because v1.9 already has `jobs` and `job_items`, for the queued jobs run by `job-run`. Those are unchanged.
+- **B2: waiting out server errors** applies only to the clients for CNINFO. Eastmoney answers 502 to refuse a request without a Referer, and the quote-list fallback relies on a quick retry; the full suite caught this.
+- **B5: trading calendar.** The periodic-report deadlines are counted in calendar months, so no trading calendar is needed. The share-dealing rules (B6) count trading days with the existing `trading_calendar` table (`build-calendar`), not a bundled holiday file. Without the calendar, no trading-day flag is computed.
+- **B5: the legal deadlines.** The rules were checked against the CSRC's 2020 consultation draft of the Measures for the Administration of Information Disclosure by Listed Companies (art. 20); the CSRC's website refuses automated reading. The rule file cites Securities Law art. 79 and Measures (2021) art. 13, and asks the author to confirm the final text. The exchanges' deadlines for earnings forecasts were not verified and are not applied.
+- **B6: no share-dealing rule is verified yet,** so no flag is applied. The panel variables `insider_net_buy_12m` and `insider_sales_in_window_12m` wait for the rules.
+- **B7: the ego map** shows accepted LEIs on its nodes, but not yet GLEIF's parents as a separate relation; the parents are stored and listed.
+- **A1: the readiness check** for regulatory events still counts every row, not those published by the view's date.
+- **B9: alerts are kept inside the program,** as review V11 advised. Email and Windows notifications wait for a later version.
+- **B10 is a scaffold.** The switch exists and the feature refuses to run, until a library for RFC 3161 tokens is chosen and reviewed.
+- **B4: the unit selector** (yuan, 10,000 yuan, 100 million yuan) appears on charts marked as money. The topology page's two charts take the zoom options without the toolbar, and reset by double-click.
+- **Packaging:** the `ashare/rules` folder (deadlines, share-dealing rules, nominee accounts) ships with the program.
+
+**Interference.**
+- **Every switch off.** The suite of v2.2 and earlier passes unchanged (`ASHARE_FEATURES=all=off`).
+- **Extractors.** No extractor version changed, so nothing is read again.
+- **Releases.** The new tables are left out of releases (`OPERATIONAL`, `INTERNAL_TABLES`).
+
+**Tests.**
+- `tests/test_v23.py`: 50 tests across every part.
+- Linux Python 3.12: 506 passed, 4 skipped; with every switch off, the earlier suite passes (456 passed, 4 skipped).
+- Python 3.13: 470 passed, 38 skipped (no Tk).
+- PostgreSQL 16: 499 passed, 11 skipped (the data-folder moves need a SQLite file).
+- Windows: GitHub's Windows build and tests on the release commit.

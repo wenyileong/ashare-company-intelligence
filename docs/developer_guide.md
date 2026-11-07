@@ -26,6 +26,14 @@ The desktop application runs every action through the command line in the same p
 - **Conflicts before overwrites.** Validation adds flags; review adds corrections in `manual_corrections`. Neither edits the observation.
 - **Politeness.** All network access goes through `RateLimitedClient`, at one request per second by default. Never bypass authentication, CAPTCHAs, access controls or rate limits.
 
+### Rules added in v2.3
+
+- **Stored paths.** Read every stored file path through `ashare/storepaths.py` (`document_path`, `raw_path`, `display_source`), and write new paths with `to_stored`. A test fails the build if a module builds a path from `local_path` or `payload_path` directly. This is what lets a data folder move.
+- **Feature switches.** A new feature gets a switch in `ashare/features.py`. Its commands call `features.require(name)`, and its pages say how to switch it on. The test suite must pass with every switch off (`ASHARE_FEATURES=all=off`) as well as at the defaults.
+- **Data changes are explicit.** An Alembic migration may add tables and columns, but never rewrites the researcher's data. A rewrite (for example `paths-normalise`) is a command with a preview, a backup and a record that allows it to be undone.
+- **Outputs.** A command that writes an output calls `outputs.record_output`, which never raises.
+- **Legal rules.** Deadlines and share-dealing rules live in `ashare/rules/*.json`, each with its source and a `verified` note. A rule without one is not applied.
+
 ## 3. Adding a parser
 
 1. Write a function that takes the document's pages (a list of strings, one per page) and a metadata dictionary (`title`, `announcement_date`, `fallback_period`) and returns a list of records (dictionaries).

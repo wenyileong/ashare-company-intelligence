@@ -1,6 +1,66 @@
 # Change log
 
-This log records what changed in each version and the important findings behind the changes. The live-run findings are kept in full in `docs/live_run_findings_v2.0.2.md` (findings 1 to 19) `docs/live_run_findings_v2.0.3.md` (findings 20 to 34) and `docs/live_run_findings_v2.0.5.md` (findings 35 to 57, the first live runs of the v2.0.4 catalogue engine) `docs/live_run_findings_v2.0.6.md` (findings 58 to 69) and `docs/live_run_findings_v2.0.7.md` (findings 70 to 95) and `docs/live_run_findings_v2.0.8.md` (findings 96 to 111) and `docs/live_run_findings_v2.0.9.md` (findings 112 to 117) and `docs/live_run_findings_v2.1.md` (findings 118 to 131) and `docs/live_run_findings_v2.1.2.md` (findings 132 to 139). The plan for v2.1, with its six rounds of review, is `docs/plan_v2.1.md`. Earlier versions are described in `README.md` and in section 18 of `ashare_scraper_build_plan.md`.
+This log records what changed in each version and the important findings behind the changes. The live-run findings are kept in full in `docs/live_run_findings_v2.0.2.md` (findings 1 to 19) `docs/live_run_findings_v2.0.3.md` (findings 20 to 34) and `docs/live_run_findings_v2.0.5.md` (findings 35 to 57, the first live runs of the v2.0.4 catalogue engine) `docs/live_run_findings_v2.0.6.md` (findings 58 to 69) and `docs/live_run_findings_v2.0.7.md` (findings 70 to 95) and `docs/live_run_findings_v2.0.8.md` (findings 96 to 111) and `docs/live_run_findings_v2.0.9.md` (findings 112 to 117) and `docs/live_run_findings_v2.1.md` (findings 118 to 131) and `docs/live_run_findings_v2.1.2.md` (findings 132 to 139) and `docs/live_run_findings_v2.2.md` (findings 140 to 148). The plan for v2.1, with its six rounds of review, is `docs/plan_v2.1.md`. Earlier versions are described in `README.md` and in section 18 of `ashare_scraper_build_plan.md`.
+
+## v2.3.0 (8 November 2026)
+
+**Aim:** fix what the v2.2.0 live run showed (`docs/live_run_findings_v2.2.md`, findings 140 to 146), meet the author's requirement that every chart be scalable and interactive, and bring forward the infrastructure planned for later versions: a data folder that can be moved, a register of outputs, entity identifiers, ownership networks, disclosure timeliness, share dealings and watchlists. Every new feature is built behind its own switch (Check > Diagnostics). The plan, its review against the code and its build record are in `docs/plan_v2.3.md`.
+
+**After upgrading:**
+1. Nothing is read again: no extractor changed.
+2. **Check > Data folder > Check paths** shows how the stored paths are written. Before reinstalling Windows or moving the folder, see "Moving the data folder" in the user guide.
+3. **Check > Outputs > Find earlier outputs**, with 'Apply', adds the outputs made before v2.3.
+4. Visualise: the new views, and zoom on every chart.
+
+- **The data folder (finding 145).**
+  - Stored paths are read through one accessor. A document whose folder has moved is found at the same place under the current folder and accepted only when its hash matches.
+  - New downloads are stored relative to the data folder.
+  - **Check > Data folder** adds:
+    - **Check paths**: read-only.
+    - **Move data folder**: a dry run first. On the same drive the folder is renamed; otherwise it is copied and each document checked against its hash. The stored paths are then rewritten, the setting switched and the scheduled update re-created. After a copy, the old folder is left untouched.
+    - **Use a folder already moved**: for a folder restored after reinstalling Windows.
+    - **Normalise stored paths**: a preview, then a backup, with every change recorded so that **Undo a path rewrite** can restore it.
+  - The reading caches survive a move.
+- **Outputs (Check > Outputs).** Every view, topology view, panel, event study, release, export, chart and query result is recorded, with its size and whether it lies inside the data folder. Each can be checked against its manifest or removed (preview first). Earlier outputs are found by their manifests.
+- **Interactive charts (requirement R1).**
+  - Every chart has wheel and pinch zoom on both axes or one, drag to pan, shift-drag to zoom to a box, and a reset (button or double-click).
+  - Axis ranges can be typed, and a logarithmic scale and money units can be chosen.
+  - Pointing at a value gives its exact stored figure.
+  - The coverage heatmap is now a zoomable matrix. Relational maps can fit all or zoom to the node selected, with legible labels.
+  - The topology page's charts zoom, and desktop chart windows have **Open interactive**.
+  - Long series are thinned for display only. Publication figures are unchanged.
+- **Downloads and the catalogue.**
+  - CNINFO's gateway time-outs are waited out, for up to five minutes, with progress (finding 143).
+  - The whole-market price download shows progress by company, skips companies already up to date ('Fetch again' to refetch) and keeps what it fetched when stopped (finding 144).
+  - Wording fixed (finding 146).
+- **Documents not read (Files).** Each document whose latest reading failed, and why: missing file, unreadable, nothing found.
+- **Views.**
+  - The ego map draws events that name no authority, counts what it leaves out (finding 140) and shows accepted LEIs.
+  - Guidance against outcome says why each item is unpaired (finding 141).
+  - A code given twice counts once (finding 142).
+  - New views:
+    - **Market map**: companies linked by a shared controller, top-10 holders and directors; large maps open with their groups.
+    - **Common ownership**: shared holders, linked pairs and the MHHI increment.
+    - **Sectors**: coverage, margins, growth, state control, late reports and regulatory events.
+    - **Disclosure timeliness**.
+- **Disclosure timeliness (Validate).** Each periodic report against its legal deadline. The rules, with their sources and how each was checked, are in `ashare/rules/disclosure_deadlines.json`.
+- **Identifiers (Check > Identifiers, switch 'gleif').** Legal Entity Identifiers from GLEIF:
+  - accepted automatically only on an exact credit-code match;
+  - name matches offered for decision;
+  - GLEIF's parents kept apart from the control chains read from reports.
+- **Share dealings (Management, experimental, switch 'insider').** Directors' and officers' dealings read from their announcements. The flags apply only rules whose article has been confirmed; none is yet.
+- **Watchlists (Check > Watchlists & alerts).** A baseline on the first run, then only new items, run after each daily update; the alerts stay inside the program.
+- **Panels.** Six optional variables, none among the defaults:
+  - timeliness: `report_delay_days`, `report_late`, `late_reports_3y`;
+  - networks: `holder_overlap_n`, `interlock_n`, `mhhi_delta` (a lower bound from top-10 stakes).
+
+  Share-dealing variables wait until the dealing rules are confirmed.
+- **Database.** Migration 0008 adds new tables only (work ledger, outputs, path rewrites, identifiers, external relationships, share dealings, watchlists, alerts). They are left out of releases.
+- **Tests.** 506 pass on Linux Python 3.12 (four skips), 470 on 3.13 (38 skips, no Tk) and 499 against PostgreSQL 16 (11 skips). The suite before v2.3 passes unchanged with every new switch off.
+- **Not in this version.**
+  - The quarterly top-10 layout (finding 134) and the balance-sheet digit at its source (finding 132, rule 3) still wait on the author's samples.
+  - Trusted timestamps exist as a switch only, until a library is chosen.
+  - Email alerts.
 
 ## v2.2.0 (4 November 2026)
 

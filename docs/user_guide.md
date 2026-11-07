@@ -8,7 +8,7 @@ This guide covers the desktop application and the command line. The [methods doc
 
 ### Windows installer
 
-Run `AShareScraper-2.2.0-setup.exe`. It installs for the current user (no administrator rights are needed) into `%LOCALAPPDATA%\Programs\AShareScraper` and adds Start-menu entries for the application, the command line, this guide and the uninstaller. Two options are offered:
+Run `AShareScraper-2.3.0-setup.exe`. It installs for the current user (no administrator rights are needed) into `%LOCALAPPDATA%\Programs\AShareScraper` and adds Start-menu entries for the application, the command line, this guide and the uninstaller. Two options are offered:
 
 - a desktop shortcut;
 - adding the program folder to your PATH, so that `ashare-cli` runs from any command prompt.
@@ -401,6 +401,56 @@ Network observations are not independent: use clustered or network-robust standa
 - **Controllers.** A legal representative's name printed against a wrapped controller's name is removed, and 省政府 and 省人民政府 group as one (finding 133).
 - **Re-reading.** Every report is read again after the upgrade (`financials-5`, `control-4`).
 - **Download estimates** are kept by kind of document (finding 135). **ESG** runs count unchanged rows as "unchanged" (finding 137). **Short announcements** are no longer marked as partly scanned (finding 138).
+
+### Moving the data folder (v2.3)
+
+The data folder holds the database, the downloaded documents, the archived responses and, by default, the outputs. Use **Check > Data folder**:
+
+1. **Check paths** (read-only) shows:
+   - how each stored path is written: relative to the data folder, or absolute;
+   - which files are present, missing, or found after a move;
+   - the caches and the free space.
+2. **Move data folder.**
+   - Leave 'Apply' unticked first: the dry run shows what would move, the space needed and any warnings, for example a target in OneDrive or outputs stored outside the folder.
+   - Then tick 'Apply'. On the same drive the folder is renamed. Otherwise it is copied and every document checked against its hash.
+   - The stored paths are then rewritten, the setting switched and the scheduled daily update re-created.
+   - After a copy, the old folder is left untouched: delete it yourself once the new one works. To go back, choose the old folder again under Settings.
+3. **Reinstalling Windows.** Copy the whole data folder to a backup before you start. Afterwards, install the program and restore the folder anywhere. Then use **Use a folder already moved**: it checks the folder and a sample of its documents, then switches to it. Every document is found, wherever the folder now is.
+4. **Normalise stored paths** rewrites the stored paths relative to the folder, after a preview and a backup of the database. Every change is recorded; **Undo a path rewrite** restores it.
+
+Nothing is read again after a move: the reading caches are keyed by the documents' contents, not their places.
+
+### Outputs, documents not read and diagnostics (v2.3)
+
+- **Check > Outputs** lists every output the program writes, with its date, size and whether it lies inside the data folder. Outputs include views, topology views, panels, event studies, releases, exports, charts and query results. **Check an output** compares its files with the hashes in its manifest. **Remove an output** shows what it would remove, then removes it when 'Apply' is ticked. **Find earlier outputs** adds those made before v2.3.
+- **Files > Documents not read** lists each document whose latest reading did not succeed, by reader and reason: the file is missing, it could not be read, or nothing was found in it.
+- **Check > Diagnostics** shows the data folder, the database schema and the switch of each v2.3 feature. A feature that misbehaves can be switched off on its own; switching it off never deletes its data. The switches are kept in `features.json` in the data folder.
+
+### Interactive charts (v2.3)
+
+Every chart in the view pages, the topology page and the dataset explorer can be examined closely:
+- **Zoom and pan.** Wheel or pinch to zoom, drag to pan, and shift-drag to zoom to a box. Double-click or **Reset zoom** to return.
+- **Axes.** Zoom both axes or one; type exact ranges; choose a logarithmic scale where every value is positive, and yuan, 10,000 yuan or 100 million yuan for money.
+- **Exact values.** Point at a value to read the stored figure exactly, with its label and, where there is one, its document and page.
+- **Long series** are thinned for display when zoomed out, and shown in full when zoomed in.
+- **Relational maps** add 'Fit all', 'Zoom to selected' and +/−. A map of more than 800 companies opens with its groups, and a group opens its companies.
+- **Desktop charts.** In a chart window, **Open interactive** writes the same data as a zoomable page in your browser.
+
+The publication figures (`figure_*.svg`) stay exact vector drawings with their CSV; zooming a page never changes them.
+
+### New views and layers (v2.3)
+
+- **Market map** (`viz-market-map`). Every listed company as known on a date, linked by a shared actual controller, shared top-10 holders and shared directors or officers. Stock Connect nominee accounts are left out, and so are holders among the top ten of more than 50 companies (`--max-holder-companies`); both are listed in the notes.
+- **Common ownership** (`viz-common-ownership --industry C39`). The holders an industry's companies share, the pairs they link, and the modified Herfindahl increment (O'Brien and Salop) by year. Top-10 tables omit smaller holders, so the increment is a lower bound.
+- **Sectors** (`viz-sectors`). By CSRC section and year: coverage, median net margin and revenue growth with their quartiles, the share under state control, late annual reports and regulatory events per company.
+- **Disclosure timeliness** (`viz-timeliness`, and Validate > Reporting timeliness). Each periodic report against its legal deadline: annual reports four months after the year end, half-year reports two months, first- and third-quarter reports one month. Only the first publication counts. The rules, with their sources and how each was checked, are in `rules/disclosure_deadlines.json`.
+- **Identifiers** (Check > Identifiers; switch on 'gleif' first). Legal Entity Identifiers from GLEIF's public register:
+  - accepted automatically only when GLEIF's registration number equals the entity's credit code;
+  - matches by name listed for you to accept or reject;
+  - GLEIF's parents kept beside the control chains read from reports, never mixed into them.
+- **Share dealings** (Management; experimental, switch on 'insider' first). Directors', supervisors' and senior managers' dealings read from their announcements. The flags (late report, dealing in a window period) use only the rules whose article has been confirmed, and none is yet. A flag is a fact to examine, not a finding of breach.
+- **Watchlists** (Check > Watchlists & alerts). Name the companies and the kinds of item to watch: announcements, regulatory events, guidance, controller changes, late reports, dealings. The first run records what is there; later runs, and each daily update, list only what is new.
+- **Panel variables.** `report_delay_days`, `report_late`, `late_reports_3y`, `holder_overlap_n`, `interlock_n` and `mhhi_delta`. Network observations are not independent: use clustered or network-robust standard errors.
 
 ### PDF reader messages (v2.0.3)
 

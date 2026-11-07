@@ -241,6 +241,29 @@ These are the interface's own terms for the features of v2.1 (plan v2.1, section
 | Econometric charts | 计量分析图表 | |
 | Guidance against outcome | 业绩预告与实际结果对照 | Covers forecasts (业绩预告) and flash reports (业绩快报) |
 
+## 14. Terms added in v2.3 (proposed; the renderings stand until reviewed)
+
+| English | Chinese | Notes |
+|---|---|---|
+| Data folder | 数据文件夹 | |
+| Move data folder | 移动数据文件夹 | |
+| Normalise stored paths | 规范存储路径 | |
+| Outputs (the register) | 输出 | |
+| Documents not read | 未读取的文件 | |
+| Feature switch | 功能开关 | |
+| Diagnostics | 诊断 | |
+| Legal Entity Identifier (LEI) | 法人识别编码 | GLEIF：全球法人识别编码基金会 |
+| Common ownership | 共同持股 | |
+| MHHI increment | 修正赫芬达尔指数增量 | O'Brien and Salop |
+| Board interlocks | 董事交叉任职 | as in part 13 |
+| Window period (blackout) | 窗口期 | |
+| Disclosure timeliness | 披露及时性 | |
+| Watchlist | 关注列表 | |
+| Alert | 提醒 | |
+| Trusted timestamp | 可信时间戳 | not yet available |
+| Market map | 市场关系图 | |
+| Interactive chart | 交互式图表 | |
+
 ## Review record
 
 | Date | Reviewer | Rows settled | Notes |
