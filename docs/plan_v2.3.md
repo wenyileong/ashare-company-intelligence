@@ -171,7 +171,7 @@ The work comes in six phases. Phases 0 to 3 change nothing stored. Phases 4 and 
 - New downloads and archived responses store root-relative paths with forward slashes (`disclosures/600519/<sha256>.pdf`). Phase 2 reads both forms, so old and new rows work side by side.
 - Turning the switch off returns to absolute paths for new rows. Nothing else changes.
 
-**Phase 4. Normalise stored paths** (an explicit command; never a migration, R5).
+**Phase 4. Normalise stored paths** (an explicit command; never a migration, V5).
 - `ashare-cli paths-normalise` (preview by default; `--apply` to write), and Settings > Data folder > "Normalise paths". It:
   - backs up the database (SQLite backup function; for PostgreSQL, a dump is advised and the command asks for confirmation);
   - writes every change to a new table, `path_rewrites` (table, row, column, old value, new value, run ID);
