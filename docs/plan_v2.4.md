@@ -200,4 +200,4 @@ No migration was needed: no table changed.
   - shows them in Diagnostics;
   - writes an interactive page with the zoom runtime.
 - The installer installs silently, and the installed program reports 2.4.0.
-- GitHub's Windows runner builds and tests the release commit, with the rule packs added to its smoke test.
+- GitHub's Windows runner built and tested the release commit: 516 passed and 16 skipped, and the smoke test of the packaged program (now including the rule packs) passed.
