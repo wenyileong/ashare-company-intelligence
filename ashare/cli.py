@@ -2522,6 +2522,8 @@ def show_company(security_code: str):
 # v2.3.0: the commands added in v2.3 live in their own module and register themselves on ``app``.
 from . import cli_v23  # noqa: E402
 cli_v23.register(app, _table)
+from . import cli_v24  # noqa: E402
+cli_v24.register(app, _table)
 
 if __name__ == "__main__":
     app()

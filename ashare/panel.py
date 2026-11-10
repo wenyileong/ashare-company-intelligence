@@ -557,6 +557,30 @@ def _timeliness(kind):
     return get
 
 
+def _insider(kind):
+    """v2.4.0 (plan Part B): directors', supervisors' and senior managers' share dealings in the twelve months to the
+    row's date, from the dealings published by the cut-off; blank while the 'insider' switch is off."""
+    def get(ctx):
+        from .features import enabled
+        if not enabled("insider"):
+            return None, None, None, None
+        from .models import SessionLocal, Company
+        from .insider import company_measures
+        when = min(ctx.measure_date, ctx.cutoff)
+        key = ("ins", ctx.code, when)
+        if key not in ctx.cache:
+            s = SessionLocal()
+            try:
+                c = s.query(Company).filter_by(security_code=ctx.code).first()
+                ctx.cache[key] = company_measures(s, c, when, ctx.cache.setdefault("ins_cache", {})) if c else {}
+            finally:
+                s.close()
+        m = ctx.cache[key]
+        v = m.get("net_buy" if kind == "net_buy" else "window_sales")
+        return v, None, ("LOW" if v is not None else None), None
+    return get
+
+
 def _network(kind):
     """v2.3.0 (plan B8): ownership and board network measures, as known on the row's date; computed once per date
     for every company and shared across the panel's rows."""
@@ -686,6 +710,17 @@ def _register_control():
     _var("late_reports_3y", "late periodic reports in three years", "COUNT", "timeliness", "periodic reports (annual, "
          "half-year, quarterly) published after their legal deadlines in the three years to the row's date", "",
          "disclosures", "reports published by the cut-off", getter=_timeliness("late_3y"))
+    _var("insider_net_buy_12m", "net shares bought by directors and officers in a year", "COUNT", "insider",
+         "shares bought less shares sold by directors, supervisors and senior managers in the twelve months to the "
+         "row's date, from the dealings published by then; blank while the 'insider' switch is off or none was read",
+         "Σ bought − Σ sold", "insider_dealings", "dealings published by the cut-off", getter=_insider("net_buy"),
+         confidence="LOW: experimental reader of dealing announcements")
+    _var("insider_window_sales_12m", "sales by directors and officers in a blackout window in a year", "COUNT",
+         "insider", "sales in the twelve months to the row's date made within a blackout window before a periodic "
+         "report or earnings forecast, under the rule pack 'insider' (rules applied while provisional; see Check > "
+         "Rules)", "", "insider_dealings, disclosures", "dealings published by the cut-off",
+         getter=_insider("window_sales"),
+         confidence="LOW: experimental reader; the window rule is provisional until confirmed")
     _var("top10_pct", "top-10 holders' combined stake", "RATIO", "ownership", "sum of the top-10 holders' stakes", "",
          "ownership_observations (top-10 tables)", getter=_top10("sum"))
     _var("top_holder_pledged", "largest holder's pledged share", "RATIO", "ownership",
@@ -828,7 +863,8 @@ def build_panel(variables_: list[str] | None = None, unit: str = "year", start: 
             if urep.get(k):                                     # v2.0.2: reported, not silent
                 dropped[k] = max(dropped.get(k, 0), urep[k])
         members = {m["code"] for m in index_members(index_code, measure)} if index_code else None
-        for code in (codes or all_codes):
+        from .progressbar import count                      # v2.4.0 (R3)
+        for code in count(list(codes or all_codes), unit="companies"):
             u = listed.get(code)
             if u is None:
                 continue

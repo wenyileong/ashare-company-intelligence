@@ -1,4 +1,4 @@
-# China A-share Company Intelligence v2.3.0
+# China A-share Company Intelligence v2.4.0
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23982987.svg)](https://doi.org/10.5281/zenodo.23982987)
 
@@ -14,7 +14,7 @@ A provenance-preserving research data system for SSE Main Board, STAR Market, SZ
 - `docs/live_run_findings_v2.1.2.md`;
 - `docs/live_run_findings_v2.2.md`.
 
-The register of the findings, and the visualisation plan, is `docs/plan_v2.0.8_and_visualisation.md`; the plan for v2.1 is `docs/plan_v2.1.md`, for v2.1.2 `docs/plan_v2.1.2.md`, for v2.2 `docs/plan_v2.2.md`, and for v2.3 `docs/plan_v2.3.md`.
+The register of the findings, and the visualisation plan, is `docs/plan_v2.0.8_and_visualisation.md`; the plan for v2.1 is `docs/plan_v2.1.md`, for v2.1.2 `docs/plan_v2.1.2.md`, for v2.2 `docs/plan_v2.2.md`, for v2.3 `docs/plan_v2.3.md`, and for v2.4 `docs/plan_v2.4.md`.
 
 ## The paper this software accompanies
 
@@ -47,6 +47,12 @@ SSRN's suggested citation: Leong, Wen Yi, Institutional Coordination and the Mak
 - Point-in-time panel econometrics of fundamentals, segments, R&D and workforce.
 - ESG disclosure, kept as disclosed, without a composite score.
 - Work with Chinese-language primary sources, with every value traceable to its page.
+
+v2.4 makes the legal rules the program applies swappable, applies the share-dealing rules provisionally, and adds a percentage progress bar (`docs/plan_v2.4.md`):
+- **Swappable rule packs.** The share-dealing rules, the periodic-report deadlines and the nominee accounts are packs that can be updated without a new version (Check > Rules). Each rule is provisional (applied, and its results say so), confirmed, or withdrawn. Every update is checked first, and the pack it replaces is kept.
+- **Share-dealing flags.** Late reports, sales without an announced reduction plan and dealings in a blackout window are flagged under the provisional rules, each flag marked as such; two optional panel variables follow. A flag is a fact to examine, not a finding of breach.
+- **Progress.** Long actions show a percentage bar with the count, the stage and the time left; a resumed action starts where it stopped. A terminal shows the same bar on one line.
+- **Smaller additions.** GLEIF parents appear on the ego map as their own relation, and the readiness check for regulatory events counts only those published by the view's date.
 
 v2.3 fixes what the v2.2.0 live run showed (`docs/live_run_findings_v2.2.md`, findings 140 to 146), makes every chart zoomable, and adds infrastructure that later views build on (`docs/plan_v2.3.md`). Each new feature has its own switch under Check > Diagnostics.
 - **A data folder that moves.** Documents are found after the folder has moved, checked by their hash. Check > Data folder checks the stored paths, moves the folder (a dry run first, the old folder left untouched after a copy) or adopts one restored after reinstalling Windows. Every rewrite of stored paths can be undone.
@@ -844,7 +850,7 @@ A-share Company Intelligence is research software, provided as is and without wa
 
 Each release is archived on Zenodo: <https://doi.org/10.5281/zenodo.23982987>. Cite the version you used, for example:
 
-Wen Yi Leong, *A-share Company Intelligence* (version 2.3.0, software, 2026) <https://doi.org/10.5281/zenodo.23982987>.
+Wen Yi Leong, *A-share Company Intelligence* (version 2.4.0, software, 2026) <https://doi.org/10.5281/zenodo.23982987>.
 
 GitHub's "Cite this repository" gives the same details from `CITATION.cff`. A dataset built with the software is cited by its release name and database fingerprint, from the release's own `CITATION.cff`. The Zenodo record is a copy for citation; the licence below governs the software wherever it is obtained.
 

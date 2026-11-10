@@ -326,8 +326,12 @@ SECTIONS = [
            "Reads the dealings (name, date, direction, shares, price) from the announcements of directors', "
            "supervisors' and senior managers' share changes. Experimental: switch 'insider' on under Diagnostics "
            "first. Names are shown only under pseudonyms outside the program."),
-         A("Share dealings and their flags (experimental)", "insider-flags", [CODE_OPT("Leave blank for every company.")],
-           "Each dealing with the flags of the rules that have been verified (late report, dealing in a window). A "
+         A("Share dealings and their flags (experimental)", "insider-flags", [
+             CODE_OPT("Leave blank for every company."),
+             F("confirmed_only", "Confirmed rules only", "bool", False, ("--confirmed-only", None),
+               "Ticked, leaves out the rules not yet confirmed.")],
+           "Each dealing with the flags of the rules (late report, sale without an announced plan, dealing in a "
+           "window). Rules not yet confirmed are applied provisionally and their flags say so (Check > Rules). A "
            "flag is a fact to examine, not a finding of breach."),
          A("Extract from announcements and annual reports", "extract-management", [
              CODE_OPT(), F("docs", "Read downloaded documents", "bool", True, ("--use-documents", "--titles-only")),
@@ -782,6 +786,40 @@ SECTIONS = [
            "The switches are kept in features.json in the data folder."),
      ]},
 
+    {"id": "rules", "group": "Check", "title": "Rules",
+     "intro": "The legal and reference rules the program applies, kept as swappable packs: the share-dealing rules, "
+              "the periodic-report deadlines and the nominee accounts. A pack can be updated without a new version "
+              "of the program. A rule is provisional (applied, and its results say so) until it is confirmed against "
+              "the official text; a withdrawn rule is not applied. Every update is checked first, and the pack it "
+              "replaces is kept.",
+     "actions": [
+         A("List the rule packs", "rules-list", [], "Each pack's version, whether it is the one shipped with the "
+           "program or an updated one in the data folder, and how many of its rules are provisional."),
+         A("Show a pack's rules", "rules-show", [F("pack", "Pack", "choice:insider,deadlines,nominees", "insider", None)],
+           "Each rule with its status, its number of days or months and its source."),
+         A("Copy a pack for editing", "rules-export", [
+             F("pack", "Pack", "choice:insider,deadlines,nominees", "insider", None),
+             F("out", "To file or folder", "folder", "", "--out", "Blank: the data folder's rules folder, where the copy "
+               "becomes the pack in use."),
+             F("force", "Overwrite", "bool", False, ("--force", None), "The pack replaced is kept.")],
+           "Edit the copy in any text editor: set a rule's status to 'confirmed' once checked, and record the check "
+           "in 'verified'."),
+         A("Check a pack", "rules-check", [
+             F("pack", "Pack", "choice:insider,deadlines,nominees", "insider", None),
+             F("file", "File", "file", "", "--file", "Blank: the pack in use.")],
+           "Checks every field, number, date and status. A pack that fails is never applied."),
+         A("Install an updated pack", "rules-import", [
+             F("pack", "Pack", "choice:insider,deadlines,nominees", "insider", None),
+             F("file", "File", "file", "", None, "", required=True),
+             F("apply", "Apply", "bool", False, ("--apply", None), "Unticked, only checks the file.")],
+           "Checks the file and, ticked, installs it. It applies from the next action; the pack it replaces is kept "
+           "in rules/_replaced."),
+         A("Return to the shipped pack", "rules-reset", [
+             F("pack", "Pack", "choice:insider,deadlines,nominees", "insider", None),
+             F("apply", "Apply", "bool", False, ("--apply", None), "Unticked, only says which pack is in use.")],
+           "The updated pack is kept in rules/_replaced."),
+     ]},
+
     {"id": "selftest", "group": "Check", "title": "Self-test",
      "intro": "Confirms that each public source (CNINFO, SSE, SZSE and the price feed) still answers in the shape "
               "this program expects. Run it on first use and whenever a collection step returns nothing.",
@@ -1042,12 +1080,15 @@ def stop_message(argv: list[str], exc) -> str:
     return f"Stopped: {exc}" + (f"; {note}" if note else "")
 
 
-def run_command(argv: list[str], stream=None) -> tuple[int, str]:
+def run_command(argv: list[str], stream=None, on_progress=None) -> tuple[int, str]:
     """Run one CLI command in-process and capture its output; with *stream*,
-    each line is also passed on as it is written."""
+    each line is also passed on as it is written. With *on_progress* (v2.4.0, R3), each progress report of the
+    action is passed on as numbers (``progressbar``)."""
     from .cli import app
     from .http import Cancelled, reset_cancel
+    from . import progressbar
     reset_cancel()
+    progressbar.set_sink(on_progress)
     buf = _Tee(stream)
     os.environ["COLUMNS"] = os.environ.get("ASHARE_GUI_COLUMNS", "150")
     code = 0
@@ -1078,6 +1119,7 @@ def run_command(argv: list[str], stream=None) -> tuple[int, str]:
                 if path:
                     print(f"Full error: {path}")
     buf.flush_pending()
+    progressbar.set_sink(None)
     return code, buf.getvalue()
 
 
@@ -1272,7 +1314,7 @@ class App(tk.Tk):
         self.status = tk.StringVar(value=tr("ui.status.ready", "Ready"))
         self.status_lbl = ttk.Label(bar, textvariable=self.status, style="Muted.TLabel")
         self.status_lbl.pack(side="left", padx=12)
-        self.progress = ttk.Progressbar(bar, mode="indeterminate", length=120)
+        self.progress = ttk.Progressbar(bar, mode="indeterminate", length=160, maximum=1000)
         self.stop_btn = ttk.Button(bar, text=tr("ui.stop", "Stop"), style="Small.TButton", command=self._stop)
         for text, cmd in ((tr("ui.clear", "Clear"), lambda: self.log.delete("1.0", "end")),
                           (tr("ui.copy", "Copy"), self._copy),
@@ -1830,6 +1872,8 @@ class App(tk.Tk):
             b.state(["disabled"])
         self._lock_settings(True)
         self.status.set(tr("ui.status.running", "Running: {label}…").format(label=action_label(action)))
+        self._running_label = action_label(action)
+        self.progress.configure(mode="indeterminate", value=0)
         self.progress.pack(side="left", padx=8)
         self.progress.start(12)
         self.stop_btn.pack(side="left", padx=(10, 0), before=self.status_lbl)   # first, so it always has room
@@ -1839,7 +1883,8 @@ class App(tk.Tk):
 
         def work():
             started = _dt.datetime.now()
-            code, out = run_command(argv, stream=self._log)
+            code, out = run_command(argv, stream=self._log,
+                                    on_progress=lambda d: self.after(0, self._on_progress, d))
             elapsed = (_dt.datetime.now() - started).total_seconds()
             if out and not out.endswith("\n"):
                 self._log("\n")
@@ -1854,6 +1899,25 @@ class App(tk.Tk):
             self.after(0, lambda: self._done(action, code, out))
 
         threading.Thread(target=work, daemon=True).start()
+
+    def _on_progress(self, d: dict) -> None:
+        """v2.4.0 (R3): a determinate bar with the percentage, the count and the time left; a moving bar, 'counting…',
+        while the total is not known."""
+        from .progressbar import fraction, text
+        if not self.busy:
+            return
+        f = fraction(d)
+        if f is None:
+            if str(self.progress.cget("mode")) != "indeterminate":
+                self.progress.configure(mode="indeterminate", value=0)
+                self.progress.start(12)
+        else:
+            if str(self.progress.cget("mode")) != "determinate":
+                self.progress.stop()
+                self.progress.configure(mode="determinate")
+            self.progress.configure(value=int(f * 1000))
+        self._last_progress = d
+        self.status.set(f"{getattr(self, '_running_label', '')}: {text(d, tr)}")
 
     def _stop(self):
         from .http import request_cancel
@@ -1892,6 +1956,7 @@ class App(tk.Tk):
     def _done(self, action, code, out):
         self.busy = False
         self.progress.stop()
+        self.progress.configure(mode="indeterminate", value=0)
         self.progress.pack_forget()
         self.stop_btn.pack_forget()
         for b in self.run_buttons:

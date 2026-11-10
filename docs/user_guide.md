@@ -8,7 +8,7 @@ This guide covers the desktop application and the command line. The [methods doc
 
 ### Windows installer
 
-Run `AShareScraper-2.3.0-setup.exe`. It installs for the current user (no administrator rights are needed) into `%LOCALAPPDATA%\Programs\AShareScraper` and adds Start-menu entries for the application, the command line, this guide and the uninstaller. Two options are offered:
+Run `AShareScraper-2.4.0-setup.exe`. It installs for the current user (no administrator rights are needed) into `%LOCALAPPDATA%\Programs\AShareScraper` and adds Start-menu entries for the application, the command line, this guide and the uninstaller. Two options are offered:
 
 - a desktop shortcut;
 - adding the program folder to your PATH, so that `ashare-cli` runs from any command prompt.
@@ -448,9 +448,63 @@ The publication figures (`figure_*.svg`) stay exact vector drawings with their C
   - accepted automatically only when GLEIF's registration number equals the entity's credit code;
   - matches by name listed for you to accept or reject;
   - GLEIF's parents kept beside the control chains read from reports, never mixed into them.
-- **Share dealings** (Management; experimental, switch on 'insider' first). Directors', supervisors' and senior managers' dealings read from their announcements. The flags (late report, dealing in a window period) use only the rules whose article has been confirmed, and none is yet. A flag is a fact to examine, not a finding of breach.
+- **Share dealings** (Management; experimental, switch on 'insider' first). Directors', supervisors' and senior managers' dealings read from their announcements. Since v2.4 the flags (late report, sale without an announced reduction plan, dealing in a window period) apply the rules provisionally; see "Rule packs (v2.4)" below. A flag is a fact to examine, not a finding of breach.
 - **Watchlists** (Check > Watchlists & alerts). Name the companies and the kinds of item to watch: announcements, regulatory events, guidance, controller changes, late reports, dealings. The first run records what is there; later runs, and each daily update, list only what is new.
 - **Panel variables.** `report_delay_days`, `report_late`, `late_reports_3y`, `holder_overlap_n`, `interlock_n` and `mhhi_delta`. Network observations are not independent: use clustered or network-robust standard errors.
+
+### Rule packs (v2.4)
+
+The legal and reference rules the program applies are kept as **swappable packs**, which can be updated without a new version of the program:
+
+| Pack | What it holds | Used by |
+|---|---|---|
+| `insider` | share-dealing rules: report within 2 trading days; announce a reduction plan 15 trading days before a sale by auction; blackout windows before periodic reports and earnings forecasts | share-dealing flags and their panel variables |
+| `deadlines` | periodic-report deadlines: annual 4 months, half-year 2 months, first and third quarter 1 month | timeliness, its views and panel variables |
+| `nominees` | nominee and custody accounts left out of ownership networks | the market map, common ownership and the network variables |
+
+**Status of a rule.**
+- **Provisional** rules are applied, and every result they produce says so: a share-dealing flag ends "(provisional rule)", and the notes of each view name the pack and its status.
+- **Confirmed** rules are applied as they are.
+- **Withdrawn** rules are kept for the record but not applied.
+
+The rules shipped with v2.4 are all provisional until you confirm their articles and figures against the official texts.
+
+**Updating a pack** (Check > Rules, or the command line):
+1. `rules-export insider` copies the pack in use into the `rules` folder of the data folder, where the copy becomes the pack in use.
+2. Edit it in any text editor. For each rule you have checked, set `"status": "confirmed"`, fill in the article in `source`, the date from which it applies in `effective_from`, and how you checked it in `verified`.
+3. `rules-check insider` checks every field, number, date and status. A pack that fails is never applied: the program uses the shipped pack and says why.
+4. To install a file kept elsewhere, use `rules-import insider FILE --apply`. The pack it replaces is kept in `rules/_replaced`, and every change is logged in `rules/_changes.jsonl`.
+5. `rules-reset insider --apply` returns to the pack shipped with the program.
+
+A pack applies from the next action. Turning off the switch `rules.overrides` (Check > Diagnostics) uses only the shipped packs. `insider-flags --confirmed-only` (or the tick box on the Management page) applies only the confirmed rules.
+
+**The third share-dealing rule.** A sale is flagged when no announcement of a reduction plan, found by its title, was published at least the rule's number of trading days before it, within 200 days. The plan is matched by company, not by person. A sale whose method is not given is treated as a sale by auction, and the flag says so. Trading days need the trading calendar (`build-calendar`); without it the rule is not checked, and the note counts the dealings left unchecked.
+
+**Panel variables.**
+- `insider_net_buy_12m`: shares bought less shares sold in the twelve months to the row's date.
+- `insider_window_sales_12m`: sales flagged by the blackout rule in the same twelve months.
+
+Both use the dealings published by the row's date, and are blank while the 'insider' switch is off.
+
+### Progress (v2.4)
+
+Long actions show a bar in the status line that fills from left to right, with:
+- the percentage;
+- the count ("1,234 of 2,370 documents");
+- the stage, for the daily update;
+- the time left.
+
+**How it behaves.**
+- **Unknown totals.** While the total is not yet known, the bar moves back and forth and says "counting…".
+- **Resuming.** A resumed action starts its bar at the count already done.
+- **Jobs.** For a job, the bar counts the job's items, and the action running within it is shown beside.
+- **The command line.** In a terminal, the same bar is drawn on one line. Written to a file, the output is unchanged.
+- **Other programs.** A program that runs the command line can set `ASHARE_PROGRESS=machine` and read lines that start with `@@ashare-progress`.
+- **Turning it off.** `ASHARE_PROGRESS=off`, or the switch `progress.bar`, turns all of this off.
+
+### GLEIF parents on the ego map (v2.4)
+
+When the 'gleif' switch is on, the direct and ultimate parents GLEIF records for organisations on the ego map are drawn with their own relation, "GLEIF parent". They are never merged into the control chain read from reports. Only links GLEIF showed by the map's date are drawn.
 
 ### PDF reader messages (v2.0.3)
 

@@ -973,11 +973,14 @@ def catalogue(since: str, until: str, kind: str = "all", download_documents: boo
                 if state["consecutive"] >= max_failures:
                     raise StopRun(exc)
 
+        from .progressbar import Counter as _Bar           # v2.4.0 (R3): days of the period, the finished first
+        bar = _Bar(len(wanted), "days", start=len(wanted) - len(pending))
         try:
             for ma, mb in _months(min(wanted), max(wanted)) if wanted else []:
                 month_days = [d for d in pending if ma <= d <= mb]
                 for a, b in _runs(month_days):
                     window(a, b)
+                    bar.step(len(_days(a, b)))
         except StopRun as stop:
             from .errors import friendly_error
             tot["stopped_early"] = True

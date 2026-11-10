@@ -1623,6 +1623,14 @@
   "en_hash": "0467bcf142",
   "zh": "列：security_code、observation_date、person_name、role、gender、age、tenure_start、tenure_end、remuneration。"
  },
+ "action.management.insider-flags.field.confirmed_only.hint": {
+  "en_hash": "40ebc40722",
+  "zh": "勾选后，不适用尚未确认的规则。"
+ },
+ "action.management.insider-flags.field.confirmed_only.label": {
+  "en_hash": "ace7246f53",
+  "zh": "仅适用已确认的规则"
+ },
  "action.management.insider-flags.field.security_code.hint": {
   "en_hash": "94b507960c",
   "zh": "留空则为全部公司。"
@@ -1636,8 +1644,8 @@
   "zh": "股份买卖及其标记（试验性）"
  },
  "action.management.insider-flags.note": {
-  "en_hash": "9caa7eb681",
-  "zh": "列出每笔买卖及已核实规则的标记（报告逾期、窗口期内买卖）。标记是有待核查的事实，并非违规认定。"
+  "en_hash": "c2ca68c78f",
+  "zh": "每笔买卖及规则提示（迟报、未预先披露减持计划即减持、窗口期内买卖）。尚未确认的规则暂行适用，其提示会注明（检查 > 规则）。提示是有待核查的事实，并非违规认定。"
  },
  "action.management.roster.field.as_of.hint": {
   "en_hash": "67949cb276",
@@ -2579,6 +2587,118 @@
   "en_hash": "5a67c77756",
   "zh": "显示文件、页码、原始文本及提取方法，并核对文件哈希值。"
  },
+ "action.rules.rules-check.field.file.hint": {
+  "en_hash": "b152dcc62a",
+  "zh": "留空：当前使用的规则包。"
+ },
+ "action.rules.rules-check.field.file.label": {
+  "en_hash": "2c3cafa4db",
+  "zh": "文件"
+ },
+ "action.rules.rules-check.field.pack.label": {
+  "en_hash": "152a5035bf",
+  "zh": "规则包"
+ },
+ "action.rules.rules-check.label": {
+  "en_hash": "9479302b5b",
+  "zh": "检查规则包"
+ },
+ "action.rules.rules-check.note": {
+  "en_hash": "81b624cecd",
+  "zh": "检查每个字段、数字、日期和状态。未通过检查的规则包不会被适用。"
+ },
+ "action.rules.rules-export.field.force.hint": {
+  "en_hash": "f7192df38e",
+  "zh": "被替换的规则包会被保留。"
+ },
+ "action.rules.rules-export.field.force.label": {
+  "en_hash": "0625c54e03",
+  "zh": "覆盖"
+ },
+ "action.rules.rules-export.field.out.hint": {
+  "en_hash": "8e918aff38",
+  "zh": "留空：复制到数据文件夹的 rules 文件夹，副本即成为当前使用的规则包。"
+ },
+ "action.rules.rules-export.field.out.label": {
+  "en_hash": "6616e1c7ec",
+  "zh": "复制到文件或文件夹"
+ },
+ "action.rules.rules-export.field.pack.label": {
+  "en_hash": "152a5035bf",
+  "zh": "规则包"
+ },
+ "action.rules.rules-export.label": {
+  "en_hash": "914a444561",
+  "zh": "复制规则包以便编辑"
+ },
+ "action.rules.rules-export.note": {
+  "en_hash": "8a2db0e36c",
+  "zh": "可用任何文本编辑器编辑副本：核对后将规则的 status 设为 confirmed，并在 verified 中记录核对情况。"
+ },
+ "action.rules.rules-import.field.apply.hint": {
+  "en_hash": "6c70c3f265",
+  "zh": "不勾选时，仅检查该文件。"
+ },
+ "action.rules.rules-import.field.apply.label": {
+  "en_hash": "cfea419c3b",
+  "zh": "执行"
+ },
+ "action.rules.rules-import.field.file.label": {
+  "en_hash": "2c3cafa4db",
+  "zh": "文件"
+ },
+ "action.rules.rules-import.field.pack.label": {
+  "en_hash": "152a5035bf",
+  "zh": "规则包"
+ },
+ "action.rules.rules-import.label": {
+  "en_hash": "f5d783e91a",
+  "zh": "安装更新的规则包"
+ },
+ "action.rules.rules-import.note": {
+  "en_hash": "8b9fb65420",
+  "zh": "检查该文件；勾选后安装。自下一次操作起适用；被替换的规则包保存在 rules/_replaced 中。"
+ },
+ "action.rules.rules-list.label": {
+  "en_hash": "63b7b7cf42",
+  "zh": "列出规则包"
+ },
+ "action.rules.rules-list.note": {
+  "en_hash": "1fe065c928",
+  "zh": "每个规则包的版本、它是程序自带的还是数据文件夹中的更新版本，以及其中有多少条规则为暂行规则。"
+ },
+ "action.rules.rules-reset.field.apply.hint": {
+  "en_hash": "47faff94ba",
+  "zh": "不勾选时，仅显示当前使用的规则包。"
+ },
+ "action.rules.rules-reset.field.apply.label": {
+  "en_hash": "cfea419c3b",
+  "zh": "执行"
+ },
+ "action.rules.rules-reset.field.pack.label": {
+  "en_hash": "152a5035bf",
+  "zh": "规则包"
+ },
+ "action.rules.rules-reset.label": {
+  "en_hash": "1bb8e36f54",
+  "zh": "恢复程序自带的规则包"
+ },
+ "action.rules.rules-reset.note": {
+  "en_hash": "96b2ee4bce",
+  "zh": "更新的规则包保存在 rules/_replaced 中。"
+ },
+ "action.rules.rules-show.field.pack.label": {
+  "en_hash": "152a5035bf",
+  "zh": "规则包"
+ },
+ "action.rules.rules-show.label": {
+  "en_hash": "5d78bcdd29",
+  "zh": "显示规则包中的规则"
+ },
+ "action.rules.rules-show.note": {
+  "en_hash": "9d7452e7bf",
+  "zh": "每条规则的状态、天数或月数及其出处。"
+ },
  "action.segments.extract-segments.field.again.hint": {
   "en_hash": "93e93f4859",
   "zh": "通常会跳过本版本已读取的报告，停止后再次运行将从中断处继续。"
@@ -3171,6 +3291,34 @@
   "en_hash": "32abefa089",
   "zh": "可视化"
  },
+ "progress.bytes": {
+  "en_hash": "f26414a075",
+  "zh": "{done} / {total}"
+ },
+ "progress.count": {
+  "en_hash": "3d6db69602",
+  "zh": "{done:,} / {total:,} {unit}"
+ },
+ "progress.counting": {
+  "en_hash": "8746259046",
+  "zh": "正在计数…"
+ },
+ "progress.counting_n": {
+  "en_hash": "c36e7c37bd",
+  "zh": "已完成 {done:,} {unit}"
+ },
+ "progress.left": {
+  "en_hash": "ec4acff675",
+  "zh": "约剩 {time}"
+ },
+ "progress.stage": {
+  "en_hash": "5847e54c65",
+  "zh": "第 {n} 阶段，共 {of} 个阶段"
+ },
+ "progress.within": {
+  "en_hash": "6532edf43a",
+  "zh": "其中 {done:,} / {total:,} {unit}"
+ },
  "section.accuracy.intro": {
   "en_hash": "ee3614b003",
   "zh": "以一组经您手工核对数值的报告（“标准语料库”）为基准，衡量从文件中读取数据的准确程度。评估结果决定所提取数值的置信度。"
@@ -3390,6 +3538,14 @@
  "section.review.title": {
   "en_hash": "e29a79fe0c",
   "zh": "人工复核"
+ },
+ "section.rules.intro": {
+  "en_hash": "fe29104fcd",
+  "zh": "本程序适用的法律规则和参考规则，以可替换的规则包形式保存：董监高股份买卖规则、定期报告披露期限和名义持有人账户。规则包可以在不更新程序版本的情况下更新。规则在对照官方文本确认之前为暂行规则（予以适用，其结果会注明）；已撤回的规则不予适用。每次更新都会先经检查，被替换的规则包会被保留。"
+ },
+ "section.rules.title": {
+  "en_hash": "bb11a8e3f8",
+  "zh": "规则"
  },
  "section.segments.intro": {
   "en_hash": "ddb9eec188",

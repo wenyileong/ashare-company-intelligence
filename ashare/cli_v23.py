@@ -54,6 +54,8 @@ def register(app, _table) -> None:
             print(f"Schema: {sch.get('current')} (head {sch.get('head')})")
         _table([{**r, "on": "on" if r["on"] else "off"} for r in d["features"]], ["name", "on", "source", "part"],
                title="Feature switches")
+        if d.get("rule_packs"):
+            _table(d["rule_packs"], ["pack", "version", "status", "in_use", "problem"], title="Rule packs (swappable)")
 
 
     @app.command("paths-report")
@@ -232,8 +234,9 @@ def register(app, _table) -> None:
         from .timeliness import timeliness
         r = _guard(timeliness, code or None, _number(year) if year else None, as_of or None, out)
         sm = r["summary"]
-        print(f"{sm['reports']:,} reports; {sm['with_a_deadline']:,} with a verified deadline; {sm['late']:,} late "
+        print(f"{sm['reports']:,} reports; {sm['with_a_deadline']:,} with a deadline; {sm['late']:,} late "
               f"(rules {sm['rules']})")
+        print(sm["note"])
         late = [x for x in r["rows"] if x["late"]]
         if late:
             _table(late[:200], ["code", "kind", "period", "published", "deadline", "days_late", "title"],
@@ -253,10 +256,13 @@ def register(app, _table) -> None:
         print(_guard(extract_dealings, code or None, progress=lambda m: print(m, flush=True)))
 
     @app.command("insider-flags")
-    def insider_flags_cmd(code: str = typer.Option(None, "--code", "--security-code")):
-        """Each dealing with the flags of the verified rules (v2.3.0; experimental)."""
+    def insider_flags_cmd(code: str = typer.Option(None, "--code", "--security-code"),
+                          confirmed_only: bool = typer.Option(False, "--confirmed-only",
+                                                              help="Apply only the rules confirmed by the author")):
+        """Each dealing with the flags of the rules applied: provisional rules (flags marked so) and confirmed ones
+        (v2.3.0; v2.4.0 applies the swappable rule pack; experimental)."""
         from .insider import flags
-        r = _guard(flags, code or None)
+        r = _guard(flags, code or None, confirmed_only)
         _table(r["rows"][:500], ["code", "deal_date", "direction", "shares", "published", "flags"],
                title="Share dealings")
         print(r["note"])

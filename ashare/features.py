@@ -1,4 +1,4 @@
-"""Feature switches (v2.3.0, plan section "Scaffolding first").
+"""Feature switches (v2.3.0, plan section "Scaffolding first"; two added in v2.4.0).
 
 Every feature added in v2.3 is built behind a switch, so that a fault can be isolated by switching one feature off
 without touching the others. Switching a feature off never deletes its data.
@@ -41,6 +41,11 @@ FEATURES: dict[str, Feature] = {f.name: f for f in [
     Feature("network_measures", "Ownership network measures", True, "B8", "Optional panel variables."),
     Feature("watchlists", "Watchlists and alerts", True, "B9", "Alerts inside the program only."),
     Feature("timestamps", "Trusted timestamps", False, "B10", "Not available in v2.3.0 (scaffold only)."),
+    # v2.4.0
+    Feature("rules.overrides", "Updated rule packs from the data folder", True, "v2.4 A",
+            "Off: only the rule packs shipped with the program are used."),
+    Feature("progress.bar", "Percentage progress bar", True, "v2.4 C",
+            "Off: the moving bar of v2.3, with progress only as lines in the Output pane."),
 ]}
 
 
@@ -129,6 +134,12 @@ def diagnostics() -> dict:
         out["schema"] = {"current": current(), "head": head()}
     except Exception as exc:                       # noqa: BLE001
         out["schema"] = {"error": str(exc)}
+    try:
+        from .rulepacks import listing
+        out["rule_packs"] = [{k: r[k] for k in ("pack", "version", "status", "in_use", "provisional", "problem")}
+                             for r in listing()]
+    except Exception as exc:                       # noqa: BLE001
+        out["rule_packs"] = [{"pack": "?", "problem": str(exc)}]
     from . import __version__
     out["version"] = __version__
     return out

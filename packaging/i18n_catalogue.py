@@ -21,7 +21,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-MODULES = ("ashare/gui.py", "ashare/gui_review.py", "ashare/errors.py")
+MODULES = ("ashare/gui.py", "ashare/gui_review.py", "ashare/errors.py", "ashare/progressbar.py")
 SOURCE = ROOT / "packaging" / "i18n" / "zh_CN_source.json"
 
 

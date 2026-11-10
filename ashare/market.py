@@ -336,7 +336,7 @@ def acquire_market_data(security_code: str | None, start: str, end: str, provide
             say(f"{totals['skipped_up_to_date']:,} companies already have prices for the period and are skipped "
                 "(tick 'Fetch again' to fetch them anyway)")
         say(f"{len(todo):,} companies to fetch")
-        prog = Progress(len(todo), say, every=50, unit="companies")
+        prog = Progress(len(todo), say, every=50, unit="companies", start=totals["skipped_up_to_date"])
         for company in todo:
             totals["companies"] += 1
             t0 = time.monotonic()

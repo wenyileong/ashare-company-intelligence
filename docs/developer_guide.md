@@ -32,7 +32,12 @@ The desktop application runs every action through the command line in the same p
 - **Feature switches.** A new feature gets a switch in `ashare/features.py`. Its commands call `features.require(name)`, and its pages say how to switch it on. The test suite must pass with every switch off (`ASHARE_FEATURES=all=off`) as well as at the defaults.
 - **Data changes are explicit.** An Alembic migration may add tables and columns, but never rewrites the researcher's data. A rewrite (for example `paths-normalise`) is a command with a preview, a backup and a record that allows it to be undone.
 - **Outputs.** A command that writes an output calls `outputs.record_output`, which never raises.
-- **Legal rules.** Deadlines and share-dealing rules live in `ashare/rules/*.json`, each with its source and a `verified` note. A rule without one is not applied.
+- **Legal rules.** Deadlines and share-dealing rules live in `ashare/rules/*.json`, each with its source and a `verified` note. (Superseded in v2.4: see below.)
+
+### Rules added in v2.4
+
+- **Rule packs.** Read legal and reference rules only through `ashare/rulepacks.py` (`load(name)`, `data(name)`), never by opening `ashare/rules/*.json`. A pack in the data folder's `rules` folder takes precedence, while it validates. A new pack is registered in `PACKS` with a validator, and every rule carries a `status` (`provisional`, `confirmed` or `withdrawn`). Results from a provisional rule must say so.
+- **Progress.** A loop over many items that fetches or reads data reports through `ashare/progressbar.py`: `Counter(total, unit, start=…)` and `.step()`, or `count(items, unit=…)`. `extractstate.Progress` already does this. Do not print progress control characters; the desktop program receives the numbers directly.
 
 ## 3. Adding a parser
 

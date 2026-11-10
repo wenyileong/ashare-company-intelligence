@@ -6,10 +6,10 @@ abstract: "A provenance-preserving research data system for companies listed on 
 # The PolyForm Strict License 1.0.0 has no SPDX identifier, so it is given by its address (a "license" field must
 # be an SPDX identifier, and Zenodo rejects the file otherwise).
 license-url: "https://polyformproject.org/licenses/strict/1.0.0"
-version: "2.3.0"
+version: "2.4.0"
 doi: "10.5281/zenodo.23982987"
 repository-code: "https://github.com/wenyileong/ashare-company-intelligence"
-date-released: "2026-11-08"
+date-released: 2026-11-11
 authors:
   - family-names: "Leong"
     given-names: "Wen Yi"

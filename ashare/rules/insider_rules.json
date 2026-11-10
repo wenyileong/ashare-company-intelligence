@@ -1,19 +1,55 @@
 {
-  "version": "insider-0",
-  "note": "Rules for directors', supervisors' and senior managers' share dealings (v2.3.0, plan B6). None is verified yet against the current official text, so no flag is applied: a flag is computed only for a rule whose 'verified' is filled in. The author confirms each rule (article and effective date) before it is used.",
+  "pack": "insider",
+  "version": "insider-1",
+  "schema": 1,
+  "swappable": true,
+  "status": "provisional",
+  "updated": "2026-11-11",
+  "note": "PROVISIONAL RULES, SWAPPABLE. Rules for directors', supervisors' and senior managers' share dealings (v2.3.0, plan B6; made a swappable pack in v2.4.0). None of these rules has yet been confirmed against the current official text. They are applied provisionally: every flag they raise is marked '(provisional rule)'. A flag is a fact to examine, not a finding of breach.",
+  "how_to_update": "SWAPPABLE MODULE. This pack can be replaced without a new version of the program: 'ashare-cli rules-export insider' copies it to the data folder's rules folder for editing; 'ashare-cli rules-import insider FILE --apply' installs an edited copy after checking it (the pack it replaces is kept in rules/_replaced); 'ashare-cli rules-reset insider --apply' returns to the pack shipped with the program. The same actions are under Check > Rules. Set a rule's 'status' to 'confirmed' once its article, effective date and numbers have been checked against the official text, and record the check in 'verified'; 'withdrawn' keeps a rule without applying it.",
   "rules": [
-    {"id": "report_within", "trading_days": 2, "applies_to": "a change in holdings, reported from the day it occurs",
-     "source": "CSRC Rules on the Shares Held by Directors, Supervisors and Senior Managers of Listed Companies and Changes Therein (2024 revision): article to be confirmed",
-     "effective_from": null, "verified": null},
-    {"id": "plan_before_sale", "trading_days": 15, "applies_to": "a reduction by auction, announced before the first sale",
-     "source": "CSRC Interim Measures on Share Reductions by Shareholders of Listed Companies (2024) and the same Rules: article to be confirmed",
-     "effective_from": null, "verified": null},
-    {"id": "blackout", "windows": [
-        {"before": "annual_report", "calendar_days": 15},
-        {"before": "interim_report", "calendar_days": 15},
-        {"before": "quarterly_report", "calendar_days": 5},
-        {"before": "earnings_forecast_or_flash", "calendar_days": 5}],
-     "source": "the same Rules (window periods): article and lengths to be confirmed",
-     "effective_from": null, "verified": null}
+    {
+      "id": "report_within",
+      "trading_days": 2,
+      "applies_to": "a change in holdings, reported from the day it occurs",
+      "source": "CSRC Rules on the Shares Held by Directors, Supervisors and Senior Managers of Listed Companies and Changes Therein (2024 revision): article to be confirmed",
+      "effective_from": null,
+      "verified": null,
+      "status": "provisional"
+    },
+    {
+      "id": "plan_before_sale",
+      "trading_days": 15,
+      "applies_to": "a reduction by auction, announced before the first sale",
+      "source": "CSRC Interim Measures on Share Reductions by Shareholders of Listed Companies (2024) and the same Rules: article to be confirmed",
+      "effective_from": null,
+      "verified": null,
+      "status": "provisional"
+    },
+    {
+      "id": "blackout",
+      "windows": [
+        {
+          "before": "annual_report",
+          "calendar_days": 15
+        },
+        {
+          "before": "interim_report",
+          "calendar_days": 15
+        },
+        {
+          "before": "quarterly_report",
+          "calendar_days": 5
+        },
+        {
+          "before": "earnings_forecast_or_flash",
+          "calendar_days": 5
+        }
+      ],
+      "source": "the same Rules (window periods): article and lengths to be confirmed",
+      "effective_from": null,
+      "verified": null,
+      "status": "provisional"
+    }
   ]
 }

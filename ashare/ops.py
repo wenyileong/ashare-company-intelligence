@@ -289,6 +289,8 @@ def run_job(job_id: int, progress=None, sleep=time.sleep) -> dict:
         items = [i for i in s.query(JobItem).filter(JobItem.job_id == job_id).order_by(JobItem.id)
                  if i.status == "PENDING" or (i.status == "FAILED" and i.attempts < MAX_ATTEMPTS)]
         refused = 0
+        from .progressbar import Counter as _Bar
+        bar = _Bar(job.total, "items", start=job.done or 0, outer=True)      # v2.4.0 (R3)
         for item in items:
             s.refresh(job)
             if job.cancel_requested:
@@ -313,6 +315,8 @@ def run_job(job_id: int, progress=None, sleep=time.sleep) -> dict:
             job.done = s.query(JobItem).filter_by(job_id=job_id, status="DONE").count()
             job.failed = s.query(JobItem).filter_by(job_id=job_id, status="FAILED").count()
             s.commit()
+            bar.done = job.done + job.failed
+            bar.step(0)
             if progress:
                 progress(job.done, job.total, item.item_key, item.status)
             if refused >= MAX_REFUSED_ITEMS:
@@ -376,12 +380,17 @@ def daily_update(until: str | None = None, prices: bool = True, extract: bool = 
             set_mark("CNINFO", "*", "recheck", until)
         except Exception as exc:          # never block the daily update
             out["recheck_error"] = repr(exc)
+    from .progressbar import stage                    # v2.4.0 (R3): which stage of the update is running
+    stages = 1 + bool(prices) + bool(extract)
     if since <= until:
+        stage(1, stages, "announcements and documents")
         j = create_job("catalogue_day", {"since": since, "until": until, "kind": "all", "download": True})
         out["catalogue"] = run_job(j, progress)
     if prices:
+        stage(2, stages, "prices")
         out["prices"] = update_prices(until, progress)
     if extract:
+        stage(stages, stages, "reading documents")
         s = SessionLocal()
         try:
             codes = sorted({c.security_code for d, c in s.query(Disclosure, Company).join(
@@ -392,6 +401,7 @@ def daily_update(until: str | None = None, prices: bool = True, extract: bool = 
         if codes:
             j = create_job("extract", {}, codes)
             out["extract"] = run_job(j, progress)
+    stage(None, None, None)
     # v2.3.0 (B9): the watchlists, when they are on; a failure here never fails the update
     try:
         from .features import enabled

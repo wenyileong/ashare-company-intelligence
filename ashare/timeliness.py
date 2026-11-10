@@ -9,17 +9,26 @@ published later is not a late filing.
 from __future__ import annotations
 
 import calendar
-import json
 from datetime import date
-from functools import lru_cache
 from pathlib import Path
 
-RULES_FILE = Path(__file__).resolve().parent / "rules" / "disclosure_deadlines.json"
+RULES_FILE = Path(__file__).resolve().parent / "rules" / "disclosure_deadlines.json"     # the bundled pack
 
 
-@lru_cache(maxsize=1)
 def rules() -> dict:
-    return json.loads(RULES_FILE.read_text(encoding="utf-8"))
+    """The deadline rules in use (v2.4.0: a swappable pack, see ``rulepacks``)."""
+    from .rulepacks import data
+    return data("deadlines")
+
+
+def rules_note() -> str:
+    """Which pack the deadlines came from, and whether its rules are provisional (for notes on every result)."""
+    from .rulepacks import load
+    pk = load("deadlines")
+    s = f"Deadline rules: {pk.describe()}"
+    if pk.provisional_ids():
+        s += (f"; provisional until confirmed against the official text ({', '.join(pk.provisional_ids())})")
+    return s + "."
 
 
 def add_months(d: date, months: int) -> date:
@@ -34,7 +43,10 @@ def deadline(kind: str, period_end: str, period_type: str) -> tuple[str | None, 
         end = date.fromisoformat(period_end[:10])
     except (TypeError, ValueError):
         return None, None
+    from .rulepacks import rule_status
     for r in rules()["rules"]:
+        if rule_status(r) == "withdrawn":
+            continue
         types = r["period_type"] if isinstance(r["period_type"], list) else [r["period_type"]]
         if kind not in r["kinds"] or period_type not in types:
             continue
@@ -98,7 +110,7 @@ def timeliness(security_code: str | None = None, year: int | None = None, as_of:
         rows = [r for r in rows if r["period"].startswith(str(year))]
     judged = [r for r in rows if r["late"] is not None]
     summary = {"reports": len(rows), "with_a_deadline": len(judged), "late": sum(r["late"] for r in judged),
-               "rules": rules()["version"]}
+               "rules": rules()["version"], "note": rules_note()}
     if out:
         import csv
         p = Path(out)

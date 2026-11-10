@@ -39,7 +39,7 @@ class TimelinessView(View):
                              filters=lambda m: (m.kind.in_(("annual_report", "interim_report", "quarterly_report")),))]
 
     def build(self, params: dict) -> Built:
-        from ...timeliness import report_rows, rules
+        from ...timeliness import report_rows, rules, rules_note
         try:
             y0 = int(params.get("start") or 2021)
             y1 = int(params.get("end") or date.today().year - 1)
@@ -80,7 +80,7 @@ class TimelinessView(View):
                                   "disclosure_id"], "rows": late},
             }
             notes = [f"Deadlines: rules {rules()['version']} (annual four months, half-year two, quarterly one); "
-                     "a report whose deadline fell before a rule took effect is not judged.",
+                     "a report whose deadline fell before a rule took effect is not judged.", rules_note(),
                      "Only the first publication of a report counts; corrections published later are not late "
                      "filings."]
             summary = [{"label": "Reports", "value": f"{len(rows):,}"},

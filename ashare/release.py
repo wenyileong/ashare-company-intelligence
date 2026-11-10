@@ -341,8 +341,9 @@ def build_release(out_dir: str = "releases", name: str | None = None, security_c
                 if any((t.name, c) in PERSON_ALWAYS | PERSON_IF_NATURAL for c in t.c.keys()):
                     for r in rows_of(t):
                         ps.learn(t.name, r)
+        from .progressbar import count                      # v2.4.0 (R3)
         with dst.begin() as conn:
-            for t in tables:
+            for t in count(tables, unit="tables"):
                 batch, n = [], 0
                 for r in rows_of(t) or ():
                     lic = row_licence(t.name, r, ov)

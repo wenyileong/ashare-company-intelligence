@@ -770,10 +770,14 @@ def test_dealing_rows_are_read_and_unverified_rules_flag_nothing(db, company, tm
     s.close()
     r = extract_dealings("600519")
     assert r["announcements"] == 1 and r["rows"] == 1
-    f = flags("600519")
+    f = flags("600519", confirmed_only=True)          # v2.4.0: only confirmed rules, of which there are none yet
     assert f["rows"][0]["shares"] == 120000.0 and f["rows"][0]["direction"] == "SELL"
     assert f["applied_rules"] == [] and f["rows"][0]["flags"] == "" and "not a finding of breach" in f["note"]
     assert all(r["verified"] is None for r in rules()["rules"])
+    f = flags("600519")                               # v2.4.0: the provisional rules apply, and say so
+    assert set(f["applied_rules"]) == {"report_within", "plan_before_sale", "blackout"}
+    assert "2 day(s) before a annual report" in f["rows"][0]["flags"]
+    assert "(provisional rule)" in f["rows"][0]["flags"] and "Provisional" in f["note"]
     assert not is_dealing_title("2024年年度报告") and is_dealing_title("关于高级管理人员增持公司股份的公告")
 
 

@@ -96,7 +96,8 @@ def match_entities(names: bool = False, limit: int | None = None, progress=None,
         if limit:
             ents = ents[:limit]
         say(f"{len(ents):,} entities to look up")
-        for e in ents:
+        from .progressbar import count                      # v2.4.0 (R3)
+        for e in count(ents, unit="entities"):
             totals["looked_up"] += 1
             try:
                 hits = []

@@ -840,7 +840,7 @@ def extract_financials(security_code: str | None = None, kind: str = "reports", 
         from .extractstate import Progress
         from .http import check_cancel
         from .parallel import imap
-        prog = Progress(n, say)
+        prog = Progress(n, say, start=totals["already_read"])
         from .ledger import Ledger, DONE, EMPTY, NOT_READ, FAILED
         led = Ledger("financials")              # v2.3.0 (B3): records only; extracted_version decides what is skipped
         jobs, by_id = [], {}

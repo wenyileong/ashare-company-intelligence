@@ -1,5 +1,16 @@
 {
+  "pack": "nominees",
   "version": "nominees-1",
-  "note": "Holders that hold for others (nominee or custody accounts), left out when companies are linked by shared holders (v2.3.0, plan B8): two companies are not linked because both have Stock Connect investors. Names are compared after removing spaces and full-width brackets.",
-  "names": ["香港中央结算有限公司", "香港中央结算(代理人)有限公司", "HKSCC NOMINEES LIMITED", "HONG KONG SECURITIES CLEARING COMPANY LIMITED"]
+  "schema": 1,
+  "swappable": true,
+  "status": "confirmed",
+  "updated": "2026-11-11",
+  "note": "Holders that hold for others (nominee or custody accounts), left out when companies are linked by shared holders (v2.3.0, plan B8): two companies are not linked because both have Stock Connect investors. Names are compared after removing spaces and full-width brackets. A swappable pack (v2.4.0): add names as they are found.",
+  "how_to_update": "SWAPPABLE MODULE. This pack can be replaced without a new version of the program: 'ashare-cli rules-export nominees' copies it to the data folder's rules folder for editing; 'ashare-cli rules-import nominees FILE --apply' installs an edited copy after checking it (the pack it replaces is kept in rules/_replaced); 'ashare-cli rules-reset nominees --apply' returns to the pack shipped with the program. The same actions are under Check > Rules.",
+  "names": [
+    "香港中央结算有限公司",
+    "香港中央结算(代理人)有限公司",
+    "HKSCC NOMINEES LIMITED",
+    "HONG KONG SECURITIES CLEARING COMPANY LIMITED"
+  ]
 }

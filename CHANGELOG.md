@@ -2,6 +2,42 @@
 
 This log records what changed in each version and the important findings behind the changes. The live-run findings are kept in full in `docs/live_run_findings_v2.0.2.md` (findings 1 to 19) `docs/live_run_findings_v2.0.3.md` (findings 20 to 34) and `docs/live_run_findings_v2.0.5.md` (findings 35 to 57, the first live runs of the v2.0.4 catalogue engine) `docs/live_run_findings_v2.0.6.md` (findings 58 to 69) and `docs/live_run_findings_v2.0.7.md` (findings 70 to 95) and `docs/live_run_findings_v2.0.8.md` (findings 96 to 111) and `docs/live_run_findings_v2.0.9.md` (findings 112 to 117) and `docs/live_run_findings_v2.1.md` (findings 118 to 131) and `docs/live_run_findings_v2.1.2.md` (findings 132 to 139) and `docs/live_run_findings_v2.2.md` (findings 140 to 148). The plan for v2.1, with its six rounds of review, is `docs/plan_v2.1.md`. Earlier versions are described in `README.md` and in section 18 of `ashare_scraper_build_plan.md`.
 
+## v2.4.0 (11 November 2026)
+
+**Aim:** make the legal rules the program applies swappable (the author's instruction of 11 November 2026), apply the share-dealing rules provisionally, and meet requirement R3, a percentage progress bar whenever the program fetches or reads data. The plan, its review against the code and its build record are in `docs/plan_v2.4.md`.
+
+**After upgrading:**
+1. Nothing is read again: no extractor changed.
+2. **Check > Rules > List the rule packs** shows the packs and their status. Every rule shipped is provisional until you confirm it (user guide, "Rule packs").
+3. With the 'insider' switch on, **Share dealings and their flags** now flags dealings under the provisional rules, each flag marked "(provisional rule)".
+
+- **Swappable rule packs.**
+  - The share-dealing rules, the periodic-report deadlines and the nominee accounts are packs, marked as swappable. They are read through one loader (`rulepacks.py`) and can be updated without a new version.
+  - An updated pack lives in the data folder's `rules` folder and applies from the next action. It is checked when installed and when loaded; a pack that fails is not used, and the program says why.
+  - The pack it replaces is kept, and every change is logged.
+  - **Check > Rules** (and `rules-list`, `rules-show`, `rules-export`, `rules-check`, `rules-import`, `rules-reset`).
+  - Each rule is provisional, confirmed or withdrawn; results from provisional rules say so. Diagnostics lists the packs.
+  - New switch: `rules.overrides`.
+- **Share dealings.**
+  - The flags apply the provisional rules, marked as such; `--confirmed-only` applies only the confirmed ones.
+  - The third rule is applied: a sale by auction without a reduction plan announced the required number of trading days before.
+  - Each rule applies only from its effective date, when one is given.
+  - Dealings that could not be checked for want of a trading calendar are counted in the note.
+  - New panel variables: `insider_net_buy_12m` and `insider_window_sales_12m`.
+- **Progress (requirement R3).**
+  - The status bar shows a bar that fills from left to right, with the percentage, the count, the stage and the time left. It moves back and forth, "counting…", while the total is unknown.
+  - A resumed action starts at the count already done; a job's bar shows the action within it.
+  - Counters were added for:
+    - the catalogue (by day);
+    - building a panel;
+    - writing a release;
+    - GLEIF matching;
+    - the daily update (by stage).
+  - A terminal shows the same bar on one line; another program can ask for machine-readable lines.
+  - New switch: `progress.bar`.
+- **Ego map.** GLEIF's direct and ultimate parents are drawn with their own relation, "GLEIF parent", never merged into the chains read from reports.
+- **Readiness.** The check for regulatory events counts only those published by the view's date.
+
 ## v2.3.0 (8 November 2026)
 
 **Aim:** fix what the v2.2.0 live run showed (`docs/live_run_findings_v2.2.md`, findings 140 to 146), meet the author's requirement that every chart be scalable and interactive, and bring forward the infrastructure planned for later versions: a data folder that can be moved, a register of outputs, entity identifiers, ownership networks, disclosure timeliness, share dealings and watchlists. Every new feature is built behind its own switch (Check > Diagnostics). The plan, its review against the code and its build record are in `docs/plan_v2.3.md`.

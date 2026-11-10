@@ -33,20 +33,29 @@ def _duration(seconds: float) -> str:
 
 
 class Progress:
-    """'250 of 9,800 documents; 8.7 s each; about 23 hours left', every ``every`` documents and once a minute."""
+    """'250 of 9,800 documents; 8.7 s each; about 23 hours left', every ``every`` documents and once a minute.
 
-    def __init__(self, total: int, say=None, every: int = 25, interval: float = 60.0, unit: str = "documents"):
+    v2.4.0 (R3): each step is also reported as numbers to ``progressbar``, which drives the percentage bar of the
+    desktop program and, in a terminal, a bar on one line. ``start`` is the number already done before this run."""
+
+    def __init__(self, total: int, say=None, every: int = 25, interval: float = 60.0, unit: str = "documents",
+                 start: int = 0):
+        from .progressbar import Counter
         self.total, self.say, self.every, self.interval = total, say or (lambda m: None), every, interval
         self.unit = unit
         self.done = 0
         self.t0 = self.last = time.monotonic()
+        self.bar = Counter(total + start if total is not None else None, unit, start)
 
     def step(self) -> None:
         self.done += 1
+        self.bar.step()
         now = time.monotonic()
         if self.done % self.every == 0 or now - self.last >= self.interval or self.done == self.total:
+            from .progressbar import clear_line
             each = (now - self.t0) / self.done
             left = f"; about {_duration(each * (self.total - self.done))} left" if self.done < self.total else ""
+            clear_line()
             self.say(f"  {self.done:,} of {self.total:,} {self.unit}; {each:.1f} s each{left}")
             self.last = now
 
@@ -90,7 +99,7 @@ def run(extractor: str, rows, handle, totals: dict, again: bool = False, progres
     say(f"{n:,} document(s) to read from {len({c.id for _, c in todo}):,} companies"
         + (f"; {totals['already_read']:,} already read by this version are skipped (--again reads them too)"
            if totals["already_read"] else ""))
-    prog = Progress(n, say)
+    prog = Progress(n, say, start=totals["already_read"])
     from .ledger import Ledger, DONE, EMPTY, NOT_READ, FAILED, SKIPPED
     led = Ledger(extractor)                     # v2.3.0 (B3): records only; the marks below decide what is skipped
 

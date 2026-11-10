@@ -137,6 +137,8 @@ class SectorsView(View):
                 "Late annual reports follow the rules in rules/disclosure_deadlines.json; state control, the "
                 "controller's ownership type read from reports.",
             ]
+            from ...timeliness import rules_note
+            notes.append(rules_note())
             p = {"start": y0, "end": y1, "as_of": ctx.as_of, "group_basis": basis,
                  "title": f"Sectors {y0}–{y1}, as of {ctx.as_of}"}
             snap = series_snapshot(self.id, p, ctx.policy(), tables, [], notes, self.evidence,

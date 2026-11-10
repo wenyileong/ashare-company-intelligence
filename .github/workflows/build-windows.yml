@@ -30,7 +30,7 @@ jobs:
         run: pyinstaller --noconfirm --clean packaging\ashare.spec --distpath dist --workpath build
       - name: Smoke test
         run: dist\AShareScraper\ashare-cli.exe version
-      - name: Smoke test of the packaged data (v2.3)
+      - name: Smoke test of the packaged data (v2.3, v2.4)
         shell: pwsh
         run: |
           $cli = (Resolve-Path dist\AShareScraper\ashare-cli.exe).Path
@@ -46,6 +46,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
           if (-not (Select-String -Path cov\view.html -Pattern "chartjs-plugin-zoom" -Quiet)) { Write-Error "zoom runtime missing"; exit 1 }
           & $cli timeliness --out t.csv
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          # v2.4: the bundled rule packs are packaged and valid, and an exported pack can be checked and reset
+          & $cli rules-list
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          foreach ($p in "insider", "deadlines", "nominees") { & $cli rules-check $p; if ($LASTEXITCODE -ne 0) { exit 1 } }
+          & $cli rules-export insider
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          & $cli rules-reset insider --apply
           if ($LASTEXITCODE -ne 0) { exit 1 }
       - name: Add quick-start note, documentation and third-party notices
         run: |

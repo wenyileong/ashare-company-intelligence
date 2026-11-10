@@ -144,8 +144,37 @@ class EgoMapView(View):
             if n["label"] in lei:
                 n["lei"] = lei[n["label"]]
                 n_with += 1
-        return {"item": "identifiers", "status": "FOUND" if n_with else "NONE",
-                "note": f"{n_with} of {len(ents)} organisations with a Legal Entity Identifier (GLEIF)"}
+        parents = self._gleif_parents(ctx, g)
+        note = f"{n_with} of {len(ents)} organisations with a Legal Entity Identifier (GLEIF)"
+        if parents:
+            note += f"; {parents} parent link(s) from the GLEIF register"
+        return {"item": "identifiers", "status": "FOUND" if n_with else "NONE", "note": note}
+
+    def _gleif_parents(self, ctx, g) -> int:
+        """v2.4.0: the direct and ultimate parents GLEIF records for the organisations on the map, as their own
+        relation (never merged into the control chain read from reports). Only links observed by the map's date."""
+        from ...models_v23 import ExternalRelationship
+        by_lei = {n["lei"]: nid for nid, n in g.nodes.items() if n.get("lei")}
+        if not by_lei:
+            return 0
+        by_label = {n["label"]: nid for nid, n in g.nodes.items() if n["kind"] in ("entity", "company")}
+        added = 0
+        for r in ctx.s.query(ExternalRelationship).filter(ExternalRelationship.child_lei.in_(list(by_lei)),
+                                                          ExternalRelationship.source == "GLEIF"):
+            if r.observed_date and r.observed_date > ctx.as_of:
+                continue
+            child = by_lei[r.child_lei]
+            parent = by_lei.get(r.parent_lei) or by_label.get(r.parent_name or "")
+            if parent is None:
+                parent = f"lei:{r.parent_lei}"
+                g.node(parent, "entity", r.parent_name or r.parent_lei, lei=r.parent_lei, ring="control")
+            if parent == child:
+                continue
+            kind = "ultimate parent" if r.relation == "ULTIMATE_PARENT" else "direct parent"
+            g.edge(parent, child, "GLEIF_PARENT", basis={"source": "GLEIF", "relation": r.relation},
+                   dates={"observed_date": r.observed_date}, label=kind)
+            added += 1
+        return added
 
     def _entity(self, ctx, g, table, row, col, natural_hint=False):
         shown, masked = ctx.mask(table, row, col)

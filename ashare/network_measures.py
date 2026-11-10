@@ -23,7 +23,7 @@ from functools import lru_cache
 from pathlib import Path
 
 ROLE_WINDOW_DAYS = 450
-NOMINEES_FILE = Path(__file__).resolve().parent / "rules" / "nominee_holders.json"
+NOMINEES_FILE = Path(__file__).resolve().parent / "rules" / "nominee_holders.json"     # the bundled pack
 
 
 def _norm(name: str | None) -> str:
@@ -32,9 +32,15 @@ def _norm(name: str | None) -> str:
     return re.sub(r"\s+", "", t)
 
 
-@lru_cache(maxsize=1)
 def nominees() -> frozenset:
-    return frozenset(_norm(n) for n in json.loads(NOMINEES_FILE.read_text(encoding="utf-8"))["names"])
+    """The nominee and custody accounts in use (v2.4.0: a swappable pack, see ``rulepacks``)."""
+    from .rulepacks import data
+    return _nominee_set(tuple(data("nominees")["names"]))
+
+
+@lru_cache(maxsize=8)
+def _nominee_set(names: tuple) -> frozenset:
+    return frozenset(_norm(n) for n in names)
 
 
 def latest_holders(session, as_of: str, company_ids=None) -> dict[int, dict[str, float]]:
