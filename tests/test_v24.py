@@ -38,7 +38,7 @@ def test_bundled_packs_are_valid_marked_swappable_and_returned_unchanged():
 def test_the_modules_read_through_the_loader(tmp_path):
     from ashare import timeliness, insider, network_measures
     from ashare.rulepacks import export, clear_cache
-    assert timeliness.rules()["version"] == "deadlines-1" and insider.rules()["version"] == "insider-1"
+    assert timeliness.rules()["version"] == "deadlines-2" and insider.rules()["version"] == "insider-2"
     export("nominees")
     p = tmp_path / "rules" / "nominee_holders.json"
     d = json.loads(p.read_text(encoding="utf-8"))
@@ -118,7 +118,7 @@ def test_rule_commands(tmp_path):
     from ashare.cli import app
     run = CliRunner().invoke
     r = run(app, ["rules-list"], env={"COLUMNS": "160"})
-    assert r.exit_code == 0 and "insider-1" in r.output and "provisional" in r.output
+    assert r.exit_code == 0 and "insider-2" in r.output and "provisional" in r.output
     r = run(app, ["rules-show", "insider"])
     assert "plan_before_sale" in r.output and "provisional" in r.output
     out = tmp_path / "copy.json"
@@ -175,7 +175,7 @@ def test_rule_three_and_late_report_with_the_calendar(db, company, monkeypatch):
     first = rows["2025-03-10"]["flags"]
     assert "reduction plan announced 5 trading days before the sale (rule: at least 15)" in first
     assert "reported 5 trading days after the dealing (rule: within 2)" in first
-    assert "method not given, taken as a sale by auction" in first and first.count("(provisional rule)") == 2
+    assert "method not given, taken as a sale the rule covers" in first and first.count("(provisional rule)") == 2
     assert rows["2025-04-14"]["flags"] == ""
     assert flags("600519", confirmed_only=True)["rows"][0]["flags"] == ""
 
@@ -189,7 +189,8 @@ def test_a_sale_without_any_plan_and_without_a_calendar(db, company, monkeypatch
     r = flags("600519")
     by = {x["deal_date"]: x for x in r["rows"]}
     assert "no reduction plan announced in the 200 days before the sale" in by["2025-03-10"]["flags"]
-    assert by["2025-03-11"]["flags"] == "" and by["2025-03-12"]["flags"] == ""       # a purchase; a block trade
+    assert by["2025-03-11"]["flags"] == ""                                            # a purchase
+    assert "no reduction plan" in by["2025-03-12"]["flags"]                           # v2.4.1: block trades are covered
     assert "report_within: 3 dealing(s) not checked" in r["note"]
 
 
@@ -344,12 +345,11 @@ def test_desktop_status_bar_turns_determinate_and_resets(tmp_path, monkeypatch):
     try:
         app.busy = True
         app._running_label = "Read"
-        app.progress.pack(side="left")
         app._on_progress({"done": None, "total": None, "unit": "pages"})
-        assert str(app.progress.cget("mode")) == "indeterminate" and "counting…" in app.status.get()
+        assert str(app.progress.cget("mode")) == "indeterminate" and "counting…" in app.progress_text.get()
         app._on_progress({"done": 26, "total": 50, "unit": "documents", "left": 90})
         assert str(app.progress.cget("mode")) == "determinate" and int(float(app.progress.cget("value"))) == 520
-        assert app.status.get() == "Read: 52%  26 of 50 documents; about 2 min left"
+        assert app.progress_text.get() == "52%  26 of 50 documents; about 2 min left"
         app._done({"command": "x", "label": "x"}, 0, "")
         assert str(app.progress.cget("mode")) == "indeterminate" and int(float(app.progress.cget("value"))) == 0
     finally:

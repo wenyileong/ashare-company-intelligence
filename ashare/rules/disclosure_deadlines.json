@@ -1,10 +1,10 @@
 {
   "pack": "deadlines",
-  "version": "deadlines-1",
+  "version": "deadlines-2",
   "schema": 1,
   "swappable": true,
   "status": "provisional",
-  "updated": "2026-11-11",
+  "updated": "2026-11-16",
   "note": "PROVISIONAL RULES, SWAPPABLE. Periodic-report deadlines (v2.3.0, plan B5; made a swappable pack in v2.4.0). Each rule names its source; 'verified' records how it was checked. The rules are applied provisionally until the author confirms the final text; results say so.",
   "how_to_update": "SWAPPABLE MODULE. This pack can be replaced without a new version of the program: 'ashare-cli rules-export deadlines' copies it to the data folder's rules folder for editing; 'ashare-cli rules-import deadlines FILE --apply' installs an edited copy after checking it (the pack it replaces is kept in rules/_replaced); 'ashare-cli rules-reset deadlines --apply' returns to the pack shipped with the program. The same actions are under Check > Rules. Set a rule's 'status' to 'confirmed' once its article, effective date and numbers have been checked against the official text, and record the check in 'verified'; 'withdrawn' keeps a rule without applying it.",
   "rules": [
@@ -16,10 +16,10 @@
       "period_type": "FY",
       "months_after_period_end": 4,
       "counting": "calendar",
-      "source": "Securities Law of the PRC (2019 revision), art. 79(1); CSRC Measures for the Administration of Information Disclosure by Listed Companies (2021), art. 13",
+      "source": "Securities Law of the PRC (2019 revision), art 79(1); CSRC Order No 182, Measures for the Administration of Information Disclosure by Listed Companies (2021), art 13, in force 1 May 2021; replaced by CSRC Order No 226 (2025), art 13, in force 1 July 2025 (same period)",
       "effective_from": "2020-03-01",
       "effective_to": null,
-      "verified": "checked against the CSRC's 2020 consultation draft of the Measures (art. 20: 年度报告应当在每个会计年度结束之日起四个月内); the final text to be confirmed by the author",
+      "verified": "art 13 of Order No 226 seen in the State Council Gazette copy (annual report within four months of the year end), 16 November 2026; the 2021 text checked only against its 2020 consultation draft; to be confirmed by the author",
       "status": "provisional"
     },
     {
@@ -30,10 +30,10 @@
       "period_type": "H1",
       "months_after_period_end": 2,
       "counting": "calendar",
-      "source": "Securities Law of the PRC (2019 revision), art. 79(2); CSRC Measures (2021), art. 13",
+      "source": "Securities Law of the PRC (2019 revision), art 79(2); CSRC Order No 182 (2021), art 13; replaced by CSRC Order No 226 (2025), art 13, in force 1 July 2025 (same period)",
       "effective_from": "2020-03-01",
       "effective_to": null,
-      "verified": "checked against the 2020 consultation draft (art. 20: 中期报告应当在每个会计年度的上半年结束之日起两个月内); the final text to be confirmed by the author",
+      "verified": "art 13 of Order No 226 seen in the State Council Gazette copy (interim report within two months of the half-year end), 16 November 2026; to be confirmed by the author",
       "status": "provisional"
     },
     {
@@ -47,10 +47,10 @@
       ],
       "months_after_period_end": 1,
       "counting": "calendar",
-      "source": "CSRC Measures (2021), art. 13",
+      "source": "the stock exchanges' listing rules (article to be confirmed). Not the CSRC Measures: Order No 226 (2025), art 12, names only annual and interim reports as periodic reports",
       "effective_from": "2021-05-01",
       "effective_to": null,
-      "verified": "checked against the 2020 consultation draft (art. 20: 季度报告应当在每个会计年度第三个月、第九个月结束后的一个月内编制完成并披露); the final text to be confirmed by the author",
+      "verified": "one month after the first and third quarters is taken from the 2020 consultation draft of the Measures; the exchange rule that now sets it was not retrieved, 16 November 2026; source and article to be confirmed by the author",
       "status": "provisional"
     }
   ],

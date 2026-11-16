@@ -1,4 +1,4 @@
-# China A-share Company Intelligence v2.4.0
+# China A-share Company Intelligence v2.4.1
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23982987.svg)](https://doi.org/10.5281/zenodo.23982987)
 
@@ -53,6 +53,8 @@ v2.4 makes the legal rules the program applies swappable, applies the share-deal
 - **Share-dealing flags.** Late reports, sales without an announced reduction plan and dealings in a blackout window are flagged under the provisional rules, each flag marked as such; two optional panel variables follow. A flag is a fact to examine, not a finding of breach.
 - **Progress.** Long actions show a percentage bar with the count, the stage and the time left; a resumed action starts where it stopped. A terminal shows the same bar on one line.
 - **Smaller additions.** GLEIF parents appear on the ego map as their own relation, and the readiness check for regulatory events counts only those published by the view's date.
+
+v2.4.1 fixes what a review of v2.4.0 found (three progress-bar defects, a loose matcher for reduction plans), reads the method of each share dealing, records in the rule packs where each rule was checked, and adds an offline rehearsal of a live run (`packaging/rehearsal.py`).
 
 v2.3 fixes what the v2.2.0 live run showed (`docs/live_run_findings_v2.2.md`, findings 140 to 146), makes every chart zoomable, and adds infrastructure that later views build on (`docs/plan_v2.3.md`). Each new feature has its own switch under Check > Diagnostics.
 - **A data folder that moves.** Documents are found after the folder has moved, checked by their hash. Check > Data folder checks the stored paths, moves the folder (a dry run first, the old folder left untouched after a copy) or adopts one restored after reinstalling Windows. Every rewrite of stored paths can be undone.
@@ -850,7 +852,7 @@ A-share Company Intelligence is research software, provided as is and without wa
 
 Each release is archived on Zenodo: <https://doi.org/10.5281/zenodo.23982987>. Cite the version you used, for example:
 
-Wen Yi Leong, *A-share Company Intelligence* (version 2.4.0, software, 2026) <https://doi.org/10.5281/zenodo.23982987>.
+Wen Yi Leong, *A-share Company Intelligence* (version 2.4.1, software, 2026) <https://doi.org/10.5281/zenodo.23982987>.
 
 GitHub's "Cite this repository" gives the same details from `CITATION.cff`. A dataset built with the software is cited by its release name and database fingerprint, from the release's own `CITATION.cff`. The Zenodo record is a copy for citation; the licence below governs the software wherever it is obtained.
 

@@ -201,3 +201,49 @@ No migration was needed: no table changed.
   - writes an interactive page with the zoom runtime.
 - The installer installs silently, and the installed program reports 2.4.0.
 - GitHub's Windows runner built and tested the release commit: 516 passed and 16 skipped, and the smoke test of the packaged program (now including the rule packs) passed.
+
+# Review after the build, and v2.4.1 (16 November 2026)
+
+A review of v2.4.0 against this plan and requirement R3 found the points below. v2.4.1 deals with those marked fixed.
+
+| # | Finding | How it was found | In v2.4.1 |
+|---|---|---|---|
+| X1 | The daily update's bar stuck at 100% after its first stage: the finished job still held the bar. | Reproduced | Fixed: a job releases its bar, and a new stage releases the counters before it. |
+| X2 | In a terminal, ordinary messages printed on the end of the bar's line. | Reproduced | Fixed. |
+| X3 | An action with nothing to do said "counting…" for ever. | Reproduced | Fixed: a total of zero is complete. |
+| X4 | Notices that a reduction plan had finished or progressed counted as plans. | Six titles tested | Fixed. |
+| X5 | The method of a dealing was never read, so every sale was judged as a sale by auction. | Code read | Fixed: read from the row or the page. |
+| X6 | The plan rule was applied to auction sales only, though the 2024 rule also covers block trades. | Texts read | Fixed: the pack names the methods. |
+| X7 | Dealings of any date were judged under the 2024 figures. | Texts read | Flags on earlier dealings say an earlier version applied. Dated earlier versions are not yet in the pack. |
+| X8 | Supervisors were judged after the Rules ceased to cover them (27 March 2025). | Texts read | Fixed. |
+| X9 | The twelve-month window began up to three days early. | Code read | Fixed. |
+| X10 | The quarterly deadline cited the CSRC Measures, which name only annual and half-year reports. | Texts read | Source corrected; article to be confirmed. |
+| X11 | A long count pushed the buttons out of the Output heading, and the bar itself was squeezed out of sight. | Screenshots | Fixed: the bar has its own row. |
+| X12 | Units, stage names and durations stayed in English. | Screenshots | Fixed. |
+| X13 | No megabytes or speed; no overall figure across stages. | R3 | Megabytes and speed for document downloads; an overall percentage. One file's bytes are still not counted as they arrive. |
+
+**Attempts that did not succeed.**
+- **The legal database connector** needed the author to sign in again, so the texts were read through web search instead: the State Council Gazette for the two CSRC orders, republished copies for the Rules. The CSRC's own site was not read.
+- **Samples for findings 134 and 132.** CNINFO and the exchanges cannot be reached from the build machine, and the documents concerned are in the author's database. These still wait on the `inspect-tables` samples.
+- **The exchanges' terms.** Only the Shanghai notice was read (compliance notes, "Added in v2.4.1").
+
+**Tests for v2.4.1.** `tests/test_v241.py` (17 tests, one of which runs the rehearsal). The results are in the build record below.
+
+# Build record (v2.4.1, 16 November 2026)
+
+No migration was needed: no table changed. No extractor version changed; the dealing reader now also records the method, so **Read share dealings** should be run again.
+
+| Environment | Passed | Skipped |
+|---|---|---|
+| Linux, Python 3.12 | 545 | 4 |
+| Every switch off (earlier suite) | 456 | 4 |
+| Python 3.13 | 507 | 40 |
+| PostgreSQL 16 | 538 | 11 |
+
+**Rehearsal.** 33 steps, none failed: on the source tree, and against the packaged `ashare-cli.exe` under Wine. Under Wine the Windows Python needed the PDF library added to write the synthetic documents; that library is used only by tests and the rehearsal, not by the program.
+
+**Screenshots.** The Rules page and the progress row were captured in English and Chinese on the test display and read by eye. The first capture showed finding X11.
+
+**Dependencies.** `pip-audit` on the 34 pinned libraries of the Windows build: no known vulnerabilities.
+
+**Windows.** Built under Wine; the installer installs silently and the installed program reports 2.4.1. GitHub's Windows runner builds, tests and rehearses the release commit.

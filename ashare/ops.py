@@ -325,6 +325,7 @@ def run_job(job_id: int, progress=None, sleep=time.sleep) -> dict:
                 job.status, job.last_error = "STOPPED", f"{refused} refused in a row: {item.last_error}"[:1000]
                 s.commit()
                 break
+        bar.close()                      # v2.4.1: a finished job no longer holds the progress bar
         if job.status == "RUNNING":
             retryable = s.query(JobItem).filter(JobItem.job_id == job_id, JobItem.status == "FAILED",
                                                 JobItem.attempts < MAX_ATTEMPTS).count()

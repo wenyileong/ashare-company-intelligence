@@ -109,6 +109,36 @@ def register(app, _table) -> None:
         else:
             print("Not installed: add --apply to install it.")
 
+    @app.command("rules-diff")
+    def rules_diff_cmd(pack: str = typer.Argument(..., help=PACK_HELP),
+                       file: str = typer.Option(None, "--file", help="A file to compare; blank: the pack in use")):
+        """What a rule pack changes against the one shipped with the program (v2.4.1)."""
+        from .rulepacks import diff, PackError
+        try:
+            r = diff(_pack(pack), file or None)
+        except PackError as exc:
+            _fail(exc)
+        print(f"{r['compared']} ({r['version']}) against the shipped pack ({r['shipped_version']})")
+        if not r["rows"]:
+            print("No difference.")
+            return
+        _table(r["rows"], ["field", "change", "shipped", "this_pack"], title=f"Changes: {r['pack']}")
+
+    @app.command("rules-sheet")
+    def rules_sheet_cmd(out: str = typer.Option("rule_confirmation_sheet.md", "--out", help="The file to write"),
+                        pack: str = typer.Option(None, "--pack", help="One pack; blank: all")):
+        """Write a sheet listing every rule with what is to be confirmed and blanks to fill in (v2.4.1)."""
+        from pathlib import Path
+        from .rulepacks import confirmation_sheet
+        text = confirmation_sheet([_pack(pack)] if pack else None)
+        Path(out).write_text(text, encoding="utf-8")
+        print(f"Written: {out}")
+        try:
+            from .outputs import record_output
+            record_output("document", out, "rules-sheet", {"pack": pack or "all"})
+        except Exception:                                     # noqa: BLE001
+            pass
+
     @app.command("rules-reset")
     def rules_reset_cmd(pack: str = typer.Argument(..., help=PACK_HELP),
                         apply: bool = typer.Option(False, "--apply", help="Return to the bundled pack")):

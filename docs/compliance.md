@@ -28,6 +28,11 @@ Statutory disclosures are public, but that does not by itself settle every quest
 - **Directors' and officers' share dealings.** They are read from the companies' own announcements. The rules that flag a dealing (a late report, a sale without a prior plan, a dealing in a window period) are applied only once their article and effective date have been confirmed against the official text. A flag records dates against a rule. It is not a finding that a rule was breached, and the program says so wherever a flag is shown. The dealings are personal information: they leave the program only under pseudonyms, and the table is left out of releases.
 - **Alerts** from watchlists stay inside the program. Nothing is sent by email or to a notification service in v2.3.
 
+### Added in v2.4.1
+
+- **The exchanges' own lists of share dealings are still not a source.** The Shanghai Stock Exchange's legal notice (<https://www.sse.com.cn/home/legal/>, read on 16 November 2026) allows browsing and downloading for non-commercial purposes. It forbids use for sale or profit without written permission, and names retrieval by "electronic capture systems" among the uses that then need permission. On that reading, non-commercial research use looks permissible, but the notice does not address automated collection for research in terms, and the Shenzhen and Beijing exchanges' notices were not read. The decision rests with the researcher; until it is made, dealings are read only from the companies' announcements.
+- **Legal texts.** The rule packs record where each rule was checked. On 16 November 2026 the CSRC's own site still refused automated reading, so the articles were read in the State Council Gazette and in republished copies; every rule stays provisional until the researcher confirms it.
+
 ## 3. Personal information
 
 The data include personal information: the names, gender, age, remuneration, shareholdings and career histories of directors, supervisors and senior officers, and the names of natural-person shareholders, pledgors and controllers. Listed companies must disclose this information, but its further processing remains subject to data-protection law.

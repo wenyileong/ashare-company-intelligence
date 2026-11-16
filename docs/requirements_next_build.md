@@ -1,8 +1,23 @@
 # Requirements for the next builds
 
-## For the build after v2.3.0 (recorded 8 November 2026)
+## For the build after v2.3.0 (recorded 8 November 2026; met in v2.4.0 and v2.4.1, with the gaps listed)
 
-The plan for the build after v2.3.0, whatever its version number, must address R3 and record how it was met, or why it was not.
+**How R3 was met.**
+
+| Item | State after v2.4.1 |
+|---|---|
+| 1. A determinate bar with percentage, count, time left | Met (v2.4.0). The bar has its own row under the Output heading since v2.4.1, after screenshots showed the count crowding out the buttons. |
+| 1. Speed when downloading | Met in v2.4.1 for document downloads: megabytes so far and MB/s. |
+| 2. Stages, and an overall bar | Stage shown (v2.4.0); an overall percentage across stages, weighed alike, in v2.4.1. Not a second bar. |
+| 3. Unknown and growing totals | Met. A total of zero is complete since v2.4.1. |
+| 4. Downloads by size | Not met: documents are not downloaded in a stream, so one file's bytes cannot be counted as they arrive. Megabytes are counted file by file instead. |
+| 5. Stop and resume | Met. |
+| 6. The command line | Met; other messages clear the bar's line first since v2.4.1. |
+| 7. Accuracy and cost | Met. |
+| 8. Language | Met in v2.4.1: units, stage names and durations are translated. |
+| 9. Windows taskbar | Not built: it cannot be checked without a Windows desktop. |
+
+The requirement as recorded:
 
 ### R3. A percentage progress bar whenever the program fetches or reads data
 

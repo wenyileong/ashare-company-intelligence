@@ -240,6 +240,8 @@ def download_pending(ids: list[int] | None = None, kinds: tuple[str, ...] | None
                         mb = document_path(row).stat().st_size / 1048576 if row.local_path else 0.0
                     except OSError:
                         mb = 0.0
+                    from .progressbar import add_megabytes       # v2.4.1 (R3): megabytes and speed
+                    add_megabytes(mb)
                     sec0, mb0, k0 = timed.get(row.kind or "", (0.0, 0.0, 0))
                     timed[row.kind or ""] = (sec0 + time.monotonic() - t_doc, mb0 + mb, k0 + 1)
                 except Exception as exc:

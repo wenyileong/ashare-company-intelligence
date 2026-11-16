@@ -773,7 +773,7 @@ def test_dealing_rows_are_read_and_unverified_rules_flag_nothing(db, company, tm
     f = flags("600519", confirmed_only=True)          # v2.4.0: only confirmed rules, of which there are none yet
     assert f["rows"][0]["shares"] == 120000.0 and f["rows"][0]["direction"] == "SELL"
     assert f["applied_rules"] == [] and f["rows"][0]["flags"] == "" and "not a finding of breach" in f["note"]
-    assert all(r["verified"] is None for r in rules()["rules"])
+    assert all(r["status"] == "provisional" for r in rules()["rules"])     # v2.4.1: checked, not yet confirmed
     f = flags("600519")                               # v2.4.0: the provisional rules apply, and say so
     assert set(f["applied_rules"]) == {"report_within", "plan_before_sale", "blackout"}
     assert "2 day(s) before a annual report" in f["rows"][0]["flags"]

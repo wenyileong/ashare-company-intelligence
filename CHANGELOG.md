@@ -2,6 +2,37 @@
 
 This log records what changed in each version and the important findings behind the changes. The live-run findings are kept in full in `docs/live_run_findings_v2.0.2.md` (findings 1 to 19) `docs/live_run_findings_v2.0.3.md` (findings 20 to 34) and `docs/live_run_findings_v2.0.5.md` (findings 35 to 57, the first live runs of the v2.0.4 catalogue engine) `docs/live_run_findings_v2.0.6.md` (findings 58 to 69) and `docs/live_run_findings_v2.0.7.md` (findings 70 to 95) and `docs/live_run_findings_v2.0.8.md` (findings 96 to 111) and `docs/live_run_findings_v2.0.9.md` (findings 112 to 117) and `docs/live_run_findings_v2.1.md` (findings 118 to 131) and `docs/live_run_findings_v2.1.2.md` (findings 132 to 139) and `docs/live_run_findings_v2.2.md` (findings 140 to 148). The plan for v2.1, with its six rounds of review, is `docs/plan_v2.1.md`. Earlier versions are described in `README.md` and in section 18 of `ashare_scraper_build_plan.md`.
 
+## v2.4.1 (16 November 2026)
+
+**Aim:** fix the defects and close the gaps found in a review of v2.4.0 against its plan, and do what could be done without the author: check the rules against published texts, rehearse a live run offline, and look at the desktop program by eye. The review and the build record are in `docs/plan_v2.4.md`.
+
+**After upgrading:**
+1. Run **Management > Read share dealings** again (switch 'insider'), so that each dealing's method is read.
+2. An updated rule pack of your own in the data folder still applies. Compare it with the new shipped packs: **Check > Rules > Compare a pack with the shipped one**.
+
+- **Progress: defects fixed.**
+  - The daily update's bar no longer sticks at 100% after its first stage.
+  - In a terminal, other messages clear the bar's line first.
+  - An action with nothing to do is complete, not "counting…".
+- **Progress: refinements.**
+  - The bar has its own row, after screenshots showed a long count pushing the buttons out of the heading.
+  - Megabytes and speed for document downloads; an overall percentage across stages.
+  - Units, stage names and durations in Chinese.
+  - Reading share dealings has a counter.
+- **Share dealings.**
+  - The method of each dealing is read (auction, block trade, agreement, other).
+  - The plan rule covers auction and block trades, as the pack now says, and not agreements.
+  - Notices that a plan has finished, progressed, expired or been dropped are no longer taken for plans.
+  - Flags on dealings before a rule's present form say that an earlier version applied.
+  - Supervisors are not judged after 27 March 2025.
+  - The twelve-month window of the two panel variables is exact.
+- **Rule packs `insider-2` and `deadlines-2`.**
+  - Each rule records the article found and where it was read on 16 November 2026. Every rule stays provisional.
+  - The quarterly deadline's source is corrected to the exchanges' listing rules (article to be confirmed).
+  - New: `rules-diff` and `rules-sheet` (a confirmation sheet with blanks to fill in).
+- **Rehearsal.** `packaging/rehearsal.py` runs 33 steps of a live run offline; it runs in the tests and against the packaged program on GitHub's Windows runner.
+- **Checked, nothing to change.** The libraries in the Windows build have no known vulnerabilities (pip-audit, 16 November 2026).
+
 ## v2.4.0 (11 November 2026)
 
 **Aim:** make the legal rules the program applies swappable (the author's instruction of 11 November 2026), apply the share-dealing rules provisionally, and meet requirement R3, a percentage progress bar whenever the program fetches or reads data. The plan, its review against the code and its build record are in `docs/plan_v2.4.md`.

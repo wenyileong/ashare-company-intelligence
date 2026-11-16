@@ -1,30 +1,38 @@
 {
   "pack": "insider",
-  "version": "insider-1",
+  "version": "insider-2",
   "schema": 1,
   "swappable": true,
   "status": "provisional",
-  "updated": "2026-11-11",
-  "note": "PROVISIONAL RULES, SWAPPABLE. Rules for directors', supervisors' and senior managers' share dealings (v2.3.0, plan B6; made a swappable pack in v2.4.0). None of these rules has yet been confirmed against the current official text. They are applied provisionally: every flag they raise is marked '(provisional rule)'. A flag is a fact to examine, not a finding of breach.",
+  "updated": "2026-11-16",
+  "note": "PROVISIONAL RULES, SWAPPABLE. Rules for directors', supervisors' and senior managers' share dealings (v2.3.0, plan B6; a swappable pack since v2.4.0). insider-2 (v2.4.1) records the articles found in published copies of the texts on 16 November 2026; the author has not yet confirmed them, so every rule stays provisional and every flag is marked '(provisional rule)'. A flag is a fact to examine, not a finding of breach.",
   "how_to_update": "SWAPPABLE MODULE. This pack can be replaced without a new version of the program: 'ashare-cli rules-export insider' copies it to the data folder's rules folder for editing; 'ashare-cli rules-import insider FILE --apply' installs an edited copy after checking it (the pack it replaces is kept in rules/_replaced); 'ashare-cli rules-reset insider --apply' returns to the pack shipped with the program. The same actions are under Check > Rules. Set a rule's 'status' to 'confirmed' once its article, effective date and numbers have been checked against the official text, and record the check in 'verified'; 'withdrawn' keeps a rule without applying it.",
   "rules": [
     {
       "id": "report_within",
       "trading_days": 2,
       "applies_to": "a change in holdings, reported from the day it occurs",
-      "source": "CSRC Rules on the Shares Held by Directors, Supervisors and Senior Managers of Listed Companies and Changes Therein (2024 revision): article to be confirmed",
+      "source": "CSRC, Rules on the Administration of Shares Held by Directors and Senior Managers of Listed Companies and Changes Therein (上市公司董事和高级管理人员所持本公司股份及其变动管理规则; 2024 revision, as amended by CSRC Announcement [2025] No 5 of 27 March 2025), art 12",
       "effective_from": null,
-      "verified": null,
-      "status": "provisional"
+      "verified": "article and figure seen in republished copies of the 2024 and 2025 texts (art 12: within two trading days of the change), 16 November 2026; not checked on csrc.gov.cn, which refuses automated reading; date of the 2024 revision to be confirmed by the author",
+      "status": "provisional",
+      "in_this_form_from": "2024-05-24",
+      "supervisors_until": "2025-03-27"
     },
     {
       "id": "plan_before_sale",
       "trading_days": 15,
-      "applies_to": "a reduction by auction, announced before the first sale",
-      "source": "CSRC Interim Measures on Share Reductions by Shareholders of Listed Companies (2024) and the same Rules: article to be confirmed",
+      "applies_to": "a sale by auction or block trade, with a reduction plan announced before the first sale",
+      "source": "CSRC, Rules on the Administration of Shares Held by Directors and Senior Managers of Listed Companies and Changes Therein (上市公司董事和高级管理人员所持本公司股份及其变动管理规则; 2024 revision, as amended by CSRC Announcement [2025] No 5 of 27 March 2025), art 9 (to be confirmed); for major shareholders, CSRC Order No 224, Interim Measures for the Administration of Share Reductions by Shareholders of Listed Companies (上市公司股东减持股份管理暂行办法), art 9, in force 24 May 2024",
       "effective_from": null,
-      "verified": null,
-      "status": "provisional"
+      "verified": "art 9 of the Interim Measures seen in the State Council Gazette copy (auction or block trade; 15 trading days before the first sale), 16 November 2026; the matching article of the Rules for directors and senior managers was not retrieved and is to be confirmed by the author",
+      "status": "provisional",
+      "in_this_form_from": "2024-05-24",
+      "supervisors_until": "2025-03-27",
+      "methods": [
+        "AUCTION",
+        "BLOCK"
+      ]
     },
     {
       "id": "blackout",
@@ -46,10 +54,12 @@
           "calendar_days": 5
         }
       ],
-      "source": "the same Rules (window periods): article and lengths to be confirmed",
+      "source": "CSRC, Rules on the Administration of Shares Held by Directors and Senior Managers of Listed Companies and Changes Therein (上市公司董事和高级管理人员所持本公司股份及其变动管理规则; 2024 revision, as amended by CSRC Announcement [2025] No 5 of 27 March 2025), art 13",
       "effective_from": null,
-      "verified": null,
-      "status": "provisional"
+      "verified": "article and figures seen in republished copies of the 2024 and 2025 texts (art 13: 15 days before annual and half-year reports; 5 days before quarterly reports, earnings forecasts and flash reports), 16 November 2026; the limb on material events (art 13(3)) is not tested; earlier versions set longer windows, to be confirmed by the author",
+      "status": "provisional",
+      "in_this_form_from": "2024-05-24",
+      "supervisors_until": "2025-03-27"
     }
   ]
 }

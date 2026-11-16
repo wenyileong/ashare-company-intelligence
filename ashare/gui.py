@@ -814,6 +814,14 @@ SECTIONS = [
              F("apply", "Apply", "bool", False, ("--apply", None), "Unticked, only checks the file.")],
            "Checks the file and, ticked, installs it. It applies from the next action; the pack it replaces is kept "
            "in rules/_replaced."),
+         A("Compare a pack with the shipped one", "rules-diff", [
+             F("pack", "Pack", "choice:insider,deadlines,nominees", "insider", None),
+             F("file", "File", "file", "", "--file", "Blank: the pack in use.")],
+           "Each field that differs from the pack shipped with the program."),
+         A("Write a confirmation sheet", "rules-sheet", [
+             F("out", "File", "text", "rule_confirmation_sheet.md", "--out", "")],
+           "A sheet listing every rule with its figure, source and how it was checked so far, and blanks for the "
+           "article, the effective date and your finding."),
          A("Return to the shipped pack", "rules-reset", [
              F("pack", "Pack", "choice:insider,deadlines,nominees", "insider", None),
              F("apply", "Apply", "bool", False, ("--apply", None), "Unticked, only says which pack is in use.")],
@@ -1314,7 +1322,14 @@ class App(tk.Tk):
         self.status = tk.StringVar(value=tr("ui.status.ready", "Ready"))
         self.status_lbl = ttk.Label(bar, textvariable=self.status, style="Muted.TLabel")
         self.status_lbl.pack(side="left", padx=12)
-        self.progress = ttk.Progressbar(bar, mode="indeterminate", length=160, maximum=1000)
+        # v2.4.1: the bar and its figures have a row of their own, shown while an action runs, so a long count
+        # never pushes the buttons out of the header
+        self.progress_row = ttk.Frame(out, padding=(20, 0, 20, 6))
+        self._header_bar = bar
+        self.progress = ttk.Progressbar(self.progress_row, mode="indeterminate", length=280, maximum=1000)
+        self.progress.pack(side="left")
+        self.progress_text = tk.StringVar(value="")
+        ttk.Label(self.progress_row, textvariable=self.progress_text, style="Muted.TLabel").pack(side="left", padx=12)
         self.stop_btn = ttk.Button(bar, text=tr("ui.stop", "Stop"), style="Small.TButton", command=self._stop)
         for text, cmd in ((tr("ui.clear", "Clear"), lambda: self.log.delete("1.0", "end")),
                           (tr("ui.copy", "Copy"), self._copy),
@@ -1874,7 +1889,8 @@ class App(tk.Tk):
         self.status.set(tr("ui.status.running", "Running: {label}…").format(label=action_label(action)))
         self._running_label = action_label(action)
         self.progress.configure(mode="indeterminate", value=0)
-        self.progress.pack(side="left", padx=8)
+        self.progress_text.set("")
+        self.progress_row.pack(fill="x", after=self._header_bar)
         self.progress.start(12)
         self.stop_btn.pack(side="left", padx=(10, 0), before=self.status_lbl)   # first, so it always has room
         self.stop_btn.state(["!disabled"])
@@ -1917,7 +1933,7 @@ class App(tk.Tk):
                 self.progress.configure(mode="determinate")
             self.progress.configure(value=int(f * 1000))
         self._last_progress = d
-        self.status.set(f"{getattr(self, '_running_label', '')}: {text(d, tr)}")
+        self.progress_text.set(text(d, tr))
 
     def _stop(self):
         from .http import request_cancel
@@ -1957,7 +1973,7 @@ class App(tk.Tk):
         self.busy = False
         self.progress.stop()
         self.progress.configure(mode="indeterminate", value=0)
-        self.progress.pack_forget()
+        self.progress_row.pack_forget()
         self.stop_btn.pack_forget()
         for b in self.run_buttons:
             b.state(["!disabled"])

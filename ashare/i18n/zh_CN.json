@@ -2607,6 +2607,26 @@
   "en_hash": "81b624cecd",
   "zh": "检查每个字段、数字、日期和状态。未通过检查的规则包不会被适用。"
  },
+ "action.rules.rules-diff.field.file.hint": {
+  "en_hash": "b152dcc62a",
+  "zh": "留空：当前使用的规则包。"
+ },
+ "action.rules.rules-diff.field.file.label": {
+  "en_hash": "2c3cafa4db",
+  "zh": "文件"
+ },
+ "action.rules.rules-diff.field.pack.label": {
+  "en_hash": "152a5035bf",
+  "zh": "规则包"
+ },
+ "action.rules.rules-diff.label": {
+  "en_hash": "cdc38ec121",
+  "zh": "与程序自带的规则包比较"
+ },
+ "action.rules.rules-diff.note": {
+  "en_hash": "7f4870bb4c",
+  "zh": "与程序自带规则包不同的每个字段。"
+ },
  "action.rules.rules-export.field.force.hint": {
   "en_hash": "f7192df38e",
   "zh": "被替换的规则包会被保留。"
@@ -2686,6 +2706,18 @@
  "action.rules.rules-reset.note": {
   "en_hash": "96b2ee4bce",
   "zh": "更新的规则包保存在 rules/_replaced 中。"
+ },
+ "action.rules.rules-sheet.field.out.label": {
+  "en_hash": "2c3cafa4db",
+  "zh": "文件"
+ },
+ "action.rules.rules-sheet.label": {
+  "en_hash": "c9b6fb257f",
+  "zh": "生成规则确认表"
+ },
+ "action.rules.rules-sheet.note": {
+  "en_hash": "5b744baf6b",
+  "zh": "一份清单，列出每条规则的数值、出处和目前的核对情况，并留出空格填写条款、生效日期和您的核对结论。"
  },
  "action.rules.rules-show.field.pack.label": {
   "en_hash": "152a5035bf",
@@ -3307,13 +3339,89 @@
   "en_hash": "c36e7c37bd",
   "zh": "已完成 {done:,} {unit}"
  },
+ "progress.days": {
+  "en_hash": "ac8a38c13a",
+  "zh": "{d} 天 {h} 小时"
+ },
+ "progress.hours": {
+  "en_hash": "b0082f08ba",
+  "zh": "{h} 小时 {m:02d} 分钟"
+ },
  "progress.left": {
   "en_hash": "ec4acff675",
   "zh": "约剩 {time}"
  },
+ "progress.mb": {
+  "en_hash": "bce4ab51d3",
+  "zh": "{mb:,.1f} MB，{rate:.1f} MB/秒"
+ },
+ "progress.minutes": {
+  "en_hash": "37e737d92c",
+  "zh": "{n} 分钟"
+ },
+ "progress.nothing": {
+  "en_hash": "2bcad3c5e1",
+  "zh": "100%  无需处理"
+ },
+ "progress.overall": {
+  "en_hash": "0c1d4550b6",
+  "zh": "总进度 {pct}%"
+ },
+ "progress.seconds": {
+  "en_hash": "a6fb5d1c4e",
+  "zh": "{n} 秒"
+ },
  "progress.stage": {
   "en_hash": "5847e54c65",
   "zh": "第 {n} 阶段，共 {of} 个阶段"
+ },
+ "progress.stage.catalogue": {
+  "en_hash": "e529480f90",
+  "zh": "公告和文件"
+ },
+ "progress.stage.prices": {
+  "en_hash": "d4036891c1",
+  "zh": "行情"
+ },
+ "progress.stage.reading": {
+  "en_hash": "ac2bfd2844",
+  "zh": "读取文件"
+ },
+ "progress.unit.announcements": {
+  "en_hash": "2a60e42295",
+  "zh": "份公告"
+ },
+ "progress.unit.companies": {
+  "en_hash": "aed46479ee",
+  "zh": "家公司"
+ },
+ "progress.unit.days": {
+  "en_hash": "5548ae4f34",
+  "zh": "天"
+ },
+ "progress.unit.documents": {
+  "en_hash": "ec96667ac8",
+  "zh": "份文件"
+ },
+ "progress.unit.entities": {
+  "en_hash": "9d88f3cc17",
+  "zh": "个主体"
+ },
+ "progress.unit.files": {
+  "en_hash": "a1f13b3bc2",
+  "zh": "个文件"
+ },
+ "progress.unit.items": {
+  "en_hash": "7316c8b2e7",
+  "zh": "项"
+ },
+ "progress.unit.pages": {
+  "en_hash": "eec6542d2e",
+  "zh": "页"
+ },
+ "progress.unit.tables": {
+  "en_hash": "3915396b5f",
+  "zh": "张表"
  },
  "progress.within": {
   "en_hash": "6532edf43a",

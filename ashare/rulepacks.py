@@ -34,6 +34,9 @@ REPORT_KINDS = {"annual_report", "interim_report", "quarterly_report", "earnings
                 "earnings_forecast", "earnings_flash"}
 
 
+SALE_METHODS = {"AUCTION", "BLOCK", "AGREEMENT", "OTHER"}
+
+
 class PackError(ValueError):
     """A pack that cannot be used (unknown, unreadable or invalid)."""
 
@@ -60,7 +63,7 @@ def _common_rule(r: dict, i: int, errors: list, warnings: list, known: set | Non
         errors.append(f"{where}: 'status' must be one of {', '.join(STATUSES)}")
     if not isinstance(r.get("source"), str) or not r["source"].strip():
         errors.append(f"{where}: needs a 'source' (the instrument and article)")
-    for k in ("effective_from", "effective_to"):
+    for k in ("effective_from", "effective_to", "in_this_form_from", "supervisors_until"):
         if not _date_ok(r.get(k)):
             errors.append(f"{where}: '{k}' must be a date such as 2024-05-24, or null")
     if r.get("effective_from") and r.get("effective_to") and r["effective_to"] < r["effective_from"]:
@@ -84,6 +87,9 @@ def _validate_insider(d: dict, errors: list, warnings: list) -> None:
         _common_rule(r, i, errors, warnings, {"report_within", "plan_before_sale", "blackout"})
         if r.get("id") in ("report_within", "plan_before_sale") and not _pos_int(r.get("trading_days")):
             errors.append(f"rule {r['id']}: 'trading_days' must be a whole number above 0")
+        ms = r.get("methods")
+        if ms is not None and (not isinstance(ms, list) or not ms or not set(ms) <= SALE_METHODS):
+            errors.append(f"rule {r.get('id')}: 'methods' must list some of {', '.join(sorted(SALE_METHODS))}")
         if r.get("id") == "blackout":
             ws = r.get("windows")
             if not isinstance(ws, list) or not ws:
@@ -412,3 +418,76 @@ def reset(name: str, apply: bool = False) -> dict:
     clear_cache()
     res.update({"applied": True, "kept": kept, "now": load(name).describe()})
     return res
+
+
+# --- comparing and confirming (v2.4.1) --------------------------------------------------------------------------------
+
+def _flat(data: dict) -> dict:
+    """A pack as {path: value}: its own fields, each rule's fields by rule id, and the names."""
+    out = {}
+    for k, v in data.items():
+        if k == "rules":
+            for r in v or []:
+                rid = r.get("id") or "?"
+                for rk, rv in r.items():
+                    if rk != "id":
+                        out[f"rule {rid}: {rk}"] = rv
+        elif k == "names":
+            for n in v or []:
+                out[f"name: {n}"] = True
+        elif k not in ("how_to_update",):
+            out[k] = v
+    return out
+
+
+def diff(name: str, file: str | Path | None = None) -> dict:
+    """What a pack changes against the one shipped with the program: ``file``, or else the pack in use."""
+    base = _read(bundled_path(name))
+    if file:
+        try:
+            other = json.loads(Path(file).read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise PackError(f"{file} could not be read: {exc}")
+        label = str(file)
+    else:
+        pk = load(name)
+        other, label = pk.data, pk.path
+    a, b = _flat(base), _flat(other if isinstance(other, dict) else {})
+    rows = []
+    for k in sorted(set(a) | set(b)):
+        if a.get(k) != b.get(k):
+            rows.append({"field": k, "shipped": "" if k not in a else json.dumps(a[k], ensure_ascii=False),
+                         "this_pack": "" if k not in b else json.dumps(b[k], ensure_ascii=False),
+                         "change": "added" if k not in a else "removed" if k not in b else "changed"})
+    return {"pack": name, "compared": label, "shipped_version": base.get("version"),
+            "version": other.get("version") if isinstance(other, dict) else None, "rows": rows}
+
+
+def confirmation_sheet(names: list[str] | None = None) -> str:
+    """A sheet (Markdown) listing every rule in use with what is to be confirmed and blanks to fill in."""
+    lines = ["# Rule confirmation sheet", "",
+             "For each rule: check the article, the date it took effect and the figure against the official text. "
+             "Then set the rule's `status` to `confirmed` in the pack, with `source`, `effective_from` and `verified` "
+             "(Check > Rules > Copy a pack for editing).", ""]
+    for name in (names or list(PACKS)):
+        pk = load(name)
+        lines += [f"## {PACKS[name].title} (`{name}`, {pk.version}; {pk.origin}; {pk.status})", ""]
+        if not pk.rules:
+            lines += [f"{len(pk.data.get('names', [])):,} names; nothing to confirm rule by rule.", ""]
+            continue
+        for r in pk.rules:
+            fig = (f"{r['trading_days']} trading days" if r.get("trading_days") else
+                   f"{r['months_after_period_end']} month(s) after the period end" if r.get("months_after_period_end")
+                   else "; ".join(f"{w['calendar_days']} days before {w['before'].replace('_', ' ')}"
+                                  for w in r.get("windows", [])))
+            lines += [f"### `{r.get('id')}` ({rule_status(r)})", "",
+                      f"- **Figure in the pack:** {fig}" + (f"; methods {', '.join(r['methods'])}" if r.get("methods")
+                                                              else ""),
+                      f"- **Source in the pack:** {r.get('source') or 'none'}",
+                      f"- **Effective from, in the pack:** {r.get('effective_from') or 'not given'}"
+                      + (f" (in this form from {r['in_this_form_from']})" if r.get("in_this_form_from") else ""),
+                      f"- **How it was checked so far:** {r.get('verified') or 'not checked'}", "",
+                      "| To confirm | Your finding |", "|---|---|",
+                      "| Instrument and article | |", "| Date it took effect | |", "| Figure correct? | |",
+                      "| Earlier versions that differ, and their dates | |", "| Checked against (source, date) | |", ""]
+    return "\n".join(lines)

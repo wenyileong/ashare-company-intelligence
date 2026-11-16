@@ -28,6 +28,21 @@ ROW = re.compile(
 
 
 PLAN_TITLE = re.compile(r"减持(股份)?计划|拟减持|减持.{0,6}预披露|预披露.{0,10}减持")
+# v2.4.1: a notice that a plan has ended, progressed or been dropped announces no new plan
+NOT_A_PLAN = re.compile(r"完毕|完成|结果|进展|过半|届满|期满|终止|实施情况|提前结束|未减持")
+METHODS = (("AUCTION", re.compile(r"集中竞价|竞价交易|二级市场")), ("BLOCK", re.compile(r"大宗交易")),
+           ("AGREEMENT", re.compile(r"协议转让")), ("OTHER", re.compile(r"司法|继承|赠与|非交易过户|股权激励|行权")))
+METHOD_LABEL = {"AUCTION": "sale by auction", "BLOCK": "block trade", "AGREEMENT": "transfer by agreement",
+                "OTHER": "other transfer"}
+
+
+def read_method(row_text: str, page_text: str = "") -> str | None:
+    """The method of a dealing (v2.4.1): from the row's own line, or else from the page when it names exactly one."""
+    for name, rx in METHODS:
+        if rx.search(row_text or ""):
+            return name
+    found = [name for name, rx in METHODS if rx.search(page_text or "")]
+    return found[0] if len(found) == 1 else None
 PLAN_LOOKBACK_DAYS = 200            # a reduction plan older than this is not taken to cover a sale
 
 
@@ -56,13 +71,23 @@ def verified(rule_id: str) -> dict | None:
     return rule(rule_id, confirmed_only=True)
 
 
-def _tag(r: dict) -> str:
+def _tag(r: dict, when: str | None = None) -> str:
+    """What is said after a flag: that the rule is provisional, and (v2.4.1) that the dealing predates the rule's
+    present form, when an earlier version, which may differ, applied."""
     from .rulepacks import rule_status
-    return " (provisional rule)" if rule_status(r) == "provisional" else ""
+    s = ""
+    since = r.get("in_this_form_from")
+    if when and since and when < since:
+        s += f" (before {since}: an earlier version of the rule applied, which may differ)"
+    return s + (" (provisional rule)" if rule_status(r) == "provisional" else "")
+
+
+def _supervisor_only(role: str | None) -> bool:
+    return bool(role) and "监事" in role and "董事" not in role and not re.search(r"经理|总裁|财务|秘书|高级管理", role)
 
 
 def is_plan_title(title: str | None) -> bool:
-    return bool(title and PLAN_TITLE.search(title))
+    return bool(title and PLAN_TITLE.search(title) and not NOT_A_PLAN.search(title))
 
 
 def is_dealing_title(title: str | None) -> bool:
@@ -83,11 +108,13 @@ def parse_rows(text: str, title: str = "") -> list[dict]:
             continue
         price = m.group("price")
         d = m.group("dir")
+        a, b = (text.rfind("\n", 0, m.start()) + 1), text.find("\n", m.end())
+        line = text[a:b if b != -1 else len(text)]
         out.append({"person_name": m.group("name"), "role": (m.group("role") or "").strip() or None,
                     "deal_date": f"{int(m.group('y')):04d}-{int(m.group('m')):02d}-{int(m.group('d')):02d}",
                     "direction": {"增持": "BUY", "买入": "BUY", "减持": "SELL", "卖出": "SELL"}.get(d, default),
                     "shares": shares, "price": float(price.replace(",", "")) if price else None,
-                    "raw_text": m.group(0)[:300]})
+                    "method": read_method(line, text), "raw_text": m.group(0)[:300]})
     return out
 
 
@@ -114,7 +141,8 @@ def extract_dealings(security_code: str | None = None, progress=None) -> dict:
         if security_code:
             ids = [c.id for c in s.query(Company).filter(Company.security_code == str(security_code).zfill(6))]
         with Ledger("insider") as led:
-            for d, c in dealing_announcements(s, ids):
+            from .progressbar import count                   # v2.4.1 (R3)
+            for d, c in count(dealing_announcements(s, ids), unit="announcements"):
                 totals["announcements"] += 1
                 p = document_path(d)
                 if p is None or not p.exists():
@@ -166,6 +194,11 @@ def dealing_flags(session, x, company, confirmed_only: bool = False, cache: dict
     out, unchecked = [], {}
     when = x.deal_date
     exch = company.exchange or "SSE"
+    # v2.4.1: supervisors left the Rules on the date the pack gives (CSRC Announcement [2025] No 5)
+    for r0 in rules().get("rules", []):
+        until = r0.get("supervisors_until")
+        if when and until and when >= until and _supervisor_only(getattr(x, "role", None)):
+            return [], {"all rules": f"a supervisor's dealing on or after {until}, when supervisors left the Rules"}
     rep = rule("report_within", confirmed_only, when) if when else None
     if rep and x.published_date:
         pub = x.published_date[:10]
@@ -175,7 +208,7 @@ def dealing_flags(session, x, company, confirmed_only: bool = False, cache: dict
             n = len(trading_days(when, pub, exch)) - 1
             if n > rep["trading_days"]:
                 out.append(("report_within", f"reported {n} trading days after the dealing (rule: within "
-                                             f"{rep['trading_days']}){_tag(rep)}"))
+                                             f"{rep['trading_days']}){_tag(rep, when)}"))
     win = rule("blackout", confirmed_only, when) if when else None
     if win:
         for w in win["windows"]:
@@ -189,9 +222,11 @@ def dealing_flags(session, x, company, confirmed_only: bool = False, cache: dict
                 gap = (date.fromisoformat(later.announcement_date[:10]) - date.fromisoformat(when)).days
                 if gap <= w["calendar_days"]:
                     out.append(("blackout", f"{gap} day(s) before a {w['before'].replace('_', ' ')} (window: "
-                                            f"{w['calendar_days']} days){_tag(win)}"))
+                                            f"{w['calendar_days']} days){_tag(win, when)}"))
     plan = rule("plan_before_sale", confirmed_only, when) if when and x.direction == "SELL" else None
-    if plan and (x.method in (None, "", "AUCTION", "集中竞价")):
+    covered = set((plan or {}).get("methods") or ["AUCTION"])
+    method = {"集中竞价": "AUCTION", "大宗交易": "BLOCK"}.get(x.method or "", x.method or None)
+    if plan and (method is None or method in covered):       # v2.4.1: only the methods the rule covers
         key = ("plans", company.id)
         if key not in cache:
             cache[key] = sorted(d.announcement_date[:10] for d in session.query(Disclosure).filter(
@@ -199,17 +234,17 @@ def dealing_flags(session, x, company, confirmed_only: bool = False, cache: dict
                 if is_plan_title(d.title_cn))
         start = (date.fromisoformat(when) - timedelta(days=PLAN_LOOKBACK_DAYS)).isoformat()
         plans = [p for p in cache[key] if start <= p <= when]
-        unknown = "" if x.method else "; method not given, taken as a sale by auction"
+        unknown = "" if method else "; method not given, taken as a sale the rule covers"
         if not plans:
             out.append(("plan_before_sale", f"no reduction plan announced in the {PLAN_LOOKBACK_DAYS} days before "
-                                            f"the sale{unknown}{_tag(plan)}"))
+                                            f"the sale{unknown}{_tag(plan, when)}"))
         elif not _covers(session, exch, plans[0], when):
             unchecked["plan_before_sale"] = "no trading calendar for the span (run build-calendar)"
         else:
             best = max(len(trading_days(p, when, exch)) - 1 for p in plans)
             if best < plan["trading_days"]:
                 out.append(("plan_before_sale", f"reduction plan announced {best} trading days before the sale (rule: "
-                                                f"at least {plan['trading_days']}){unknown}{_tag(plan)}"))
+                                                f"at least {plan['trading_days']}){unknown}{_tag(plan, when)}"))
     return out, unchecked
 
 
@@ -232,10 +267,11 @@ def flags(security_code: str | None = None, confirmed_only: bool = False) -> dic
         rows, cache, unchecked_n = [], {}, {}
         for x, c in q.order_by(Company.security_code, InsiderDealing.deal_date):
             f, unchecked = dealing_flags(s, x, c, confirmed_only, cache) if x.deal_date else ([], {})
-            for k in unchecked:
-                unchecked_n[k] = unchecked_n.get(k, 0) + 1
+            for k, why in unchecked.items():
+                unchecked_n[(k, why)] = unchecked_n.get((k, why), 0) + 1
             rows.append({"code": c.security_code, "deal_date": x.deal_date, "direction": x.direction,
-                         "shares": x.shares, "published": x.published_date,
+                         "shares": x.shares, "method": METHOD_LABEL.get(x.method or "", x.method or ""),
+                         "published": x.published_date,
                          "flags": "; ".join(t for _, t in f) if x.deal_date else "no dealing date: not checked",
                          "rules_flagged": ",".join(sorted({k for k, _ in f}))})
         prov = [r for r in applied if r in pk.provisional_ids()]
@@ -247,8 +283,8 @@ def flags(security_code: str | None = None, confirmed_only: bool = False) -> dic
             if prov:
                 note += (f" Provisional, not yet confirmed against the official text: {', '.join(prov)}; their flags "
                          "are marked '(provisional rule)'.")
-        for k, n in unchecked_n.items():
-            note += f" {k}: {n:,} dealing(s) not checked (no trading calendar for the span; run build-calendar)."
+        for (k, why), n in unchecked_n.items():
+            note += f" {k}: {n:,} dealing(s) not checked ({why})."
         return {"rows": rows, "applied_rules": applied, "provisional_rules": prov, "pack": pk.describe(),
                 "note": note + " A flag is a fact to examine, not a finding of breach."}
     finally:
@@ -260,7 +296,8 @@ def company_measures(session, company, as_of: str, cache: dict | None = None) ->
     senior managers, and the sales flagged by the blackout rule, from the dealings published by ``as_of``."""
     from datetime import date
     from .models_v23 import InsiderDealing
-    start = date(int(as_of[:4]) - 1, int(as_of[5:7]), min(int(as_of[8:10]), 28)).isoformat()
+    y, mo, dd = int(as_of[:4]) - 1, int(as_of[5:7]), int(as_of[8:10])
+    start = (date(y, mo, dd) if not (mo == 2 and dd == 29) else date(y, 2, 28)).isoformat()   # exactly a year
     rows = [x for x in session.query(InsiderDealing).filter(InsiderDealing.company_id == company.id)
             if x.deal_date and start < x.deal_date <= as_of and (x.published_date or "9999")[:10] <= as_of]
     if not rows:

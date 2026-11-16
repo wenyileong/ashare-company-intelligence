@@ -264,6 +264,22 @@ These are the interface's own terms for the features of v2.1 (plan v2.1, section
 | Market map | 市场关系图 | |
 | Interactive chart | 交互式图表 | |
 
+## 15. Terms added in v2.4 (proposed; the renderings stand until reviewed)
+
+| English | Chinese | Notes |
+|---|---|---|
+| Rule pack | 规则包 | swappable: 可替换 |
+| Provisional rule | 暂行规则 | applied, and its results say so |
+| Confirmed rule | 已确认的规则 | |
+| Withdrawn rule | 已撤回的规则 | not applied |
+| Confirmation sheet | 规则确认表 | |
+| Reduction plan | 减持计划 | pre-disclosure: 预披露 |
+| Sale by auction | 集中竞价交易 | |
+| Block trade | 大宗交易 | |
+| Transfer by agreement | 协议转让 | |
+| Stage (of an action) | 阶段 | |
+| Overall progress | 总进度 | |
+
 ## Review record
 
 | Date | Reviewer | Rows settled | Notes |

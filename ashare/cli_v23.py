@@ -263,7 +263,7 @@ def register(app, _table) -> None:
         (v2.3.0; v2.4.0 applies the swappable rule pack; experimental)."""
         from .insider import flags
         r = _guard(flags, code or None, confirmed_only)
-        _table(r["rows"][:500], ["code", "deal_date", "direction", "shares", "published", "flags"],
+        _table(r["rows"][:500], ["code", "deal_date", "direction", "shares", "method", "published", "flags"],
                title="Share dealings")
         print(r["note"])
 

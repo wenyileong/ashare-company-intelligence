@@ -14,6 +14,10 @@ depends on who runs the action:
 
 Reports are throttled to four a second; the first and the last are always sent. ``ASHARE_PROGRESS=off``, or the switch
 ``progress.bar`` off, turns all of this off.
+
+v2.4.1: a job's counter is released when the job ends (the bar no longer sticks on a finished job); a total of zero
+is complete, not unknown; other output written to a terminal first clears the bar's line; megabytes and speed for
+downloads; an overall percentage across stages; units and stage names are translated.
 """
 from __future__ import annotations
 
@@ -35,12 +39,21 @@ _tty_drawn = False
 _stage: dict = {}
 _outer = None          # a job's counter (its items), when the work is a job of several actions
 _inner = None          # the counter of the action running now
+_megabytes = [0.0, 0.0]   # megabytes downloaded by the action running now, and when it began (v2.4.1)
+
+
+def add_megabytes(mb: float) -> None:
+    """Count megabytes downloaded by the action running now; reports then show the amount and the speed."""
+    if not _megabytes[0]:
+        _megabytes[1] = _megabytes[1] or time.monotonic()
+    _megabytes[0] += max(0.0, mb or 0.0)
 
 
 def reset() -> None:
     """Forget the stage and the counters (at the start and end of each action)."""
     global _last_sent, _stage, _outer, _inner
     _last_sent, _stage, _outer, _inner = 0.0, {}, None, None
+    _megabytes[0] = _megabytes[1] = 0.0
 
 
 def set_sink(fn) -> None:
@@ -77,8 +90,10 @@ def mode() -> str:
 
 
 def stage(n: int | None, of: int | None, label: str | None) -> None:
-    """Set the stage reported with every later report (``None`` clears it)."""
-    global _stage
+    """Set the stage reported with every later report (``None`` clears it). A new stage starts with no counter:
+    the counters of the stage before are released (v2.4.1)."""
+    global _stage, _outer, _inner
+    _outer = _inner = None
     _stage = {} if n is None else {"stage": n, "stages": of, "stage_label": label}
     report(None, None, None, force=True, stage_only=True)
 
@@ -103,6 +118,11 @@ def report(done: int | None, total: int | None, unit: str | None, left: float | 
         d["stage_only"] = True
     if sub:
         d["sub"] = sub
+    if _megabytes[0]:
+        d["mb"] = round(_megabytes[0], 1)
+        el = now - _megabytes[1]
+        if el > 0:
+            d["mb_per_s"] = round(_megabytes[0] / el, 2)
     if m == "sink":
         try:
             _sink(d)
@@ -122,22 +142,45 @@ def end() -> None:
     reset()
     if _tty_drawn:
         try:
-            sys.stdout.write("\n")
-            sys.stdout.flush()
+            _real().write("\n")
+            _real().flush()
         except (OSError, ValueError):
             pass
         _tty_drawn = False
+    if isinstance(sys.stdout, _ClearingStream):
+        sys.stdout = sys.stdout._real
 
 
 def clear_line() -> None:
     """Before a human line is printed over a terminal bar."""
     global _tty_drawn
     if _tty_drawn:
-        sys.stdout.write("\r\033[K")
+        _real().write("\r\033[K")
         _tty_drawn = False
 
 
 _atexit = False
+
+
+class _ClearingStream:
+    """Stands in for the terminal's stdout while a bar is drawn (v2.4.1): anything else written first clears the
+    bar's line, so a message never lands on the end of the bar."""
+
+    def __init__(self, real):
+        self._real = real
+
+    def write(self, text):
+        if text:
+            clear_line()
+        return self._real.write(text)
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+
+def _real():
+    out = sys.stdout
+    return out._real if isinstance(out, _ClearingStream) else out
 
 
 def _draw(d: dict) -> None:
@@ -146,8 +189,11 @@ def _draw(d: dict) -> None:
         import atexit
         atexit.register(end)
         _atexit = True
-    sys.stdout.write("\r\033[K" + render(d))
-    sys.stdout.flush()
+    if not isinstance(sys.stdout, _ClearingStream):
+        sys.stdout = _ClearingStream(sys.stdout)
+    out = _real()
+    out.write("\r\033[K" + render(d))
+    out.flush()
     _tty_drawn = True
 
 
@@ -159,19 +205,57 @@ def fraction(d: dict) -> float | None:
         return max(0.0, min(1.0, (d.get("bytes") or 0) / d["bytes_total"]))
     if d.get("total"):
         return max(0.0, min(1.0, (d.get("done") or 0) / d["total"]))
+    if d.get("total") == 0 and not d.get("stage_only"):
+        return 1.0                                       # nothing to do is complete, not unknown (v2.4.1)
     return None
 
 
-def duration(seconds: float | None) -> str:
+def overall(d: dict) -> float | None:
+    """Across the stages, each weighed alike: None without stages or while the stage's total is unknown."""
+    f = fraction(d)
+    if not (d.get("stage") and d.get("stages")) or f is None or d["stages"] < 2:
+        return None
+    return max(0.0, min(1.0, (d["stage"] - 1 + f) / d["stages"]))
+
+
+def _unit(tr, unit: str | None) -> str:
+    """The unit in the reader's language (v2.4.1)."""
+    names = {
+        "documents": tr("progress.unit.documents", "documents"),
+        "companies": tr("progress.unit.companies", "companies"),
+        "days": tr("progress.unit.days", "days"),
+        "tables": tr("progress.unit.tables", "tables"),
+        "entities": tr("progress.unit.entities", "entities"),
+        "items": tr("progress.unit.items", "items"),
+        "files": tr("progress.unit.files", "files"),
+        "pages": tr("progress.unit.pages", "pages"),
+        "announcements": tr("progress.unit.announcements", "announcements"),
+    }
+    return names.get(unit or "", unit or "")
+
+
+def _stage_label(tr, label: str | None) -> str:
+    names = {
+        "announcements and documents": tr("progress.stage.catalogue", "announcements and documents"),
+        "prices": tr("progress.stage.prices", "prices"),
+        "reading documents": tr("progress.stage.reading", "reading documents"),
+    }
+    return names.get(label or "", label or "")
+
+
+def duration(seconds: float | None, tr=None) -> str:
+    tr = tr or (lambda key, default: default)
     if seconds is None:
         return ""
     s = int(round(seconds))
     if s < 60:
-        return f"{s} s"
+        return tr("progress.seconds", "{n} s").format(n=s)
     if s < 3600:
-        return f"{max(1, round(s / 60))} min"
+        return tr("progress.minutes", "{n} min").format(n=max(1, round(s / 60)))
     h, m = divmod(s // 60, 60)
-    return f"{h} h {m:02d} min" if h < 48 else f"{h // 24} days {h % 24} h"
+    if h < 48:
+        return tr("progress.hours", "{h} h {m:02d} min").format(h=h, m=m)
+    return tr("progress.days", "{d} days {h} h").format(d=h // 24, h=h % 24)
 
 
 def _mb(n: int) -> str:
@@ -183,16 +267,18 @@ def text(d: dict, tr=None) -> str:
     tr = tr or (lambda key, default: default)
     parts = []
     if d.get("stage") and d.get("stages"):
-        lab = d.get("stage_label") or ""
+        lab = _stage_label(tr, d.get("stage_label"))
         parts.append(tr("progress.stage", "Stage {n} of {of}").format(n=d["stage"], of=d["stages"])
                      + (f": {lab}" if lab else ""))
     f = fraction(d)
     if f is None:
         if d.get("done"):
             parts.append(tr("progress.counting_n", "{done:,} {unit} so far").format(done=d["done"],
-                                                                                   unit=d.get("unit") or ""))
+                                                                                   unit=_unit(tr, d.get("unit"))))
         else:
             parts.append(tr("progress.counting", "counting…"))
+    elif d.get("total") == 0 and not d.get("bytes_total"):
+        parts.append(tr("progress.nothing", "100%  nothing to do"))
     else:
         pct = f"{int(f * 100)}%"
         if d.get("bytes_total"):
@@ -200,16 +286,22 @@ def text(d: dict, tr=None) -> str:
                                                                      total=_mb(d["bytes_total"]))
         else:
             count = tr("progress.count", "{done:,} of {total:,} {unit}").format(
-                done=d.get("done") or 0, total=d["total"], unit=d.get("unit") or "")
+                done=d.get("done") or 0, total=d["total"], unit=_unit(tr, d.get("unit")))
         if d.get("note"):
             count += f" ({d['note']})"
         parts.append(f"{pct}  {count.strip()}")
         if d.get("left") is not None and f < 1:
-            parts.append(tr("progress.left", "about {time} left").format(time=duration(d["left"])))
+            parts.append(tr("progress.left", "about {time} left").format(time=duration(d["left"], tr)))
     sub = d.get("sub")
     if sub and sub.get("total"):
         parts.append(tr("progress.within", "within it {done:,} of {total:,} {unit}").format(
-            done=sub.get("done") or 0, total=sub["total"], unit=sub.get("unit") or ""))
+            done=sub.get("done") or 0, total=sub["total"], unit=_unit(tr, sub.get("unit"))))
+    if d.get("mb"):
+        parts.append(tr("progress.mb", "{mb:,.1f} MB at {rate:.1f} MB/s").format(mb=d["mb"],
+                                                                                 rate=d.get("mb_per_s") or 0.0))
+    o = overall(d)
+    if o is not None:
+        parts.append(tr("progress.overall", "{pct}% overall").format(pct=int(o * 100)))
     return "; ".join(parts)
 
 
@@ -293,6 +385,14 @@ class Counter:
             self.total, self._grown = self.done, True
         last = self.total is not None and self.done >= self.total
         self._emit(last)
+
+    def close(self) -> None:
+        """Release this counter (v2.4.1): a finished job no longer holds the bar."""
+        global _outer, _inner
+        if _outer is self:
+            _outer = None
+        if _inner is self:
+            _inner = None
 
     def bytes(self, done: int, total: int | None) -> None:
         report(self.done, self.total, self.unit, None, bytes_done=done, bytes_total=total)

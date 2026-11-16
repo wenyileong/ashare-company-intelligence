@@ -8,7 +8,7 @@ This guide covers the desktop application and the command line. The [methods doc
 
 ### Windows installer
 
-Run `AShareScraper-2.4.0-setup.exe`. It installs for the current user (no administrator rights are needed) into `%LOCALAPPDATA%\Programs\AShareScraper` and adds Start-menu entries for the application, the command line, this guide and the uninstaller. Two options are offered:
+Run `AShareScraper-2.4.1-setup.exe`. It installs for the current user (no administrator rights are needed) into `%LOCALAPPDATA%\Programs\AShareScraper` and adds Start-menu entries for the application, the command line, this guide and the uninstaller. Two options are offered:
 
 - a desktop shortcut;
 - adding the program folder to your PATH, so that `ashare-cli` runs from any command prompt.
@@ -486,6 +486,18 @@ A pack applies from the next action. Turning off the switch `rules.overrides` (C
 
 Both use the dealings published by the row's date, and are blank while the 'insider' switch is off.
 
+**Added in v2.4.1.**
+- **Compare and confirm.** `rules-diff insider` (Check > Rules > Compare a pack with the shipped one) lists each field an edited pack changes. `rules-sheet` (Write a confirmation sheet) writes a sheet of every rule with its figure, its source, how it was checked so far, and blanks for your findings.
+- **Which sales the plan rule covers.** The pack now names the methods: sales by auction and block trades. The reader takes the method from the dealing's row, or from the page when the page names only one. A transfer by agreement is not judged under this rule. Run **Read share dealings** again to fill in the methods of dealings read before v2.4.1.
+- **Notices that are not plans.** An announcement that a reduction plan has finished, progressed, expired or been dropped no longer counts as a plan.
+- **Earlier versions of the rules.** Each rule gives the date from which it has had its present form (`in_this_form_from`, 24 May 2024 in the shipped pack). A flag on an earlier dealing is kept, and says "an earlier version of the rule applied, which may differ". Earlier versions set longer windows, so treat such flags with particular care.
+- **Supervisors.** The Rules stopped covering supervisors on 27 March 2025 (`supervisors_until`). A dealing by a person who is only a supervisor on or after that date is not judged, and the note counts such dealings.
+- **Quarterly deadline.** The pack now gives the exchanges' listing rules as its source, not the CSRC Measures, which name only annual and half-year reports. The article is still to be confirmed.
+
+### Rehearsal (v2.4.1)
+
+`python packaging/rehearsal.py` runs the steps of a live run offline, on a small data folder made from the synthetic corpus: diagnostics, the rule packs, timeliness, share-dealing flags, a panel, five views, the outputs register, moving the data folder, and using a folder restored elsewhere. It checks that each step ends cleanly and that every document is still found after each move. It fetches nothing and does not replace a live run. `--cli` points it at the packaged `ashare-cli.exe`.
+
 ### Progress (v2.4)
 
 Long actions show a bar in the status line that fills from left to right, with:
@@ -501,6 +513,13 @@ Long actions show a bar in the status line that fills from left to right, with:
 - **The command line.** In a terminal, the same bar is drawn on one line. Written to a file, the output is unchanged.
 - **Other programs.** A program that runs the command line can set `ASHARE_PROGRESS=machine` and read lines that start with `@@ashare-progress`.
 - **Turning it off.** `ASHARE_PROGRESS=off`, or the switch `progress.bar`, turns all of this off.
+
+**Changed in v2.4.1.**
+- The bar and its figures have their own row under the Output heading.
+- Document downloads also show megabytes so far and the speed.
+- The daily update shows an overall percentage across its stages, each weighed alike.
+- Units, stage names and durations appear in Chinese when the program does.
+- Three defects are fixed: the bar stuck at 100% after the daily update's first stage; messages printed on the terminal bar's line; and an action with nothing to do said "counting…" for ever.
 
 ### GLEIF parents on the ego map (v2.4)
 
