@@ -246,4 +246,4 @@ No migration was needed: no table changed. No extractor version changed; the dea
 
 **Dependencies.** `pip-audit` on the 34 pinned libraries of the Windows build: no known vulnerabilities.
 
-**Windows.** Built under Wine; the installer installs silently and the installed program reports 2.4.1. GitHub's Windows runner builds, tests and rehearses the release commit.
+**Windows.** Built under Wine; the installer installs silently and the installed program reports 2.4.1. GitHub's Windows runner built, tested and rehearsed the release commit: 533 passed and 16 skipped, and the rehearsal against the packaged program ran 33 steps with none failed.
