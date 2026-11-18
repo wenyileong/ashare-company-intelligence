@@ -1,6 +1,6 @@
 # China A-share Company Intelligence v2.4.1
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23982987.svg)](https://doi.org/10.5281/zenodo.23982987)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23982986.svg)](https://doi.org/10.5281/zenodo.23982986)
 
 A provenance-preserving research data system for SSE Main Board, STAR Market, SZSE Main Board and ChiNext companies. The architecture is set out in `ashare_scraper_build_plan.md`. Changes by version, and the findings behind them, are in `CHANGELOG.md`. The live-run findings are in:
 - `docs/live_run_findings_v2.0.2.md`;
@@ -850,9 +850,9 @@ A-share Company Intelligence is research software, provided as is and without wa
 
 ## Citing the software
 
-Each release is archived on Zenodo: <https://doi.org/10.5281/zenodo.23982987>. Cite the version you used, for example:
+Each release is archived on Zenodo. The DOI 10.5281/zenodo.23982986 covers all versions and always resolves to the latest one; each version also has a DOI of its own, listed on its Zenodo record. Cite the version you used, giving its own DOI where you have it, for example:
 
-Wen Yi Leong, *A-share Company Intelligence* (version 2.4.1, software, 2026) <https://doi.org/10.5281/zenodo.23982987>.
+Wen Yi Leong, *A-share Company Intelligence* (version 2.4.1, software, 2026) <https://doi.org/10.5281/zenodo.23982986>.
 
 GitHub's "Cite this repository" gives the same details from `CITATION.cff`. A dataset built with the software is cited by its release name and database fingerprint, from the release's own `CITATION.cff`. The Zenodo record is a copy for citation; the licence below governs the software wherever it is obtained.
 
